@@ -1,870 +1,1087 @@
-
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cipher — AES-256-GCM × XChaCha20-Poly1305</title>
-<style>
-  *,
-  *::before,
-  *::after {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cipher — AES-256-GCM × XChaCha20-Poly1305</title>
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  :root {
-    --bg: #fafafa;
-    --surface: #ffffff;
-    --text: #0a0a0a;
-    --text-secondary: #525252;
-    --text-tertiary: #a3a3a3;
-    --border: #e5e5e5;
-    --border-strong: #d4d4d4;
-    --accent: #0a0a0a;
-    --accent-hover: #262626;
-    --error: #dc2626;
-    --error-bg: rgba(220, 38, 38, 0.06);
-    --success: #16a34a;
-    --success-bg: rgba(22, 163, 74, 0.06);
-    --radius: 8px;
-    --mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
-  }
+        :root {
+            --bg: #fafafa;
+            --surface: #ffffff;
+            --surface-elevated: #f5f5f5;
+            --text: #0a0a0a;
+            --text-secondary: #525252;
+            --text-tertiary: #a3a3a3;
+            --border: #e5e5e5;
+            --border-strong: #d4d4d4;
+            --accent: #0a0a0a;
+            --accent-hover: #262626;
+            --accent-text: #fafafa;
+            --error: #dc2626;
+            --error-bg: rgba(220, 38, 38, 0.06);
+            --success: #16a34a;
+            --success-bg: rgba(22, 163, 74, 0.06);
+            --info-bg: rgba(10, 10, 10, 0.04);
+            --radius: 8px;
+            --radius-sm: 5px;
+            --mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Menlo', 'Monaco', monospace;
+            --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'Inter', sans-serif;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+            --transition-fast: 0.12s ease;
+            --transition-normal: 0.18s ease;
+        }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0a0a0a;
-      --surface: #141414;
-      --text: #fafafa;
-      --text-secondary: #a3a3a3;
-      --text-tertiary: #525252;
-      --border: #262626;
-      --border-strong: #404040;
-      --accent: #fafafa;
-      --accent-hover: #e5e5e5;
-      --error: #f87171;
-      --error-bg: rgba(248, 113, 113, 0.08);
-      --success: #4ade80;
-      --success-bg: rgba(74, 222, 128, 0.08);
-    }
-  }
+        [data-theme="dark"] {
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --surface-elevated: #1a1a1a;
+            --text: #fafafa;
+            --text-secondary: #a3a3a3;
+            --text-tertiary: #525252;
+            --border: #262626;
+            --border-strong: #404040;
+            --accent: #fafafa;
+            --accent-hover: #e5e5e5;
+            --accent-text: #0a0a0a;
+            --error: #f87171;
+            --error-bg: rgba(248, 113, 113, 0.08);
+            --success: #4ade80;
+            --success-bg: rgba(74, 222, 128, 0.08);
+            --info-bg: rgba(250, 250, 250, 0.04);
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
 
-  html,
-  body {
-    min-height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: 14px;
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+        html,
+        body {
+            min-height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            font-size: 14px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            transition: background var(--transition-normal), color var(--transition-normal);
+        }
 
-  .container {
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 64px 28px 96px;
-  }
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 64px 28px 96px;
+            transition: max-width var(--transition-normal);
+        }
 
-  .header {
-    margin-bottom: 44px;
-  }
-  .brand {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-  .header h1 {
-    font-size: 26px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    margin-bottom: 6px;
-  }
-  .header .subtitle {
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    font-family: var(--mono);
-  }
+        .header {
+            margin-bottom: 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .header-left {
+            min-width: 0;
+        }
+        .brand {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            transition: color var(--transition-normal);
+        }
+        .header h1 {
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 6px;
+            transition: color var(--transition-normal);
+        }
+        .header .subtitle {
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            font-family: var(--mono);
+            transition: color var(--transition-normal);
+        }
 
-  .status {
-    font-size: 12px;
-    padding: 10px 14px;
-    border-radius: var(--radius);
-    margin-bottom: 20px;
-    font-family: var(--mono);
-    display: none;
-    border: 1px solid transparent;
-    word-break: break-all;
-  }
-  .status.show {
-    display: block;
-  }
-  .status.error {
-    background: var(--error-bg);
-    color: var(--error);
-    border-color: var(--error);
-  }
-  .status.success {
-    background: var(--success-bg);
-    color: var(--success);
-    border-color: var(--success);
-  }
-  .status.info {
-    background: var(--surface);
-    color: var(--text-secondary);
-    border-color: var(--border);
-  }
+        .theme-toggle {
+            flex-shrink: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 7px 14px;
+            font-size: 11px;
+            font-family: var(--sans);
+            color: var(--text-secondary);
+            cursor: pointer;
+            letter-spacing: 0.03em;
+            transition: all var(--transition-fast);
+            white-space: nowrap;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .theme-toggle:hover {
+            border-color: var(--border-strong);
+            color: var(--text);
+            background: var(--surface-elevated);
+        }
+        .theme-toggle:active {
+            transform: scale(0.97);
+        }
 
-  .field {
-    margin-bottom: 22px;
-  }
-  .label {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
-  .label .hint {
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: 0;
-    color: var(--text-tertiary);
-    font-family: var(--mono);
-    font-size: 11px;
-  }
+        .status {
+            font-size: 12px;
+            padding: 10px 14px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            font-family: var(--mono);
+            display: none;
+            border: 1px solid transparent;
+            word-break: break-all;
+            transition: all var(--transition-fast);
+        }
+        .status.show {
+            display: block;
+        }
+        .status.error {
+            background: var(--error-bg);
+            color: var(--error);
+            border-color: var(--error);
+        }
+        .status.success {
+            background: var(--success-bg);
+            color: var(--success);
+            border-color: var(--success);
+        }
+        .status.info {
+            background: var(--info-bg);
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
 
-  input,
-  textarea,
-  select {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 14px;
-    font-size: 14px;
-    font-family: inherit;
-    color: var(--text);
-    transition: border-color 0.15s, background 0.15s;
-    outline: none;
-  }
-  textarea {
-    font-family: var(--mono);
-    min-height: 130px;
-    resize: vertical;
-    line-height: 1.6;
-    font-size: 13px;
-  }
-  input:focus,
-  textarea:focus,
-  select:focus {
-    border-color: var(--text-secondary);
-  }
-  input::placeholder,
-  textarea::placeholder {
-    color: var(--text-tertiary);
-  }
+        .main-content {
+            display: block;
+        }
 
-  .input-row {
-    position: relative;
-  }
-  .toggle-visibility {
-    position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: transparent;
-    border: none;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-family: var(--sans);
-    border-radius: 4px;
-  }
-  .toggle-visibility:hover {
-    color: var(--text);
-  }
+        .field {
+            margin-bottom: 22px;
+        }
+        .label {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            transition: color var(--transition-normal);
+        }
+        .label .hint {
+            font-weight: 400;
+            text-transform: none;
+            letter-spacing: 0;
+            color: var(--text-tertiary);
+            font-family: var(--mono);
+            font-size: 11px;
+            transition: color var(--transition-normal);
+            text-align: right;
+            max-width: 55%;
+            word-break: break-word;
+        }
 
-  .actions {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 22px;
-  }
-  button.btn {
-    flex: 1;
-    padding: 12px 16px;
-    border-radius: var(--radius);
-    font-size: 13px;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.15s;
-    border: 1px solid var(--border);
-    letter-spacing: 0.01em;
-  }
-  button.btn.primary {
-    background: var(--accent);
-    color: var(--bg);
-    border-color: var(--accent);
-  }
-  button.btn.primary:hover:not(:disabled) {
-    background: var(--accent-hover);
-    border-color: var(--accent-hover);
-  }
-  button.btn.secondary {
-    background: var(--surface);
-    color: var(--text);
-  }
-  button.btn.secondary:hover:not(:disabled) {
-    border-color: var(--border-strong);
-  }
-  button.btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
+        input,
+        textarea,
+        select {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text);
+            transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+            outline: none;
+            box-shadow: var(--shadow-sm);
+        }
+        textarea {
+            font-family: var(--mono);
+            min-height: 130px;
+            resize: vertical;
+            line-height: 1.6;
+            font-size: 13px;
+        }
+        input:focus,
+        textarea:focus,
+        select:focus {
+            border-color: var(--text-secondary);
+            box-shadow: var(--shadow-md);
+        }
+        input::placeholder,
+        textarea::placeholder {
+            color: var(--text-tertiary);
+            opacity: 0.7;
+        }
+        select {
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23a3a3a3'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 36px;
+        }
 
-  .result-area {
-    position: relative;
-  }
-  .copy-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 4px 10px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-family: var(--sans);
-  }
-  .copy-btn:hover {
-    color: var(--text);
-    border-color: var(--border-strong);
-  }
+        .input-row {
+            position: relative;
+        }
+        .toggle-visibility {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-family: var(--sans);
+            border-radius: 4px;
+            transition: color var(--transition-fast);
+            -webkit-tap-highlight-color: transparent;
+            z-index: 2;
+        }
+        .toggle-visibility:hover {
+            color: var(--text);
+        }
 
-  .meta {
-    margin-top: 36px;
-    padding-top: 24px;
-    border-top: 1px solid var(--border);
-    font-size: 11px;
-    color: var(--text-tertiary);
-    font-family: var(--mono);
-    line-height: 1.9;
-  }
-  .meta div {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-  }
-  .meta strong {
-    color: var(--text-secondary);
-    font-weight: 500;
-  }
-  .meta span {
-    text-align: right;
-  }
+        .actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 22px;
+        }
+        button.btn {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            border: 1px solid var(--border);
+            letter-spacing: 0.01em;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        button.btn.primary {
+            background: var(--accent);
+            color: var(--accent-text);
+            border-color: var(--accent);
+        }
+        button.btn.primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        button.btn.secondary {
+            background: var(--surface);
+            color: var(--text);
+        }
+        button.btn.secondary:hover:not(:disabled) {
+            border-color: var(--border-strong);
+            background: var(--surface-elevated);
+        }
+        button.btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        button.btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
 
-  kbd {
-    font-family: var(--mono);
-    font-size: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 1px 5px;
-    color: var(--text-secondary);
-  }
+        .result-area {
+            position: relative;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: var(--sans);
+            transition: all var(--transition-fast);
+            z-index: 2;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .copy-btn:hover {
+            color: var(--text);
+            border-color: var(--border-strong);
+            background: var(--surface-elevated);
+        }
+        .copy-btn.copied {
+            color: var(--success);
+            border-color: var(--success);
+            background: var(--success-bg);
+        }
 
-  @media (max-width: 540px) {
-    .container {
-      padding: 40px 18px 60px;
-    }
-    .header h1 {
-      font-size: 22px;
-    }
-    .meta div {
-      flex-direction: column;
-      gap: 2px;
-    }
-    .meta span {
-      text-align: left;
-    }
-  }
-</style>
+        .stats-panel {
+            display: none;
+            margin-top: 10px;
+            padding: 12px 14px;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-secondary);
+            transition: all var(--transition-normal);
+        }
+        .stats-panel.show {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 18px;
+        }
+        .stats-panel .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .stats-panel .stat-label {
+            color: var(--text-tertiary);
+            font-size: 10px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .stats-panel .stat-value {
+            color: var(--text);
+            font-weight: 500;
+            transition: color var(--transition-normal);
+        }
+        .stats-panel .stat-sep {
+            color: var(--border-strong);
+            margin: 0 2px;
+            user-select: none;
+        }
+
+        .meta {
+            margin-top: 36px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-tertiary);
+            font-family: var(--mono);
+            line-height: 1.9;
+            transition: border-color var(--transition-normal), color var(--transition-normal);
+        }
+        .meta div {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .meta strong {
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: color var(--transition-normal);
+        }
+        .meta span {
+            text-align: right;
+        }
+
+        kbd {
+            font-family: var(--mono);
+            font-size: 10px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 1px 5px;
+            color: var(--text-secondary);
+            transition: all var(--transition-normal);
+        }
+
+        @media (min-width: 820px) {
+            .container {
+                max-width: 960px;
+                padding: 56px 36px 88px;
+            }
+            .main-content {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 32px;
+                align-items: start;
+            }
+            .main-content .col-left,
+            .main-content .col-right {
+                min-width: 0;
+            }
+            .actions {
+                margin-bottom: 0;
+            }
+            .col-right .field:first-child {
+                margin-top: 0;
+            }
+            .header h1 {
+                font-size: 28px;
+            }
+            textarea {
+                min-height: 140px;
+            }
+            .meta div {
+                gap: 24px;
+            }
+        }
+
+        @media (min-width: 1100px) {
+            .container {
+                max-width: 1040px;
+                padding: 60px 40px 92px;
+            }
+            .main-content {
+                gap: 40px;
+            }
+            textarea {
+                min-height: 150px;
+            }
+        }
+
+        @media (max-width: 540px) {
+            .container {
+                padding: 40px 16px 56px;
+            }
+            .header h1 {
+                font-size: 21px;
+            }
+            .header .subtitle {
+                font-size: 11px;
+            }
+            .meta div {
+                flex-direction: column;
+                gap: 2px;
+            }
+            .meta span {
+                text-align: left;
+            }
+            .stats-panel.show {
+                gap: 4px 10px;
+            }
+            .stats-panel .stat-item {
+                font-size: 10px;
+            }
+            .theme-toggle {
+                padding: 5px 10px;
+                font-size: 10px;
+            }
+            .label .hint {
+                max-width: 50%;
+                font-size: 10px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .container {
+                padding: 28px 10px 44px;
+            }
+            .header h1 {
+                font-size: 19px;
+            }
+            .actions {
+                gap: 6px;
+            }
+            button.btn {
+                padding: 10px 12px;
+                font-size: 12px;
+            }
+            .stats-panel .stat-item {
+                font-size: 9px;
+                gap: 3px;
+            }
+            .stats-panel .stat-sep {
+                display: none;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <header class="header">
-      <div class="brand">CIPHER</div>
-      <h1>对称加密 / 解密</h1>
-      <div class="subtitle">AES-256-GCM × XChaCha20-Poly1305 · PBKDF2-SHA512</div>
-    </header>
+    <div class="container">
+        <header class="header">
+            <div class="header-left">
+                <div class="brand">CIPHER</div>
+                <h1>对称加密 / 解密</h1>
+                <div class="subtitle">AES-256-GCM × XChaCha20-Poly1305 · PBKDF2-SHA512</div>
+            </div>
+            <button class="theme-toggle" id="themeToggle" type="button" title="切换深色/浅色模式">
+                🌙 深色模式
+            </button>
+        </header>
 
-    <div id="status" class="status"></div>
+        <div id="status" class="status"></div>
 
-    <div class="field">
-      <div class="label">
-        <span>密钥</span>
-        <span class="hint">PBKDF2 → 96B → 拆分为三把子密钥</span>
-      </div>
-      <div class="input-row">
-        <input type="password" id="key" placeholder="输入任意密钥（口令）" autocomplete="off" spellcheck="false">
-        <button class="toggle-visibility" id="toggleVis" type="button">显示</button>
-      </div>
+        <div class="main-content">
+            <div class="col-left">
+                <div class="field">
+                    <div class="label">
+                        <span>密钥</span>
+                        <span class="hint">PBKDF2 → 96B → 拆分为三把子密钥</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="password" id="key" placeholder="输入任意密钥（口令）" autocomplete="off" spellcheck="false">
+                        <button class="toggle-visibility" id="toggleVis" type="button">显示</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <div class="label">
+                        <span>输入</span>
+                        <span class="hint" id="inputHint">明文 / 密文</span>
+                    </div>
+                    <textarea id="input" placeholder="加密：粘贴明文&#10;解密：粘贴密文（须与下方输出格式一致）" spellcheck="false"></textarea>
+                </div>
+
+                <div class="actions">
+                    <button class="btn primary" id="encryptBtn" type="button">加密 <kbd>⌘/Ctrl+↵</kbd></button>
+                    <button class="btn secondary" id="decryptBtn" type="button">解密 <kbd>⌘/Ctrl+⇧+↵</kbd></button>
+                </div>
+            </div>
+
+            <div class="col-right">
+                <div class="field">
+                    <div class="label">
+                        <span>输出格式</span>
+                        <span class="hint" id="formatHint">解密时须与加密输出格式一致</span>
+                    </div>
+                    <select id="format">
+                        <option value="base64">Base64</option>
+                        <option value="base64url">Base64URL</option>
+                        <option value="hex_upper">Hexadecimal (UPPER)</option>
+                        <option value="hex_lower">Hexadecimal (lower)</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <div class="label">
+                        <span>结果</span>
+                        <span class="hint" id="resultHint">就绪</span>
+                    </div>
+                    <div class="result-area">
+                        <textarea id="output" placeholder="结果将显示在此..." spellcheck="false" readonly></textarea>
+                        <button class="copy-btn" id="copyBtn" type="button">复制</button>
+                    </div>
+                    <div class="stats-panel" id="statsPanel"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="meta">
+            <div><strong>KDF</strong><span>PBKDF2-HMAC-SHA512 · 600,000 轮</span></div>
+            <div><strong>Salt</strong><span>256-bit · 每次加密随机生成</span></div>
+            <div><strong>密钥确认</strong><span>HMAC-SHA256 · 128-bit 确认码</span></div>
+            <div><strong>Layer 1</strong><span>AES-256-GCM · 96-bit IV</span></div>
+            <div><strong>Layer 2</strong><span>XChaCha20-Poly1305 (IETF) · 192-bit nonce</span></div>
+            <div><strong>Layout</strong><span>salt[32] ‖ aes_iv[12] ‖ xnonce[24] ‖ key_check[16] ‖ ct</span></div>
+            <div><strong>Auth</strong><span>双层 128-bit Poly1305 / GCM tag + HMAC 密钥确认</span></div>
+        </div>
     </div>
 
-    <div class="field">
-      <div class="label">
-        <span>输入</span>
-        <span class="hint" id="inputHint">明文 / 密文</span>
-      </div>
-      <textarea id="input" placeholder="加密：粘贴明文&#10;解密：粘贴密文（须与下方输出格式一致）" spellcheck="false"></textarea>
-    </div>
+    <script>
+        (function() {
+            'use strict';
 
-    <div class="actions">
-      <button class="btn primary" id="encryptBtn" type="button">加密 <kbd>⌘/Ctrl+↵</kbd></button>
-      <button class="btn secondary" id="decryptBtn" type="button">解密 <kbd>⌘/Ctrl+⇧+↵</kbd></button>
-    </div>
+            const SIGMA = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
 
-    <div class="field">
-      <div class="label">
-        <span>输出格式</span>
-        <span class="hint">解密时须与加密输出格式一致</span>
-      </div>
-      <select id="format">
-        <option value="base64">Base64</option>
-        <option value="base64url">Base64URL</option>
-        <option value="hex_upper">Hexadecimal (UPPER)</option>
-        <option value="hex_lower">Hexadecimal (lower)</option>
-      </select>
-    </div>
+            function rotl32(x, n) { return ((x << n) | (x >>> (32 - n))) >>> 0; }
+            function readUint32LE(arr, pos) { return (arr[pos]) | (arr[pos+1]<<8) | (arr[pos+2]<<16) | (arr[pos+3]<<24); }
+            function writeUint32LE(val, out, pos) {
+                out[pos] = val & 0xff; out[pos+1] = (val>>>8) & 0xff; out[pos+2] = (val>>>16) & 0xff; out[pos+3] = (val>>>24) & 0xff;
+            }
+            function QR(s, a, b, c, d) {
+                s[a] = (s[a] + s[b]) >>> 0; s[d] = rotl32(s[d] ^ s[a], 16);
+                s[c] = (s[c] + s[d]) >>> 0; s[b] = rotl32(s[b] ^ s[c], 12);
+                s[a] = (s[a] + s[b]) >>> 0; s[d] = rotl32(s[d] ^ s[a], 8);
+                s[c] = (s[c] + s[d]) >>> 0; s[b] = rotl32(s[b] ^ s[c], 7);
+            }
 
-    <div class="field">
-      <div class="label">
-        <span>结果</span>
-        <span class="hint" id="resultHint"></span>
-      </div>
-      <div class="result-area">
-        <textarea id="output" placeholder="结果将显示在此..." spellcheck="false" readonly></textarea>
-        <button class="copy-btn" id="copyBtn" type="button">复制</button>
-      </div>
-    </div>
+            function hchacha20(key, nonce) {
+                const s = new Uint32Array(16);
+                s[0]=SIGMA[0]; s[1]=SIGMA[1]; s[2]=SIGMA[2]; s[3]=SIGMA[3];
+                for (let i=0;i<8;i++) s[4+i] = readUint32LE(key, i*4);
+                for (let i=0;i<4;i++) s[12+i] = readUint32LE(nonce, i*4);
+                for (let i=0;i<10;i++) { QR(s,0,4,8,12); QR(s,1,5,9,13); QR(s,2,6,10,14); QR(s,3,7,11,15); QR(s,0,5,10,15); QR(s,1,6,11,12); QR(s,2,7,8,13); QR(s,3,4,9,14); }
+                const out = new Uint8Array(32);
+                writeUint32LE(s[0],out,0); writeUint32LE(s[1],out,4); writeUint32LE(s[2],out,8); writeUint32LE(s[3],out,12);
+                writeUint32LE(s[12],out,16); writeUint32LE(s[13],out,20); writeUint32LE(s[14],out,24); writeUint32LE(s[15],out,28);
+                return out;
+            }
 
-    <div class="meta">
-      <div><strong>KDF</strong><span>PBKDF2-HMAC-SHA512 · 600,000 轮</span></div>
-      <div><strong>Salt</strong><span>256-bit · 每次加密随机生成</span></div>
-      <div><strong>密钥确认</strong><span>HMAC-SHA256 · 128-bit 确认码</span></div>
-      <div><strong>Layer 1</strong><span>AES-256-GCM · 96-bit IV</span></div>
-      <div><strong>Layer 2</strong><span>XChaCha20-Poly1305 (IETF) · 192-bit nonce</span></div>
-      <div><strong>Layout</strong><span>salt[32] ‖ aes_iv[12] ‖ xnonce[24] ‖ key_check[16] ‖ ct</span></div>
-      <div><strong>Auth</strong><span>双层 128-bit Poly1305 / GCM tag + HMAC 密钥确认</span></div>
-    </div>
-  </div>
+            function chacha20Block(key, counter, nonce) {
+                const s = new Uint32Array(16);
+                s[0]=SIGMA[0]; s[1]=SIGMA[1]; s[2]=SIGMA[2]; s[3]=SIGMA[3];
+                for (let i=0;i<8;i++) s[4+i] = readUint32LE(key, i*4);
+                s[12] = counter;
+                for (let i=0;i<3;i++) s[13+i] = readUint32LE(nonce, i*4);
+                const w = new Uint32Array(16);
+                for (let i=0;i<16;i++) w[i] = s[i];
+                for (let i=0;i<10;i++) { QR(w,0,4,8,12); QR(w,1,5,9,13); QR(w,2,6,10,14); QR(w,3,7,11,15); QR(w,0,5,10,15); QR(w,1,6,11,12); QR(w,2,7,8,13); QR(w,3,4,9,14); }
+                const out = new Uint8Array(64);
+                for (let i=0;i<16;i++) writeUint32LE((w[i]+s[i])>>>0, out, i*4);
+                return out;
+            }
 
-  <script>
-    (function() {
-      'use strict';
+            function poly1305(msg, key) {
+                let r=0n, s=0n;
+                for (let i=15;i>=0;i--) r = (r<<8n) | BigInt(key[i]);
+                for (let i=31;i>=16;i--) s = (s<<8n) | BigInt(key[i]);
+                r &= 0x0ffffffc0ffffffc0ffffffc0fffffffn;
+                const p = (1n<<130n)-5n;
+                let h=0n;
+                for (let i=0;i<msg.length;i+=16) {
+                    let n=0n;
+                    const len = Math.min(16, msg.length-i);
+                    for (let j=0;j<len;j++) n |= BigInt(msg[i+j]) << (8n*BigInt(j));
+                    n += (1n<<(8n*BigInt(len)));
+                    h = ((h+n)*r) % p;
+                }
+                h = (h+s) & ((1n<<128n)-1n);
+                const tag = new Uint8Array(16);
+                for (let i=0;i<16;i++) { tag[i]=Number(h&0xffn); h>>=8n; }
+                return tag;
+            }
 
-      // ==========================================
-      // 纯 JS 加密原语实现 (零依赖 · XChaCha20-Poly1305)
-      // ==========================================
-      const SIGMA = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
+            function chacha20Poly1305Encrypt(key, nonce, plaintext, aad) {
+                const block0 = chacha20Block(key,0,nonce);
+                const polyKey = block0.subarray(0,32);
+                const ciphertext = new Uint8Array(plaintext.length);
+                let counter=1, pos=0;
+                while (pos<plaintext.length) {
+                    const block = chacha20Block(key,counter,nonce);
+                    const len = Math.min(64, plaintext.length-pos);
+                    for (let i=0;i<len;i++) ciphertext[pos+i] = plaintext[pos+i] ^ block[i];
+                    pos+=len; counter++;
+                }
+                const pad1 = aad.length%16===0 ? 0 : 16-(aad.length%16);
+                const pad2 = ciphertext.length%16===0 ? 0 : 16-(ciphertext.length%16);
+                const macData = new Uint8Array(aad.length+pad1+ciphertext.length+pad2+16);
+                let offset=0;
+                macData.set(aad,offset); offset+=aad.length;
+                for (let i=0;i<pad1;i++) macData[offset++]=0;
+                macData.set(ciphertext,offset); offset+=ciphertext.length;
+                for (let i=0;i<pad2;i++) macData[offset++]=0;
+                const view = new DataView(macData.buffer,offset);
+                view.setUint32(0,aad.length,true); view.setUint32(4,0,true);
+                view.setUint32(8,ciphertext.length,true); view.setUint32(12,0,true);
+                offset+=16;
+                const tag = poly1305(macData.subarray(0,offset), polyKey);
+                const out = new Uint8Array(ciphertext.length+16);
+                out.set(ciphertext,0); out.set(tag,ciphertext.length);
+                return out;
+            }
 
-      function rotl32(x, n) {
-        return ((x << n) | (x >>> (32 - n))) >>> 0;
-      }
+            function chacha20Poly1305Decrypt(key, nonce, ciphertext, aad) {
+                if (ciphertext.length<16) throw new Error('认证失败：密钥错误或数据损坏');
+                const tag = ciphertext.subarray(ciphertext.length-16);
+                const ct = ciphertext.subarray(0,ciphertext.length-16);
+                const block0 = chacha20Block(key,0,nonce);
+                const polyKey = block0.subarray(0,32);
+                const pad1 = aad.length%16===0?0:16-(aad.length%16);
+                const pad2 = ct.length%16===0?0:16-(ct.length%16);
+                const macData = new Uint8Array(aad.length+pad1+ct.length+pad2+16);
+                let offset=0;
+                macData.set(aad,offset); offset+=aad.length;
+                for (let i=0;i<pad1;i++) macData[offset++]=0;
+                macData.set(ct,offset); offset+=ct.length;
+                for (let i=0;i<pad2;i++) macData[offset++]=0;
+                const view = new DataView(macData.buffer,offset);
+                view.setUint32(0,aad.length,true); view.setUint32(4,0,true);
+                view.setUint32(8,ct.length,true); view.setUint32(12,0,true);
+                offset+=16;
+                const expectedTag = poly1305(macData.subarray(0,offset), polyKey);
+                let diff=0;
+                for (let i=0;i<16;i++) diff |= tag[i] ^ expectedTag[i];
+                if (diff!==0) throw new Error('认证失败：密钥错误或数据损坏');
+                const plaintext = new Uint8Array(ct.length);
+                let counter=1, pos=0;
+                while (pos<ct.length) {
+                    const block = chacha20Block(key,counter,nonce);
+                    const len = Math.min(64, ct.length-pos);
+                    for (let i=0;i<len;i++) plaintext[pos+i] = ct[pos+i] ^ block[i];
+                    pos+=len; counter++;
+                }
+                return plaintext;
+            }
 
-      function readUint32LE(arr, pos) {
-        return (arr[pos]) | (arr[pos + 1] << 8) | (arr[pos + 2] << 16) | (arr[pos + 3] << 24);
-      }
+            function xchacha20Poly1305Encrypt(key, nonce, plaintext, aad) {
+                const subkey = hchacha20(key, nonce.subarray(0,16));
+                const chachaNonce = new Uint8Array(12);
+                chachaNonce.set(nonce.subarray(16,24),4);
+                return chacha20Poly1305Encrypt(subkey, chachaNonce, plaintext, aad);
+            }
 
-      function writeUint32LE(val, out, pos) {
-        out[pos] = val & 0xff;
-        out[pos + 1] = (val >>> 8) & 0xff;
-        out[pos + 2] = (val >>> 16) & 0xff;
-        out[pos + 3] = (val >>> 24) & 0xff;
-      }
+            function xchacha20Poly1305Decrypt(key, nonce, ciphertext, aad) {
+                const subkey = hchacha20(key, nonce.subarray(0,16));
+                const chachaNonce = new Uint8Array(12);
+                chachaNonce.set(nonce.subarray(16,24),4);
+                return chacha20Poly1305Decrypt(subkey, chachaNonce, ciphertext, aad);
+            }
 
-      function QR(s, a, b, c, d) {
-        s[a] = (s[a] + s[b]) >>> 0;
-        s[d] = rotl32(s[d] ^ s[a], 16);
-        s[c] = (s[c] + s[d]) >>> 0;
-        s[b] = rotl32(s[b] ^ s[c], 12);
-        s[a] = (s[a] + s[b]) >>> 0;
-        s[d] = rotl32(s[d] ^ s[a], 8);
-        s[c] = (s[c] + s[d]) >>> 0;
-        s[b] = rotl32(s[b] ^ s[c], 7);
-      }
+            function constantTimeEqual(a,b) {
+                if (a.length!==b.length) return false;
+                let diff=0;
+                for (let i=0;i<a.length;i++) diff |= a[i]^b[i];
+                return diff===0;
+            }
 
-      function hchacha20(key, nonce) {
-        const s = new Uint32Array(16);
-        s[0] = SIGMA[0];
-        s[1] = SIGMA[1];
-        s[2] = SIGMA[2];
-        s[3] = SIGMA[3];
-        for (let i = 0; i < 8; i++) s[4 + i] = readUint32LE(key, i * 4);
-        for (let i = 0; i < 4; i++) s[12 + i] = readUint32LE(nonce, i * 4);
-        for (let i = 0; i < 10; i++) {
-          QR(s, 0, 4, 8, 12);
-          QR(s, 1, 5, 9, 13);
-          QR(s, 2, 6, 10, 14);
-          QR(s, 3, 7, 11, 15);
-          QR(s, 0, 5, 10, 15);
-          QR(s, 1, 6, 11, 12);
-          QR(s, 2, 7, 8, 13);
-          QR(s, 3, 4, 9, 14);
-        }
-        const out = new Uint8Array(32);
-        writeUint32LE(s[0], out, 0);
-        writeUint32LE(s[1], out, 4);
-        writeUint32LE(s[2], out, 8);
-        writeUint32LE(s[3], out, 12);
-        writeUint32LE(s[12], out, 16);
-        writeUint32LE(s[13], out, 20);
-        writeUint32LE(s[14], out, 24);
-        writeUint32LE(s[15], out, 28);
-        return out;
-      }
+            async function deriveKeys(password, salt) {
+                const enc = new TextEncoder();
+                const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), {name:'PBKDF2'}, false, ['deriveBits']);
+                const km = new Uint8Array(await crypto.subtle.deriveBits({
+                    name:'PBKDF2', salt:salt, iterations:600000, hash:'SHA-512'
+                }, keyMaterial, 96*8));
+                const aesKey = km.slice(0,32);
+                const xKey = km.slice(32,64);
+                const checkKey = km.slice(64,96);
+                return { aesKey, xKey, checkKey };
+            }
 
-      function chacha20Block(key, counter, nonce) {
-        const s = new Uint32Array(16);
-        s[0] = SIGMA[0];
-        s[1] = SIGMA[1];
-        s[2] = SIGMA[2];
-        s[3] = SIGMA[3];
-        for (let i = 0; i < 8; i++) s[4 + i] = readUint32LE(key, i * 4);
-        s[12] = counter;
-        for (let i = 0; i < 3; i++) s[13 + i] = readUint32LE(nonce, i * 4);
-        const w = new Uint32Array(16);
-        for (let i = 0; i < 16; i++) w[i] = s[i];
-        for (let i = 0; i < 10; i++) {
-          QR(w, 0, 4, 8, 12);
-          QR(w, 1, 5, 9, 13);
-          QR(w, 2, 6, 10, 14);
-          QR(w, 3, 7, 11, 15);
-          QR(w, 0, 5, 10, 15);
-          QR(w, 1, 6, 11, 12);
-          QR(w, 2, 7, 8, 13);
-          QR(w, 3, 4, 9, 14);
-        }
-        const out = new Uint8Array(64);
-        for (let i = 0; i < 16; i++) writeUint32LE((w[i] + s[i]) >>> 0, out, i * 4);
-        return out;
-      }
+            async function computeKeyCheck(checkKey, salt) {
+                const hmacKey = await crypto.subtle.importKey('raw', checkKey, {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
+                const domainSep = new TextEncoder().encode('KEYCHECK');
+                const msg = new Uint8Array(domainSep.length+salt.length);
+                msg.set(domainSep,0); msg.set(salt,domainSep.length);
+                const sig = await crypto.subtle.sign('HMAC', hmacKey, msg);
+                return new Uint8Array(sig).slice(0,16);
+            }
 
-      function poly1305(msg, key) {
-        let r = 0n,
-          s = 0n;
-        for (let i = 15; i >= 0; i--) r = (r << 8n) | BigInt(key[i]);
-        for (let i = 31; i >= 16; i--) s = (s << 8n) | BigInt(key[i]);
-        r &= 0x0ffffffc0ffffffc0ffffffc0fffffffn;
-        const p = (1n << 130n) - 5n;
-        let h = 0n;
-        for (let i = 0; i < msg.length; i += 16) {
-          let n = 0n;
-          const len = Math.min(16, msg.length - i);
-          for (let j = 0; j < len; j++) n |= BigInt(msg[i + j]) << (8n * BigInt(j));
-          n += (1n << (8n * BigInt(len)));
-          h = ((h + n) * r) % p;
-        }
-        h = (h + s) & ((1n << 128n) - 1n);
-        const tag = new Uint8Array(16);
-        for (let i = 0; i < 16; i++) {
-          tag[i] = Number(h & 0xffn);
-          h >>= 8n;
-        }
-        return tag;
-      }
+            function detectFormat(str) {
+                const s = str.trim().replace(/\s+/g, '');
+                if (!s) return null;
+                if (/[+/]/.test(s)) return 'base64';
+                if (/[-_]/.test(s)) return 'base64url';
+                if (/=+$/.test(s)) return 'base64';
+                if (/^[0-9a-fA-F]+$/.test(s) && s.length%2===0) {
+                    const hasUpper=/[A-F]/.test(s), hasLower=/[a-f]/.test(s);
+                    if (hasUpper && !hasLower) return 'hex_upper';
+                    if (hasLower && !hasUpper) return 'hex_lower';
+                    if (hasUpper && hasLower) return 'hex_lower';
+                    if (/^\d+$/.test(s) && s.length>=40) return 'hex_lower';
+                    if (/^\d+$/.test(s) && s.length<40) return 'base64';
+                    return 'hex_lower';
+                }
+                if (/[g-zG-Z]/.test(s)) return 'base64';
+                return 'base64';
+            }
 
-      function chacha20Poly1305Encrypt(key, nonce, plaintext, aad) {
-        const block0 = chacha20Block(key, 0, nonce);
-        const polyKey = block0.subarray(0, 32);
-        const ciphertext = new Uint8Array(plaintext.length);
-        let counter = 1,
-          pos = 0;
-        while (pos < plaintext.length) {
-          const block = chacha20Block(key, counter, nonce);
-          const len = Math.min(64, plaintext.length - pos);
-          for (let i = 0; i < len; i++) ciphertext[pos + i] = plaintext[pos + i] ^ block[i];
-          pos += len;
-          counter++;
-        }
-        const pad1 = aad.length % 16 === 0 ? 0 : 16 - (aad.length % 16);
-        const pad2 = ciphertext.length % 16 === 0 ? 0 : 16 - (ciphertext.length % 16);
-        const macData = new Uint8Array(aad.length + pad1 + ciphertext.length + pad2 + 16);
-        let offset = 0;
-        macData.set(aad, offset);
-        offset += aad.length;
-        for (let i = 0; i < pad1; i++) macData[offset++] = 0;
-        macData.set(ciphertext, offset);
-        offset += ciphertext.length;
-        for (let i = 0; i < pad2; i++) macData[offset++] = 0;
-        const view = new DataView(macData.buffer, offset);
-        view.setUint32(0, aad.length, true);
-        view.setUint32(4, 0, true);
-        view.setUint32(8, ciphertext.length, true);
-        view.setUint32(12, 0, true);
-        offset += 16;
-        const tag = poly1305(macData.subarray(0, offset), polyKey);
-        const out = new Uint8Array(ciphertext.length + 16);
-        out.set(ciphertext, 0);
-        out.set(tag, ciphertext.length);
-        return out;
-      }
+            let busy = false;
+            const $ = (id)=>document.getElementById(id);
+            const statusEl=$('status'), keyInput=$('key'), inputArea=$('input');
+            const outputArea=$('output'), formatSelect=$('format');
+            const encryptBtn=$('encryptBtn'), decryptBtn=$('decryptBtn');
+            const copyBtn=$('copyBtn'), toggleVis=$('toggleVis');
+            const resultHint=$('resultHint'), formatHint=$('formatHint');
+            const statsPanel=$('statsPanel'), themeToggle=$('themeToggle');
 
-      function chacha20Poly1305Decrypt(key, nonce, ciphertext, aad) {
-        if (ciphertext.length < 16) throw new Error('认证失败：密钥错误或数据损坏');
-        const tag = ciphertext.subarray(ciphertext.length - 16);
-        const ct = ciphertext.subarray(0, ciphertext.length - 16);
-        const block0 = chacha20Block(key, 0, nonce);
-        const polyKey = block0.subarray(0, 32);
-        const pad1 = aad.length % 16 === 0 ? 0 : 16 - (aad.length % 16);
-        const pad2 = ct.length % 16 === 0 ? 0 : 16 - (ct.length % 16);
-        const macData = new Uint8Array(aad.length + pad1 + ct.length + pad2 + 16);
-        let offset = 0;
-        macData.set(aad, offset);
-        offset += aad.length;
-        for (let i = 0; i < pad1; i++) macData[offset++] = 0;
-        macData.set(ct, offset);
-        offset += ct.length;
-        for (let i = 0; i < pad2; i++) macData[offset++] = 0;
-        const view = new DataView(macData.buffer, offset);
-        view.setUint32(0, aad.length, true);
-        view.setUint32(4, 0, true);
-        view.setUint32(8, ct.length, true);
-        view.setUint32(12, 0, true);
-        offset += 16;
-        const expectedTag = poly1305(macData.subarray(0, offset), polyKey);
-        let diff = 0;
-        for (let i = 0; i < 16; i++) diff |= tag[i] ^ expectedTag[i];
-        if (diff !== 0) throw new Error('认证失败：密钥错误或数据损坏');
-        const plaintext = new Uint8Array(ct.length);
-        let counter = 1,
-          pos = 0;
-        while (pos < ct.length) {
-          const block = chacha20Block(key, counter, nonce);
-          const len = Math.min(64, ct.length - pos);
-          for (let i = 0; i < len; i++) plaintext[pos + i] = ct[pos + i] ^ block[i];
-          pos += len;
-          counter++;
-        }
-        return plaintext;
-      }
+            function setStatus(text, type) {
+                if (!text) { statusEl.className='status'; statusEl.textContent=''; return; }
+                statusEl.className='status show '+type; statusEl.textContent=text;
+            }
+            function clearStatus() { setStatus('',''); }
+            function clearStats() { statsPanel.className='stats-panel'; statsPanel.innerHTML=''; }
 
-      function xchacha20Poly1305Encrypt(key, nonce, plaintext, aad) {
-        const subkey = hchacha20(key, nonce.subarray(0, 16));
-        const chachaNonce = new Uint8Array(12);
-        chachaNonce.set(nonce.subarray(16, 24), 4);
-        return chacha20Poly1305Encrypt(subkey, chachaNonce, plaintext, aad);
-      }
+            function showStats(items) {
+                const html = items.map((item,i)=>{
+                    const sep = i<items.length-1 ? '<span class="stat-sep" aria-hidden="true">·</span>' : '';
+                    return '<span class="stat-item"><span class="stat-label">'+escapeHtml(item.label)+'</span><span class="stat-value">'+escapeHtml(item.value)+'</span></span>'+sep;
+                }).join('');
+                statsPanel.innerHTML=html;
+                statsPanel.className='stats-panel show';
+            }
+            function escapeHtml(str) {
+                const div=document.createElement('div'); div.textContent=str; return div.innerHTML;
+            }
+            function formatBytes(bytes) {
+                if (bytes<1000) return bytes+' B';
+                if (bytes<1000000) return (bytes/1000).toFixed(1)+' KB';
+                return (bytes/1000000).toFixed(2)+' MB';
+            }
+            function formatMs(ms) {
+                if (ms<1) return (ms*1000).toFixed(0)+' µs';
+                if (ms<1000) return ms.toFixed(1)+' ms';
+                return (ms/1000).toFixed(2)+' s';
+            }
+            function formatRatio(ratio) {
+                if (ratio<10) return ratio.toFixed(2)+'×';
+                return ratio.toFixed(1)+'×';
+            }
+            function formatPercent(pct) { return pct.toFixed(1)+'%'; }
 
-      function xchacha20Poly1305Decrypt(key, nonce, ciphertext, aad) {
-        const subkey = hchacha20(key, nonce.subarray(0, 16));
-        const chachaNonce = new Uint8Array(12);
-        chachaNonce.set(nonce.subarray(16, 24), 4);
-        return chacha20Poly1305Decrypt(subkey, chachaNonce, ciphertext, aad);
-      }
+            function encodeBytes(bytes, format) {
+                switch(format) {
+                    case 'base64': return btoa(String.fromCharCode.apply(null, bytes));
+                    case 'base64url': return btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+                    case 'hex_upper': return Array.from(bytes, b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+                    case 'hex_lower': return Array.from(bytes, b=>b.toString(16).padStart(2,'0')).join('');
+                    default: throw new Error('未知输出格式: '+format);
+                }
+            }
+            function decodeBytes(str, format) {
+                const s = str.trim(); if (!s) throw new Error('输入为空');
+                switch(format) {
+                    case 'base64': return Uint8Array.from(atob(s.replace(/\s+/g,'')), c=>c.charCodeAt(0));
+                    case 'base64url': {
+                        const padded = s.replace(/-/g,'+').replace(/_/g,'/');
+                        const pad = padded.length%4 ? '='.repeat(4-padded.length%4) : '';
+                        return Uint8Array.from(atob(padded+pad), c=>c.charCodeAt(0));
+                    }
+                    case 'hex_upper': case 'hex_lower': {
+                        const cleaned = s.replace(/[^0-9a-fA-F]/g,'');
+                        if (cleaned.length%2!==0) throw new Error('Hex 长度必须为偶数');
+                        const out = new Uint8Array(cleaned.length/2);
+                        for (let i=0;i<cleaned.length;i+=2) out[i/2]=parseInt(cleaned.substr(i,2),16);
+                        return out;
+                    }
+                    default: throw new Error('未知输入格式: '+format);
+                }
+            }
 
-      // ==========================================
-      // Constant-time 字节比较
-      // ==========================================
-      function constantTimeEqual(a, b) {
-        if (a.length !== b.length) return false;
-        let diff = 0;
-        for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
-        return diff === 0;
-      }
+            async function encrypt(plaintextStr, password) {
+                const salt = crypto.getRandomValues(new Uint8Array(32));
+                const aesIv = crypto.getRandomValues(new Uint8Array(12));
+                const xnonce = crypto.getRandomValues(new Uint8Array(24));
+                const { aesKey, xKey, checkKey } = await deriveKeys(password, salt);
+                const keyCheck = await computeKeyCheck(checkKey, salt);
+                const aesKeyObj = await crypto.subtle.importKey('raw', aesKey, {name:'AES-GCM'}, false, ['encrypt']);
+                const ptBytes = new TextEncoder().encode(plaintextStr);
+                const aesCt = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv:aesIv}, aesKeyObj, ptBytes));
+                const emptyAad = new Uint8Array(0);
+                const xCt = xchacha20Poly1305Encrypt(xKey, xnonce, aesCt, emptyAad);
+                const out = new Uint8Array(32+12+24+16+xCt.length);
+                out.set(salt,0); out.set(aesIv,32); out.set(xnonce,44); out.set(keyCheck,68); out.set(xCt,84);
+                aesKey.fill(0); xKey.fill(0); checkKey.fill(0);
+                return { cipherBytes: out, plainBytes: ptBytes };
+            }
 
-      // ==========================================
-      // KDF: PBKDF2-HMAC-SHA512 · 600,000 轮 → 96 字节
-      // ==========================================
-      async function deriveKeys(password, salt) {
-        const enc = new TextEncoder();
-        const keyMaterial = await crypto.subtle.importKey(
-          'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits']
-        );
-        const km = new Uint8Array(await crypto.subtle.deriveBits({
-          name: 'PBKDF2',
-          salt: salt,
-          iterations: 600000,
-          hash: 'SHA-512'
-        }, keyMaterial, 96 * 8));
-        const aesKey = km.slice(0, 32);
-        const xKey = km.slice(32, 64);
-        const checkKey = km.slice(64, 96);
-        return { aesKey, xKey, checkKey };
-      }
+            async function decrypt(cipherBytes, password) {
+                const MIN_LEN = 32+12+24+16+32;
+                if (cipherBytes.length < MIN_LEN) throw new Error('认证失败：密钥错误或数据损坏');
+                const salt = cipherBytes.subarray(0,32);
+                const aesIv = cipherBytes.subarray(32,44);
+                const xnonce = cipherBytes.subarray(44,68);
+                const keyCheck = cipherBytes.subarray(68,84);
+                const xCt = cipherBytes.subarray(84);
+                const { aesKey, xKey, checkKey } = await deriveKeys(password, salt);
+                const expectedKeyCheck = await computeKeyCheck(checkKey, salt);
+                if (!constantTimeEqual(keyCheck, expectedKeyCheck)) {
+                    aesKey.fill(0); xKey.fill(0); checkKey.fill(0);
+                    throw new Error('认证失败：密钥错误或数据损坏');
+                }
+                let aesCt;
+                try { aesCt = xchacha20Poly1305Decrypt(xKey, xnonce, xCt, new Uint8Array(0)); }
+                catch(e) { aesKey.fill(0); xKey.fill(0); checkKey.fill(0); throw new Error('认证失败：密钥错误或数据损坏'); }
+                try {
+                    const aesKeyObj = await crypto.subtle.importKey('raw', aesKey, {name:'AES-GCM'}, false, ['decrypt']);
+                    const ptBytes = await crypto.subtle.decrypt({name:'AES-GCM', iv:aesIv}, aesKeyObj, aesCt);
+                    const plaintext = new TextDecoder().decode(new Uint8Array(ptBytes));
+                    aesKey.fill(0); xKey.fill(0); checkKey.fill(0);
+                    return { plaintext, cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength };
+                } catch(e) {
+                    aesKey.fill(0); xKey.fill(0); checkKey.fill(0);
+                    throw new Error('认证失败：密钥错误或数据损坏');
+                }
+            }
 
-      // ==========================================
-      // 密钥确认码: HMAC-SHA256(checkKey, "KEYCHECK" || salt) → 前16字节
-      // ==========================================
-      async function computeKeyCheck(checkKey, salt) {
-        const hmacKey = await crypto.subtle.importKey('raw', checkKey, { name: 'HMAC', hash: 'SHA-256' }, false, [
-          'sign'
-        ]);
-        const domainSep = new TextEncoder().encode('KEYCHECK');
-        const msg = new Uint8Array(domainSep.length + salt.length);
-        msg.set(domainSep, 0);
-        msg.set(salt, domainSep.length);
-        const sig = await crypto.subtle.sign('HMAC', hmacKey, msg);
-        return new Uint8Array(sig).slice(0, 16);
-      }
+            function setBusy(state) { busy=state; encryptBtn.disabled=state; decryptBtn.disabled=state; }
 
-      // ==========================================
-      // UI 逻辑
-      // ==========================================
-      let busy = false;
-      const $ = (id) => document.getElementById(id);
-      const statusEl = $('status'),
-        keyInput = $('key'),
-        inputArea = $('input');
-      const outputArea = $('output'),
-        formatSelect = $('format');
-      const encryptBtn = $('encryptBtn'),
-        decryptBtn = $('decryptBtn');
-      const copyBtn = $('copyBtn'),
-        toggleVis = $('toggleVis'),
-        resultHint = $('resultHint');
+            // 主题管理（仅浅色/深色两种）
+            const THEME_KEY = 'cipher_theme_v2';
+            function getStoredTheme() {
+                try {
+                    const v = localStorage.getItem(THEME_KEY);
+                    if (v === 'dark' || v === 'light') return v;
+                } catch(e) {}
+                return 'light';
+            }
+            function applyTheme(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                themeToggle.innerHTML = theme === 'light' ? '🌙 深色模式' : '☀ 浅色模式';
+                try { localStorage.setItem(THEME_KEY, theme); } catch(e) {}
+            }
+            function toggleTheme() {
+                const current = document.documentElement.getAttribute('data-theme') || 'light';
+                const next = current === 'light' ? 'dark' : 'light';
+                applyTheme(next);
+            }
 
-      const SAVED_FMT_KEY = 'cipher_fmt_v2';
-      try {
-        const savedFmt = localStorage.getItem(SAVED_FMT_KEY);
-        if (savedFmt && formatSelect.querySelector('option[value="' + savedFmt + '"]'))
-          formatSelect.value = savedFmt;
-      } catch (e) {}
-      formatSelect.addEventListener('change', () => {
-        try { localStorage.setItem(SAVED_FMT_KEY, formatSelect.value); } catch (e) {}
-      });
+            applyTheme(getStoredTheme());
+            themeToggle.addEventListener('click', toggleTheme);
 
-      function setStatus(text, type) {
-        if (!text) { statusEl.className = 'status';
-          statusEl.textContent = ''; return; }
-        statusEl.className = 'status show ' + type;
-        statusEl.textContent = text;
-      }
+            const SAVED_FMT_KEY = 'cipher_fmt_v2';
+            try {
+                const savedFmt = localStorage.getItem(SAVED_FMT_KEY);
+                if (savedFmt && formatSelect.querySelector('option[value="'+savedFmt+'"]'))
+                    formatSelect.value = savedFmt;
+            } catch(e) {}
+            formatSelect.addEventListener('change', ()=>{
+                try { localStorage.setItem(SAVED_FMT_KEY, formatSelect.value); } catch(e) {}
+            });
 
-      function clearStatus() { setStatus('', ''); }
+            toggleVis.addEventListener('click', ()=>{
+                if (keyInput.type==='password') { keyInput.type='text'; toggleVis.textContent='隐藏'; }
+                else { keyInput.type='password'; toggleVis.textContent='显示'; }
+            });
 
-      function encodeBytes(bytes, format) {
-        switch (format) {
-          case 'base64':
-            return btoa(String.fromCharCode.apply(null, bytes));
-          case 'base64url':
-            return btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/,
-              '');
-          case 'hex_upper':
-            return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-          case 'hex_lower':
-            return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-          default:
-            throw new Error('未知输出格式: ' + format);
-        }
-      }
+            encryptBtn.addEventListener('click', async ()=>{
+                if (busy) return;
+                clearStatus(); clearStats();
+                const password = keyInput.value, plaintext = inputArea.value;
+                if (!password) { setStatus('请输入密钥','error'); keyInput.focus(); return; }
+                if (!plaintext) { setStatus('请输入需要加密的明文','error'); inputArea.focus(); return; }
+                setBusy(true);
+                setStatus('加密中… (PBKDF2 600k 轮 + 双层加密)','info');
+                resultHint.textContent = '加密中…';
+                await new Promise(r=>setTimeout(r,20));
+                const t0 = performance.now();
+                try {
+                    const { cipherBytes, plainBytes } = await encrypt(plaintext, password);
+                    const t1 = performance.now();
+                    const elapsed = t1-t0;
+                    const fmt = formatSelect.value;
+                    const encoded = encodeBytes(cipherBytes, fmt);
+                    outputArea.value = encoded;
+                    const overheadBytes = cipherBytes.length - plainBytes.length;
+                    const ratio = plainBytes.length>0 ? cipherBytes.length/plainBytes.length : 0;
+                    const overheadPct = plainBytes.length>0 ? (overheadBytes/plainBytes.length)*100 : 0;
 
-      function decodeBytes(str, format) {
-        const s = str.trim();
-        if (!s) throw new Error('输入为空');
-        switch (format) {
-          case 'base64':
-            return Uint8Array.from(atob(s.replace(/\s+/g, '')), c => c.charCodeAt(0));
-          case 'base64url':
-            const padded = s.replace(/-/g, '+').replace(/_/g, '/');
-            const pad = padded.length % 4 ? '='.repeat(4 - padded.length % 4) : '';
-            return Uint8Array.from(atob(padded + pad), c => c.charCodeAt(0));
-          case 'hex_upper':
-          case 'hex_lower':
-            const cleaned = s.replace(/[^0-9a-fA-F]/g, '');
-            if (cleaned.length % 2 !== 0) throw new Error('Hex 长度必须为偶数');
-            const out = new Uint8Array(cleaned.length / 2);
-            for (let i = 0; i < cleaned.length; i += 2) out[i / 2] = parseInt(cleaned.substr(i, 2), 16);
-            return out;
-          default:
-            throw new Error('未知输入格式: ' + format);
-        }
-      }
+                    showStats([
+                        { label:'耗时', value:formatMs(elapsed) },
+                        { label:'明文', value:formatBytes(plainBytes.length)+' · '+plainBytes.length+' 字节' },
+                        { label:'明文字符数', value:plaintext.length+' 字符' },
+                        { label:'密文', value:formatBytes(cipherBytes.length)+' · '+cipherBytes.length+' 字节' },
+                        { label:'编码输出', value:encoded.length+' 字符' },
+                        { label:'膨胀率', value:formatRatio(ratio)+' (+'+formatPercent(overheadPct)+')' },
+                    ]);
 
-      async function encrypt(plaintextStr, password) {
-        const salt = crypto.getRandomValues(new Uint8Array(32));
-        const aesIv = crypto.getRandomValues(new Uint8Array(12));
-        const xnonce = crypto.getRandomValues(new Uint8Array(24));
-        const { aesKey, xKey, checkKey } = await deriveKeys(password, salt);
-        const keyCheck = await computeKeyCheck(checkKey, salt);
+                    setStatus('加密成功 · '+cipherBytes.length+' 字节密文 · '+encoded.length+' 字符（'+fmt+'）','success');
+                    resultHint.textContent = '加密完成 · '+formatBytes(cipherBytes.length);
+                } catch(e) {
+                    setStatus('加密失败：'+(e.message||e),'error');
+                    outputArea.value = '';
+                    clearStats();
+                    resultHint.textContent = '就绪';
+                } finally { setBusy(false); }
+            });
 
-        // Layer 1: AES-256-GCM
-        const aesKeyObj = await crypto.subtle.importKey('raw', aesKey, { name: 'AES-GCM' }, false, ['encrypt']);
-        const ptBytes = new TextEncoder().encode(plaintextStr);
-        const aesCt = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: aesIv }, aesKeyObj, ptBytes));
+            decryptBtn.addEventListener('click', async ()=>{
+                if (busy) return;
+                clearStatus(); clearStats();
+                const password = keyInput.value, cipherStr = inputArea.value;
+                if (!password) { setStatus('请输入密钥','error'); keyInput.focus(); return; }
+                if (!cipherStr) { setStatus('请输入需要解密的密文','error'); inputArea.focus(); return; }
 
-        // Layer 2: XChaCha20-Poly1305 IETF
-        const emptyAad = new Uint8Array(0);
-        const xCt = xchacha20Poly1305Encrypt(xKey, xnonce, aesCt, emptyAad);
+                const detected = detectFormat(cipherStr);
+                let usedFmt = formatSelect.value;
+                if (detected) {
+                    formatSelect.value = detected;
+                    usedFmt = detected;
+                    try { localStorage.setItem(SAVED_FMT_KEY, detected); } catch(e) {}
+                }
 
-        // 拼装: salt[32] ‖ aes_iv[12] ‖ xnonce[24] ‖ key_check[16] ‖ xCt
-        const out = new Uint8Array(32 + 12 + 24 + 16 + xCt.length);
-        out.set(salt, 0);
-        out.set(aesIv, 32);
-        out.set(xnonce, 44);
-        out.set(keyCheck, 68);
-        out.set(xCt, 84);
+                setBusy(true);
+                const detectNote = detected ? ' · 自动识别格式: '+usedFmt : '';
+                setStatus('解密中… (PBKDF2 600k 轮 + 双层解密)'+detectNote,'info');
+                resultHint.textContent = '解密中…'+(detected?' 格式: '+usedFmt:'');
+                await new Promise(r=>setTimeout(r,20));
+                const t0 = performance.now();
+                try {
+                    let cipherBytes;
+                    try { cipherBytes = decodeBytes(cipherStr, usedFmt); }
+                    catch(e) { throw new Error('输入解析失败：'+e.message+'（请确认输出格式选择正确，当前: '+usedFmt+'）'); }
+                    const cipherLen = cipherBytes.length;
+                    const { plaintext, plainLen } = await decrypt(cipherBytes, password);
+                    const t1 = performance.now();
+                    const elapsed = t1-t0;
+                    outputArea.value = plaintext;
+                    const compressionRatio = cipherLen>0 ? plainLen/cipherLen : 0;
 
-        // 清理敏感中间变量
-        aesKey.fill(0);
-        xKey.fill(0);
-        checkKey.fill(0);
+                    showStats([
+                        { label:'耗时', value:formatMs(elapsed) },
+                        { label:'密文输入', value:cipherStr.length+' 字符 · '+formatBytes(cipherLen) },
+                        { label:'明文', value:formatBytes(plainLen)+' · '+plainLen+' 字节' },
+                        { label:'明文字符数', value:plaintext.length+' 字符' },
+                        { label:'压缩比', value:formatRatio(compressionRatio) },
+                    ]);
 
-        return out;
-      }
+                    setStatus('解密成功 · '+plaintext.length+' 字符明文'+detectNote,'success');
+                    resultHint.textContent = '解密完成 · '+formatBytes(plainLen)+' 明文';
+                } catch(e) {
+                    setStatus('解密失败：'+(e.message||e),'error');
+                    outputArea.value = '';
+                    clearStats();
+                    resultHint.textContent = '就绪';
+                } finally { setBusy(false); }
+            });
 
-      async function decrypt(cipherBytes, password) {
-        const MIN_LEN = 32 + 12 + 24 + 16 + 32;
-        if (cipherBytes.length < MIN_LEN)
-          throw new Error('认证失败：密钥错误或数据损坏');
+            inputArea.addEventListener('input', ()=>{
+                const val = inputArea.value;
+                if (!val || busy) return;
+                const detected = detectFormat(val);
+                if (detected && detected !== formatSelect.value) {
+                    formatSelect.value = detected;
+                    try { localStorage.setItem(SAVED_FMT_KEY, detected); } catch(e) {}
+                    formatHint.textContent = '已自动识别 · 解密时无需手动选择';
+                } else if (!detected) {
+                    formatHint.textContent = '解密时须与加密输出格式一致';
+                }
+            });
 
-        const salt = cipherBytes.subarray(0, 32);
-        const aesIv = cipherBytes.subarray(32, 44);
-        const xnonce = cipherBytes.subarray(44, 68);
-        const keyCheck = cipherBytes.subarray(68, 84);
-        const xCt = cipherBytes.subarray(84);
+            formatSelect.addEventListener('change', ()=>{
+                if (!busy) formatHint.textContent = '解密时须与加密输出格式一致';
+                try { localStorage.setItem(SAVED_FMT_KEY, formatSelect.value); } catch(e) {}
+            });
 
-        const { aesKey, xKey, checkKey } = await deriveKeys(password, salt);
-        const expectedKeyCheck = await computeKeyCheck(checkKey, salt);
+            copyBtn.addEventListener('click', async ()=>{
+                if (!outputArea.value) return;
+                try {
+                    await navigator.clipboard.writeText(outputArea.value);
+                    const original = copyBtn.textContent;
+                    copyBtn.textContent = '已复制'; copyBtn.classList.add('copied');
+                    setTimeout(()=>{ copyBtn.textContent=original; copyBtn.classList.remove('copied'); },1400);
+                } catch(e) {
+                    outputArea.removeAttribute('readonly'); outputArea.select();
+                    try { document.execCommand('copy'); } catch(_) {}
+                    outputArea.setAttribute('readonly',''); outputArea.blur();
+                    copyBtn.textContent='已复制'; copyBtn.classList.add('copied');
+                    setTimeout(()=>{ copyBtn.textContent='复制'; copyBtn.classList.remove('copied'); },1400);
+                }
+            });
 
-        // Constant-time 密钥确认
-        if (!constantTimeEqual(keyCheck, expectedKeyCheck)) {
-          aesKey.fill(0);
-          xKey.fill(0);
-          checkKey.fill(0);
-          throw new Error('认证失败：密钥错误或数据损坏');
-        }
+            document.addEventListener('keydown', (e)=>{
+                if ((e.metaKey||e.ctrlKey) && e.key==='Enter') {
+                    e.preventDefault();
+                    if (e.shiftKey) decryptBtn.click();
+                    else encryptBtn.click();
+                }
+            });
 
-        let aesCt = null;
-        try {
-          aesCt = xchacha20Poly1305Decrypt(xKey, xnonce, xCt, new Uint8Array(0));
-        } catch (e) {
-          aesKey.fill(0);
-          xKey.fill(0);
-          checkKey.fill(0);
-          throw new Error('认证失败：密钥错误或数据损坏');
-        }
-
-        try {
-          const aesKeyObj = await crypto.subtle.importKey('raw', aesKey, { name: 'AES-GCM' }, false, ['decrypt']);
-          const ptBytes = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: aesIv }, aesKeyObj, aesCt);
-          const plaintext = new TextDecoder().decode(new Uint8Array(ptBytes));
-          aesKey.fill(0);
-          xKey.fill(0);
-          checkKey.fill(0);
-          return plaintext;
-        } catch (e) {
-          aesKey.fill(0);
-          xKey.fill(0);
-          checkKey.fill(0);
-          throw new Error('认证失败：密钥错误或数据损坏');
-        }
-      }
-
-      function setBusy(state) {
-        busy = state;
-        encryptBtn.disabled = state;
-        decryptBtn.disabled = state;
-      }
-
-      toggleVis.addEventListener('click', () => {
-        if (keyInput.type === 'password') { keyInput.type = 'text';
-          toggleVis.textContent = '隐藏'; } else { keyInput.type = 'password';
-          toggleVis.textContent = '显示'; }
-      });
-
-      encryptBtn.addEventListener('click', async () => {
-        if (busy) return;
-        clearStatus();
-        const password = keyInput.value,
-          plaintext = inputArea.value;
-        if (!password) { setStatus('请输入密钥', 'error');
-          keyInput.focus(); return; }
-        if (!plaintext) { setStatus('请输入需要加密的明文', 'error');
-          inputArea.focus(); return; }
-        setBusy(true);
-        setStatus('加密中… (PBKDF2 600k 轮 + 双层加密)', 'info');
-        await new Promise(r => setTimeout(r, 20));
-        try {
-          const out = await encrypt(plaintext, password);
-          const fmt = formatSelect.value;
-          outputArea.value = encodeBytes(out, fmt);
-          setStatus('加密成功 · ' + out.length + ' 字节密文 · ' + outputArea.value.length + ' 字符（' + fmt + '）',
-            'success');
-        } catch (e) {
-          setStatus('加密失败：' + (e.message || e), 'error');
-          outputArea.value = '';
-        } finally { setBusy(false); }
-      });
-
-      decryptBtn.addEventListener('click', async () => {
-        if (busy) return;
-        clearStatus();
-        const password = keyInput.value,
-          cipherStr = inputArea.value;
-        if (!password) { setStatus('请输入密钥', 'error');
-          keyInput.focus(); return; }
-        if (!cipherStr) { setStatus('请输入需要解密的密文', 'error');
-          inputArea.focus(); return; }
-        setBusy(true);
-        setStatus('解密中… (PBKDF2 600k 轮 + 双层解密)', 'info');
-        await new Promise(r => setTimeout(r, 20));
-        try {
-          const fmt = formatSelect.value;
-          let cipherBytes;
-          try { cipherBytes = decodeBytes(cipherStr, fmt); } catch (e) { throw new Error('输入解析失败：' + e.message +
-              '（请确认输出格式选择正确）'); }
-          const pt = await decrypt(cipherBytes, password);
-          outputArea.value = pt;
-          setStatus('解密成功 · ' + pt.length + ' 字符明文', 'success');
-        } catch (e) {
-          setStatus('解密失败：' + (e.message || e), 'error');
-          outputArea.value = '';
-        } finally { setBusy(false); }
-      });
-
-      copyBtn.addEventListener('click', async () => {
-        if (!outputArea.value) return;
-        try {
-          await navigator.clipboard.writeText(outputArea.value);
-          const original = copyBtn.textContent;
-          copyBtn.textContent = '已复制';
-          setTimeout(() => { copyBtn.textContent = original; }, 1400);
-        } catch (e) {
-          outputArea.removeAttribute('readonly');
-          outputArea.select();
-          try { document.execCommand('copy'); } catch (_) {}
-          outputArea.setAttribute('readonly', '');
-          outputArea.blur();
-          copyBtn.textContent = '已复制';
-          setTimeout(() => { copyBtn.textContent = '复制'; }, 1400);
-        }
-      });
-
-      document.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-          e.preventDefault();
-          if (e.shiftKey) decryptBtn.click();
-          else encryptBtn.click();
-        }
-      });
-
-      resultHint.textContent = '就绪';
-    })();
-  </script>
+            resultHint.textContent = '就绪';
+            clearStats();
+        })();
+    </script>
 </body>
 </html>
