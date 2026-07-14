@@ -573,6 +573,11 @@
                         <option value="base64url">Base64URL</option>
                         <option value="hex_upper">Hexadecimal (UPPER)</option>
                         <option value="hex_lower">Hexadecimal (lower)</option>
+                        <option value="chinese">中文 (CJK 汉字)</option>
+                        <option value="japanese">日文 (仮名)</option>
+                        <option value="korean">韩文 (한글)</option>
+                        <option value="emoji">Emoji 😀</option>
+                        <option value="ascii_extended">扩展ASCII (!-~)</option>
                     </select>
                 </div>
 
@@ -605,6 +610,7 @@
         (function() {
             'use strict';
 
+            // ════════════════════ Chacha20 / Poly1305 原语 ════════════════════
             const SIGMA = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
 
             function rotl32(x, n) { return ((x << n) | (x >>> (32 - n))) >>> 0; }
@@ -748,6 +754,7 @@
                 return diff===0;
             }
 
+            // ════════════════════ KDF & Key Check ════════════════════
             async function deriveKeys(password, salt) {
                 const enc = new TextEncoder();
                 const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), {name:'PBKDF2'}, false, ['deriveBits']);
@@ -769,41 +776,156 @@
                 return new Uint8Array(sig).slice(0,16);
             }
 
+            // ════════════════════ 字符表 (自定义格式) ════════════════════
+            const CHINESE_ALPHABET = Array.from({ length: 4096 }, (_, i) => String.fromCodePoint(0x4E00 + i));
+            const JAPANESE_ALPHABET = (() => {
+                const chars = [];
+                for (let cp = 0x3041; cp <= 0x3094; cp++) chars.push(String.fromCodePoint(cp));
+                for (let cp = 0x30A1; cp <= 0x30FA; cp++) chars.push(String.fromCodePoint(cp));
+                return chars;
+            })();
+            const KOREAN_ALPHABET = Array.from({ length: 4096 }, (_, i) => String.fromCodePoint(0xAC00 + i));
+            const EMOJI_ALPHABET = Array.from({ length: 256 }, (_, i) => String.fromCodePoint(0x1F600 + i));
+            const ASCII_EXTENDED_ALPHABET = Array.from({ length: 94 }, (_, i) => String.fromCodePoint(0x21 + i));
+
+            // ════════════════════ 通用 Base-N 编解码 (修复前导零丢失) ════════════════════
+            function baseNEncode(bytes, alphabet) {
+                // 使用 0x01 前缀避免前导零丢失
+                if (!bytes || bytes.length === 0) {
+                    const header = new Uint8Array([0x01, 0x00, 0x00]);
+                    let value = 0n;
+                    for (let i = 0; i < header.length; i++) {
+                        value = (value << 8n) | BigInt(header[i]);
+                    }
+                    const n = BigInt(alphabet.length);
+                    const digits = [];
+                    if (value === 0n) {
+                        digits.push(0);
+                    } else {
+                        while (value > 0n) { digits.push(Number(value % n)); value /= n; }
+                    }
+                    digits.reverse();
+                    return digits.map(d => alphabet[d]).join('');
+                }
+                const lenHeader = new Uint8Array(2);
+                lenHeader[0] = (bytes.length >> 8) & 0xff;
+                lenHeader[1] = bytes.length & 0xff;
+                const combined = new Uint8Array(3 + bytes.length);
+                combined[0] = 0x01;
+                combined.set(lenHeader, 1);
+                combined.set(bytes, 3);
+                let value = 0n;
+                for (let i = 0; i < combined.length; i++) {
+                    value = (value << 8n) | BigInt(combined[i]);
+                }
+                const n = BigInt(alphabet.length);
+                const digits = [];
+                if (value === 0n) {
+                    digits.push(0);
+                } else {
+                    while (value > 0n) {
+                        digits.push(Number(value % n));
+                        value /= n;
+                    }
+                }
+                digits.reverse();
+                return digits.map(d => alphabet[d]).join('');
+            }
+
+            function baseNDecode(str, alphabet) {
+                const n = BigInt(alphabet.length);
+                const indexMap = new Map();
+                for (let i = 0; i < alphabet.length; i++) {
+                    indexMap.set(alphabet[i], i);
+                }
+                const chars = [...str];
+                if (chars.length === 0) return new Uint8Array(0);
+                let value = 0n;
+                for (const ch of chars) {
+                    const idx = indexMap.get(ch);
+                    if (idx === undefined) throw new Error('输入包含无效字符，无法解码');
+                    value = value * n + BigInt(idx);
+                }
+                let temp = value;
+                const rawBytes = [];
+                while (temp > 0n) {
+                    rawBytes.unshift(Number(temp & 0xffn));
+                    temp >>= 8n;
+                }
+                // 确保至少3字节（前缀+长度）
+                while (rawBytes.length < 3) rawBytes.unshift(0);
+                if (rawBytes[0] !== 0x01) throw new Error('解码数据格式错误');
+                const declaredLen = (rawBytes[1] << 8) | rawBytes[2];
+                const totalExpected = 3 + declaredLen;
+                while (rawBytes.length < totalExpected) rawBytes.unshift(0);
+                if (rawBytes.length < totalExpected) throw new Error('解码数据不完整');
+                const result = rawBytes.slice(3, 3 + declaredLen);
+                return new Uint8Array(result);
+            }
+
+            // ════════════════════ 格式检测 ════════════════════
             function detectFormat(str) {
                 const s = str.trim().replace(/\s+/g, '');
                 if (!s) return null;
+
+                const hasHighCodepoint = [...s].some(c => {
+                    const cp = c.codePointAt(0);
+                    return cp >= 0x1F000 && cp <= 0x1FAFF;
+                });
+                if (hasHighCodepoint && [...s].length >= 2) return 'emoji';
+
+                if (/[\uAC00-\uD7AF]/.test(s) && [...s].filter(c => /[\uAC00-\uD7AF]/.test(c)).length >= [...s].length * 0.5) {
+                    return 'korean';
+                }
+
+                const kanaCount = [...s].filter(c => /[\u3040-\u309F\u30A0-\u30FF]/.test(c)).length;
+                if (kanaCount >= [...s].length * 0.5 && kanaCount >= 2) return 'japanese';
+
+                const hanCount = [...s].filter(c => /[\u4E00-\u9FFF]/.test(c)).length;
+                if (hanCount >= [...s].length * 0.5 && hanCount >= 2) return 'chinese';
+
+                if (/^[\x21-\x7E]+$/.test(s)) {
+                    const isBase64Like = /^[A-Za-z0-9+\/]+=*$/.test(s) || /^[A-Za-z0-9\-_]+=*$/.test(s);
+                    const hasExtendedChars = /[!-\/:-@\[-`{-~]/.test(s) && !/^[A-Za-z0-9+\/\-=_]+$/.test(s);
+                    if (!isBase64Like || hasExtendedChars) {
+                        const uniqueChars = new Set([...s]).size;
+                        if (uniqueChars >= 20 || hasExtendedChars) return 'ascii_extended';
+                    }
+                }
+
                 if (/[+/]/.test(s)) return 'base64';
                 if (/[-_]/.test(s)) return 'base64url';
                 if (/=+$/.test(s)) return 'base64';
-                if (/^[0-9a-fA-F]+$/.test(s) && s.length%2===0) {
-                    const hasUpper=/[A-F]/.test(s), hasLower=/[a-f]/.test(s);
+                if (/^[0-9a-fA-F]+$/.test(s) && s.length % 2 === 0) {
+                    const hasUpper = /[A-F]/.test(s), hasLower = /[a-f]/.test(s);
                     if (hasUpper && !hasLower) return 'hex_upper';
                     if (hasLower && !hasUpper) return 'hex_lower';
                     if (hasUpper && hasLower) return 'hex_lower';
-                    if (/^\d+$/.test(s) && s.length>=40) return 'hex_lower';
-                    if (/^\d+$/.test(s) && s.length<40) return 'base64';
+                    if (/^\d+$/.test(s) && s.length >= 40) return 'hex_lower';
+                    if (/^\d+$/.test(s) && s.length < 40) return 'base64';
                     return 'hex_lower';
                 }
                 if (/[g-zG-Z]/.test(s)) return 'base64';
                 return 'base64';
             }
 
+            // ════════════════════ DOM 元素 ════════════════════
             let busy = false;
-            const $ = (id)=>document.getElementById(id);
-            const statusEl=$('status'), keyInput=$('key'), inputArea=$('input');
-            const outputArea=$('output'), formatSelect=$('format');
-            const encryptBtn=$('encryptBtn'), decryptBtn=$('decryptBtn');
-            const copyBtn=$('copyBtn'), toggleVis=$('toggleVis');
-            const resultHint=$('resultHint'), formatHint=$('formatHint');
-            const statsPanel=$('statsPanel'), themeToggle=$('themeToggle');
+            const $ = (id) => document.getElementById(id);
+            const statusEl = $('status'), keyInput = $('key'), inputArea = $('input');
+            const outputArea = $('output'), formatSelect = $('format');
+            const encryptBtn = $('encryptBtn'), decryptBtn = $('decryptBtn');
+            const copyBtn = $('copyBtn'), toggleVis = $('toggleVis');
+            const resultHint = $('resultHint'), formatHint = $('formatHint');
+            const statsPanel = $('statsPanel'), themeToggle = $('themeToggle');
 
+            // ─── UI 辅助函数 ──────────────────────────────
             function setStatus(text, type) {
                 if (!text) { statusEl.className='status'; statusEl.textContent=''; return; }
                 statusEl.className='status show '+type; statusEl.textContent=text;
             }
             function clearStatus() { setStatus('',''); }
             function clearStats() { statsPanel.className='stats-panel'; statsPanel.innerHTML=''; }
-
             function showStats(items) {
                 const html = items.map((item,i)=>{
                     const sep = i<items.length-1 ? '<span class="stat-sep" aria-hidden="true">·</span>' : '';
@@ -830,16 +952,24 @@
                 return ratio.toFixed(1)+'×';
             }
             function formatPercent(pct) { return pct.toFixed(1)+'%'; }
+            function setBusy(state) { busy=state; encryptBtn.disabled=state; decryptBtn.disabled=state; }
 
+            // ════════════════════ 编解码调度 ════════════════════
             function encodeBytes(bytes, format) {
                 switch(format) {
                     case 'base64': return btoa(String.fromCharCode.apply(null, bytes));
                     case 'base64url': return btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
                     case 'hex_upper': return Array.from(bytes, b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
                     case 'hex_lower': return Array.from(bytes, b=>b.toString(16).padStart(2,'0')).join('');
+                    case 'chinese': return baseNEncode(bytes, CHINESE_ALPHABET);
+                    case 'japanese': return baseNEncode(bytes, JAPANESE_ALPHABET);
+                    case 'korean': return baseNEncode(bytes, KOREAN_ALPHABET);
+                    case 'emoji': return baseNEncode(bytes, EMOJI_ALPHABET);
+                    case 'ascii_extended': return baseNEncode(bytes, ASCII_EXTENDED_ALPHABET);
                     default: throw new Error('未知输出格式: '+format);
                 }
             }
+
             function decodeBytes(str, format) {
                 const s = str.trim(); if (!s) throw new Error('输入为空');
                 switch(format) {
@@ -856,10 +986,16 @@
                         for (let i=0;i<cleaned.length;i+=2) out[i/2]=parseInt(cleaned.substr(i,2),16);
                         return out;
                     }
+                    case 'chinese': return baseNDecode(s, CHINESE_ALPHABET);
+                    case 'japanese': return baseNDecode(s, JAPANESE_ALPHABET);
+                    case 'korean': return baseNDecode(s, KOREAN_ALPHABET);
+                    case 'emoji': return baseNDecode(s, EMOJI_ALPHABET);
+                    case 'ascii_extended': return baseNDecode(s, ASCII_EXTENDED_ALPHABET);
                     default: throw new Error('未知输入格式: '+format);
                 }
             }
 
+            // ════════════════════ 加密 / 解密 核心 ════════════════════
             async function encrypt(plaintextStr, password) {
                 const salt = crypto.getRandomValues(new Uint8Array(32));
                 const aesIv = crypto.getRandomValues(new Uint8Array(12));
@@ -906,15 +1042,10 @@
                 }
             }
 
-            function setBusy(state) { busy=state; encryptBtn.disabled=state; decryptBtn.disabled=state; }
-
-            // 主题管理（仅浅色/深色两种）
+            // ════════════════════ 主题管理 ════════════════════
             const THEME_KEY = 'cipher_theme_v2';
             function getStoredTheme() {
-                try {
-                    const v = localStorage.getItem(THEME_KEY);
-                    if (v === 'dark' || v === 'light') return v;
-                } catch(e) {}
+                try { const v = localStorage.getItem(THEME_KEY); if (v === 'dark' || v === 'light') return v; } catch(e) {}
                 return 'light';
             }
             function applyTheme(theme) {
@@ -927,20 +1058,21 @@
                 const next = current === 'light' ? 'dark' : 'light';
                 applyTheme(next);
             }
-
             applyTheme(getStoredTheme());
             themeToggle.addEventListener('click', toggleTheme);
 
+            // ════════════════════ 格式持久化 (仅保存手动选择) ════════════════════
             const SAVED_FMT_KEY = 'cipher_fmt_v2';
             try {
                 const savedFmt = localStorage.getItem(SAVED_FMT_KEY);
                 if (savedFmt && formatSelect.querySelector('option[value="'+savedFmt+'"]'))
                     formatSelect.value = savedFmt;
             } catch(e) {}
-            formatSelect.addEventListener('change', ()=>{
+            formatSelect.addEventListener('change', () => {
                 try { localStorage.setItem(SAVED_FMT_KEY, formatSelect.value); } catch(e) {}
             });
 
+            // ════════════════════ 事件绑定 ════════════════════
             toggleVis.addEventListener('click', ()=>{
                 if (keyInput.type==='password') { keyInput.type='text'; toggleVis.textContent='隐藏'; }
                 else { keyInput.type='password'; toggleVis.textContent='显示'; }
@@ -967,7 +1099,6 @@
                     const overheadBytes = cipherBytes.length - plainBytes.length;
                     const ratio = plainBytes.length>0 ? cipherBytes.length/plainBytes.length : 0;
                     const overheadPct = plainBytes.length>0 ? (overheadBytes/plainBytes.length)*100 : 0;
-
                     showStats([
                         { label:'耗时', value:formatMs(elapsed) },
                         { label:'明文', value:formatBytes(plainBytes.length)+' · '+plainBytes.length+' 字节' },
@@ -976,7 +1107,6 @@
                         { label:'编码输出', value:encoded.length+' 字符' },
                         { label:'膨胀率', value:formatRatio(ratio)+' (+'+formatPercent(overheadPct)+')' },
                     ]);
-
                     setStatus('加密成功 · '+cipherBytes.length+' 字节密文 · '+encoded.length+' 字符（'+fmt+'）','success');
                     resultHint.textContent = '加密完成 · '+formatBytes(cipherBytes.length);
                 } catch(e) {
@@ -995,15 +1125,17 @@
                 if (!cipherStr) { setStatus('请输入需要解密的密文','error'); inputArea.focus(); return; }
 
                 const detected = detectFormat(cipherStr);
-                let usedFmt = formatSelect.value;
-                if (detected) {
-                    formatSelect.value = detected;
+                const userFmt = formatSelect.value;
+                let usedFmt = userFmt;
+                let detectNote = '';
+                if (detected && detected !== userFmt) {
                     usedFmt = detected;
-                    try { localStorage.setItem(SAVED_FMT_KEY, detected); } catch(e) {}
+                    detectNote = ' · 自动识别格式: ' + detected + ' (解码使用该格式)';
+                } else if (detected) {
+                    detectNote = ' · 格式: ' + detected;
                 }
 
                 setBusy(true);
-                const detectNote = detected ? ' · 自动识别格式: '+usedFmt : '';
                 setStatus('解密中… (PBKDF2 600k 轮 + 双层解密)'+detectNote,'info');
                 resultHint.textContent = '解密中…'+(detected?' 格式: '+usedFmt:'');
                 await new Promise(r=>setTimeout(r,20));
@@ -1011,14 +1143,13 @@
                 try {
                     let cipherBytes;
                     try { cipherBytes = decodeBytes(cipherStr, usedFmt); }
-                    catch(e) { throw new Error('输入解析失败：'+e.message+'（请确认输出格式选择正确，当前: '+usedFmt+'）'); }
+                    catch(e) { throw new Error('输入解析失败：'+e.message+'（当前使用格式: '+usedFmt+'）'); }
                     const cipherLen = cipherBytes.length;
                     const { plaintext, plainLen } = await decrypt(cipherBytes, password);
                     const t1 = performance.now();
                     const elapsed = t1-t0;
                     outputArea.value = plaintext;
                     const compressionRatio = cipherLen>0 ? plainLen/cipherLen : 0;
-
                     showStats([
                         { label:'耗时', value:formatMs(elapsed) },
                         { label:'密文输入', value:cipherStr.length+' 字符 · '+formatBytes(cipherLen) },
@@ -1026,7 +1157,6 @@
                         { label:'明文字符数', value:plaintext.length+' 字符' },
                         { label:'压缩比', value:formatRatio(compressionRatio) },
                     ]);
-
                     setStatus('解密成功 · '+plaintext.length+' 字符明文'+detectNote,'success');
                     resultHint.textContent = '解密完成 · '+formatBytes(plainLen)+' 明文';
                 } catch(e) {
@@ -1041,18 +1171,11 @@
                 const val = inputArea.value;
                 if (!val || busy) return;
                 const detected = detectFormat(val);
-                if (detected && detected !== formatSelect.value) {
-                    formatSelect.value = detected;
-                    try { localStorage.setItem(SAVED_FMT_KEY, detected); } catch(e) {}
-                    formatHint.textContent = '已自动识别 · 解密时无需手动选择';
-                } else if (!detected) {
+                if (detected) {
+                    formatHint.textContent = '已识别格式: ' + detected + ' · 解密时自动使用（下拉框不变）';
+                } else {
                     formatHint.textContent = '解密时须与加密输出格式一致';
                 }
-            });
-
-            formatSelect.addEventListener('change', ()=>{
-                if (!busy) formatHint.textContent = '解密时须与加密输出格式一致';
-                try { localStorage.setItem(SAVED_FMT_KEY, formatSelect.value); } catch(e) {}
             });
 
             copyBtn.addEventListener('click', async ()=>{
