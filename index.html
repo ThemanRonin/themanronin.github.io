@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval' https://unpkg.com; style-src 'unsafe-inline'; img-src data:; connect-src https://unpkg.com; base-uri 'none'; form-action 'none'">
+    <meta name="referrer" content="no-referrer">
     <title>Cipher — AES-256-GCM × XChaCha20-Poly1305</title>
+    <!-- Argon2id KDF 库（WASM 由 unpkg 同源目录自动加载）；加载失败时仅 Argon2id 不可用，PBKDF2 不受影响 -->
+    <script src="https://unpkg.com/argon2-browser@1.18.0/dist/argon2-bundled.min.js"
+            integrity="sha384-XOR3aNvHciLPIf6r+2glkrmbBbLmIJ1EChMXjw8eBKBf8gE0rDq1TyUNuRdorOqi"
+            crossorigin="anonymous"></script>
     <style>
         *,
         *::before,
@@ -14,6 +20,7 @@
         }
 
         :root {
+            color-scheme: light;
             --bg: #fafafa;
             --surface: #ffffff;
             --surface-elevated: #f5f5f5;
@@ -41,6 +48,7 @@
         }
 
         [data-theme="dark"] {
+            color-scheme: dark;
             --bg: #0a0a0a;
             --surface: #141414;
             --surface-elevated: #1a1a1a;
@@ -269,6 +277,52 @@
             color: var(--text);
         }
 
+        .kdf-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            padding: 11px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: var(--text);
+            cursor: pointer;
+            user-select: none;
+            box-shadow: var(--shadow-sm);
+            transition: border-color var(--transition-fast), background var(--transition-fast);
+        }
+        .kdf-option:hover {
+            border-color: var(--border-strong);
+            background: var(--surface-elevated);
+        }
+        .kdf-option input[type="checkbox"] {
+            width: auto;
+            flex-shrink: 0;
+            margin: 2px 0 0;
+            padding: 0;
+            border: none;
+            box-shadow: none;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .kdf-option .kdf-note {
+            display: block;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            font-family: var(--mono);
+            margin-top: 2px;
+            transition: color var(--transition-normal);
+        }
+        .kdf-option.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .kdf-option.disabled input[type="checkbox"] {
+            cursor: not-allowed;
+        }
+
         .actions {
             display: flex;
             gap: 8px;
@@ -311,6 +365,9 @@
         }
         button.btn:active:not(:disabled) {
             transform: scale(0.98);
+        }
+        button.btn.fixed {
+            flex: 0 0 auto;
         }
 
         .result-area {
@@ -526,7 +583,7 @@
             <div class="header-left">
                 <div class="brand">CIPHER</div>
                 <h1>对称加密 / 解密</h1>
-                <div class="subtitle">AES-256-GCM × XChaCha20-Poly1305 · PBKDF2-SHA512</div>
+                <div class="subtitle">AES-256-GCM × XChaCha20-Poly1305 · PBKDF2 / Argon2id</div>
             </div>
             <button class="theme-toggle" id="themeToggle" type="button" title="切换深色/浅色模式">
                 🌙 深色模式
@@ -540,12 +597,25 @@
                 <div class="field">
                     <div class="label">
                         <span>密钥</span>
-                        <span class="hint">PBKDF2 → 96B → 拆分为三把子密钥</span>
+                        <span class="hint">KDF → 96B → 拆分为三把子密钥</span>
                     </div>
                     <div class="input-row">
                         <input type="password" id="key" placeholder="输入任意密钥（口令）" autocomplete="off" spellcheck="false">
                         <button class="toggle-visibility" id="toggleVis" type="button">显示</button>
                     </div>
+                </div>
+
+                <div class="field">
+                    <div class="label">
+                        <span>密钥派生函数 (KDF)</span>
+                        <span class="hint" id="kdfHint">PBKDF2-SHA512 · 600,000 轮</span>
+                    </div>
+                    <label class="kdf-option" id="kdfOption">
+                        <input type="checkbox" id="kdfArgon2">
+                        <span>使用 Argon2id 派生密钥
+                            <span class="kdf-note">t=3 · m=64MB · p=4 · 抗 GPU/ASIC 暴力破解，计算需数秒；不勾选则使用 PBKDF2</span>
+                        </span>
+                    </label>
                 </div>
 
                 <div class="field">
@@ -559,6 +629,7 @@
                 <div class="actions">
                     <button class="btn primary" id="encryptBtn" type="button">加密 <kbd>⌘/Ctrl+↵</kbd></button>
                     <button class="btn secondary" id="decryptBtn" type="button">解密 <kbd>⌘/Ctrl+⇧+↵</kbd></button>
+                    <button class="btn secondary fixed" id="clearBtn" type="button" title="清空密钥、输入与输出">清空</button>
                 </div>
             </div>
 
@@ -596,19 +667,41 @@
         </div>
 
         <div class="meta">
-            <div><strong>KDF</strong><span>PBKDF2-HMAC-SHA512 · 600,000 轮</span></div>
+            <div><strong>Format</strong><span>"CIPH" 魔数 + 版本字节 · v2=PBKDF2 / v3=Argon2id（兼容 v1）</span></div>
+            <div><strong>KDF</strong><span>PBKDF2-SHA512 · 600,000 轮 或 Argon2id · t=3 / m=64MB / p=4（可选）</span></div>
             <div><strong>Salt</strong><span>256-bit · 每次加密随机生成</span></div>
             <div><strong>密钥确认</strong><span>HMAC-SHA256 · 128-bit 确认码</span></div>
             <div><strong>Layer 1</strong><span>AES-256-GCM · 96-bit IV</span></div>
             <div><strong>Layer 2</strong><span>XChaCha20-Poly1305 (IETF) · 192-bit nonce</span></div>
-            <div><strong>Layout</strong><span>salt[32] ‖ aes_iv[12] ‖ xnonce[24] ‖ key_check[16] ‖ ct</span></div>
-            <div><strong>Auth</strong><span>双层 128-bit Poly1305 / GCM tag + HMAC 密钥确认</span></div>
+            <div><strong>Layout</strong><span>magic[4] ‖ ver[1] ‖ salt[32] ‖ aes_iv[12] ‖ xnonce[24] ‖ key_check[16] ‖ ct</span></div>
+            <div><strong>Auth</strong><span>双层 128-bit Poly1305 / GCM tag + HMAC 密钥确认 + 头部 AAD 绑定</span></div>
         </div>
     </div>
 
     <script>
         (function() {
             'use strict';
+
+            // ════════════════════ 格式版本与限制 ════════════════════
+            // v2 布局: "CIPH"[4] ‖ ver[1] ‖ salt[32] ‖ aes_iv[12] ‖ xnonce[24] ‖ key_check[16] ‖ ct
+            // v1 布局(旧版, 仅供解密兼容): salt[32] ‖ aes_iv[12] ‖ xnonce[24] ‖ key_check[16] ‖ ct
+            const MAGIC = new Uint8Array([0x43, 0x49, 0x50, 0x48]); // "CIPH"
+            const VERSION_PBKDF2 = 0x02;   // v2: PBKDF2-SHA512
+            const VERSION_ARGON2ID = 0x03; // v3: Argon2id（布局与 v2 相同，仅 KDF 不同）
+            // Argon2id 默认参数: t=3 轮, m=64 MiB, p=4 并行度（mem 单位 KiB）
+            const ARGON2_TIME = 3, ARGON2_MEM = 65536, ARGON2_PARALLELISM = 4;
+            const KDF_INFO = {
+                pbkdf2:   { name: 'PBKDF2-SHA512', desc: '600,000 轮' },
+                argon2id: { name: 'Argon2id',      desc: 't=3 · m=64MB · p=4' }
+            };
+            const SALT_LEN = 32, AES_IV_LEN = 12, XNONCE_LEN = 24, KEY_CHECK_LEN = 16;
+            const HEADER_LEN = 4 + 1 + SALT_LEN + AES_IV_LEN + XNONCE_LEN + KEY_CHECK_LEN; // v2 头 89B
+            const LEGACY_HEADER_LEN = SALT_LEN + AES_IV_LEN + XNONCE_LEN + KEY_CHECK_LEN;  // v1 头 84B
+            const AE_OVERHEAD = 32; // GCM tag[16] + Poly1305 tag[16]
+            // 自定义 Base-N 编码长度头为 4 字节，硬上限 4 GiB；另设 64 MiB 实用上限防止内存压力
+            const BASN_MAX_BYTES = 64 * 1024 * 1024;
+            // 注意：JS（BigInt/Number + JIT）无法保证常数时间，手写原语不抗时序侧信道。
+            // 本地离线工具场景下风险可接受；高威胁模型请改用经审计的实现（如 libsodium）。
 
             // ════════════════════ Chacha20 / Poly1305 原语 ════════════════════
             const SIGMA = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
@@ -755,16 +848,39 @@
             }
 
             // ════════════════════ KDF & Key Check ════════════════════
-            async function deriveKeys(password, salt) {
-                const enc = new TextEncoder();
-                const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), {name:'PBKDF2'}, false, ['deriveBits']);
-                const km = new Uint8Array(await crypto.subtle.deriveBits({
-                    name:'PBKDF2', salt:salt, iterations:600000, hash:'SHA-512'
-                }, keyMaterial, 96*8));
-                const aesKey = km.slice(0,32);
-                const xKey = km.slice(32,64);
-                const checkKey = km.slice(64,96);
-                return { aesKey, xKey, checkKey };
+            function argon2Available() {
+                return typeof argon2 !== 'undefined' && argon2 && typeof argon2.hash === 'function';
+            }
+
+            async function deriveKeys(password, salt, kdf) {
+                let km;
+                if (kdf === 'argon2id') {
+                    // Argon2id (t=3, m=64MiB, p=4) → 96 字节，与 PBKDF2 路径相同的三分密钥结构
+                    if (!argon2Available()) {
+                        throw new Error('Argon2 库未加载（需联网加载 argon2-browser），请刷新页面或改用 PBKDF2');
+                    }
+                    const res = await argon2.hash({
+                        pass: password, salt: salt,
+                        time: ARGON2_TIME, mem: ARGON2_MEM, parallelism: ARGON2_PARALLELISM,
+                        hashLen: 96, type: argon2.ArgonType.Argon2id
+                    });
+                    km = res.hash;
+                } else {
+                    const enc = new TextEncoder();
+                    const pwBytes = enc.encode(password);
+                    const keyMaterial = await crypto.subtle.importKey('raw', pwBytes, {name:'PBKDF2'}, false, ['deriveBits']);
+                    pwBytes.fill(0); // 口令的字节拷贝及时擦除（JS 字符串本身无法清零，属语言限制）
+                    km = new Uint8Array(await crypto.subtle.deriveBits({
+                        name:'PBKDF2', salt:salt, iterations:600000, hash:'SHA-512'
+                    }, keyMaterial, 96*8));
+                }
+                // 三把子密钥以视图共享 km，用毕可一次性整体擦除，杜绝残留副本
+                return {
+                    aesKey: km.subarray(0, 32),
+                    xKey: km.subarray(32, 64),
+                    checkKey: km.subarray(64, 96),
+                    zero() { km.fill(0); }
+                };
             }
 
             async function computeKeyCheck(checkKey, salt) {
@@ -788,79 +904,127 @@
             const EMOJI_ALPHABET = Array.from({ length: 256 }, (_, i) => String.fromCodePoint(0x1F600 + i));
             const ASCII_EXTENDED_ALPHABET = Array.from({ length: 94 }, (_, i) => String.fromCodePoint(0x21 + i));
 
-            // ════════════════════ 通用 Base-N 编解码 (修复前导零丢失) ════════════════════
+            // ════════════════════ 通用 Base-N 编解码 (分块算法 v2) ════════════════════
+            // v2 编码: 0x02 ‖ len32[4](大端) ‖ payload ‖ 零填充至块对齐，逐块定宽编码。
+            //   旧版 v1 采用整体大数转换，O(n²) 且 2 字节长度头存在 64 KiB 静默溢出；
+            //   分块算法为 O(n)，长度头 4 字节，旧版密文仍可解码（见 baseNDecodeLegacy）。
+            // 每块: K 字节 → D 个字符（定宽，前导用 alphabet[0] 补齐），真实长度由头部声明，
+            //   因此零填充与前导零均可无歧义还原。
+            const codecCache = new Map();    // alphabet -> {K, D}
+            const indexMapCache = new Map(); // alphabet -> Map<char, index>
+
+            function blockParams(alphabet) {
+                let p = codecCache.get(alphabet);
+                if (p) return p;
+                const A = alphabet.length;
+                let bestK = 1, bestD = 1, bestEff = -1;
+                for (let K = 1; K <= 24; K++) {
+                    const D = Math.ceil(K * 8 / Math.log2(A) - 1e-9);
+                    if (BigInt(A) ** BigInt(D) < (1n << (8n * BigInt(K)))) continue; // 必须装得下 K 字节
+                    const eff = (K * 8) / (D * Math.log2(A));
+                    if (eff > bestEff) { bestEff = eff; bestK = K; bestD = D; }
+                }
+                p = { K: bestK, D: bestD };
+                codecCache.set(alphabet, p);
+                return p;
+            }
+            function getIndexMap(alphabet) {
+                let m = indexMapCache.get(alphabet);
+                if (!m) {
+                    m = new Map();
+                    for (let i = 0; i < alphabet.length; i++) m.set(alphabet[i], i);
+                    indexMapCache.set(alphabet, m);
+                }
+                return m;
+            }
+
             function baseNEncode(bytes, alphabet) {
-                // 使用 0x01 前缀避免前导零丢失
-                if (!bytes || bytes.length === 0) {
-                    const header = new Uint8Array([0x01, 0x00, 0x00]);
-                    let value = 0n;
-                    for (let i = 0; i < header.length; i++) {
-                        value = (value << 8n) | BigInt(header[i]);
-                    }
-                    const n = BigInt(alphabet.length);
-                    const digits = [];
-                    if (value === 0n) {
-                        digits.push(0);
-                    } else {
-                        while (value > 0n) { digits.push(Number(value % n)); value /= n; }
-                    }
-                    digits.reverse();
-                    return digits.map(d => alphabet[d]).join('');
+                if (!bytes) bytes = new Uint8Array(0);
+                if (bytes.length > BASN_MAX_BYTES) {
+                    throw new Error('输入过大：该编码格式上限 64 MiB，大文件请改用 Base64 / Hex');
                 }
-                const lenHeader = new Uint8Array(2);
-                lenHeader[0] = (bytes.length >> 8) & 0xff;
-                lenHeader[1] = bytes.length & 0xff;
-                const combined = new Uint8Array(3 + bytes.length);
-                combined[0] = 0x01;
-                combined.set(lenHeader, 1);
-                combined.set(bytes, 3);
-                let value = 0n;
-                for (let i = 0; i < combined.length; i++) {
-                    value = (value << 8n) | BigInt(combined[i]);
-                }
-                const n = BigInt(alphabet.length);
-                const digits = [];
-                if (value === 0n) {
-                    digits.push(0);
-                } else {
-                    while (value > 0n) {
-                        digits.push(Number(value % n));
-                        value /= n;
+                const { K, D } = blockParams(alphabet);
+                const A = BigInt(alphabet.length);
+                const data = new Uint8Array(5 + bytes.length);
+                data[0] = 0x02; // v2 头
+                data[1] = (bytes.length >>> 24) & 0xff;
+                data[2] = (bytes.length >>> 16) & 0xff;
+                data[3] = (bytes.length >>> 8) & 0xff;
+                data[4] = bytes.length & 0xff;
+                data.set(bytes, 5);
+                const padLen = (K - (data.length % K)) % K;
+                const totalBlocks = (data.length + padLen) / K;
+                const out = new Array(totalBlocks * D);
+                let o = 0;
+                for (let blk = 0; blk < totalBlocks; blk++) {
+                    let v = 0n;
+                    const base = blk * K;
+                    for (let i = 0; i < K; i++) {
+                        const idx = base + i;
+                        v = (v << 8n) | BigInt(idx < data.length ? data[idx] : 0);
                     }
+                    for (let d = D - 1; d >= 0; d--) {
+                        out[o + d] = alphabet[Number(v % A)];
+                        v /= A;
+                    }
+                    o += D;
                 }
-                digits.reverse();
-                return digits.map(d => alphabet[d]).join('');
+                return out.join('');
             }
 
             function baseNDecode(str, alphabet) {
-                const n = BigInt(alphabet.length);
-                const indexMap = new Map();
-                for (let i = 0; i < alphabet.length; i++) {
-                    indexMap.set(alphabet[i], i);
-                }
                 const chars = [...str];
                 if (chars.length === 0) return new Uint8Array(0);
+                let v2err;
+                try { return baseNDecodeV2(chars, alphabet); } catch (e) { v2err = e; }
+                try { return baseNDecodeLegacy(chars, alphabet); } catch (e) { /* 落入统一报错 */ }
+                throw v2err;
+            }
+
+            function baseNDecodeV2(chars, alphabet) {
+                const { K, D } = blockParams(alphabet);
+                if (chars.length % D !== 0) throw new Error('编码长度无效（非整块）');
+                const indexMap = getIndexMap(alphabet);
+                const A = BigInt(alphabet.length);
+                const kLimit = 1n << (8n * BigInt(K));
+                const raw = new Uint8Array((chars.length / D) * K);
+                let w = 0;
+                for (let c = 0; c < chars.length; c += D) {
+                    let v = 0n;
+                    for (let d = 0; d < D; d++) {
+                        const idx = indexMap.get(chars[c + d]);
+                        if (idx === undefined) throw new Error('输入包含无效字符，无法解码');
+                        v = v * A + BigInt(idx);
+                    }
+                    if (v >= kLimit) throw new Error('编码块数值越界');
+                    for (let i = K - 1; i >= 0; i--) { raw[w + i] = Number(v & 0xffn); v >>= 8n; }
+                    w += K;
+                }
+                if (raw.length < 5) throw new Error('解码数据格式错误');
+                if (raw[0] !== 0x02) throw new Error('解码数据格式错误：未知编码版本');
+                const declaredLen = ((raw[1] * 256 + raw[2]) * 256 + raw[3]) * 256 + raw[4];
+                if (declaredLen > raw.length - 5) throw new Error('解码数据不完整：长度校验失败（密文可能被截断）');
+                return raw.slice(5, 5 + declaredLen);
+            }
+
+            // v1 旧版: 0x01 ‖ len16[2] ‖ payload，整体大数解码（仅供兼容旧密文）
+            function baseNDecodeLegacy(chars, alphabet) {
+                const n = BigInt(alphabet.length);
+                const indexMap = getIndexMap(alphabet);
                 let value = 0n;
                 for (const ch of chars) {
                     const idx = indexMap.get(ch);
                     if (idx === undefined) throw new Error('输入包含无效字符，无法解码');
                     value = value * n + BigInt(idx);
                 }
-                let temp = value;
                 const rawBytes = [];
-                while (temp > 0n) {
-                    rawBytes.unshift(Number(temp & 0xffn));
-                    temp >>= 8n;
-                }
-                // 确保至少3字节（前缀+长度）
+                let temp = value;
+                while (temp > 0n) { rawBytes.unshift(Number(temp & 0xffn)); temp >>= 8n; }
                 while (rawBytes.length < 3) rawBytes.unshift(0);
                 if (rawBytes[0] !== 0x01) throw new Error('解码数据格式错误');
                 const declaredLen = (rawBytes[1] << 8) | rawBytes[2];
-                const totalExpected = 3 + declaredLen;
-                while (rawBytes.length < totalExpected) rawBytes.unshift(0);
-                if (rawBytes.length < totalExpected) throw new Error('解码数据不完整');
-                const result = rawBytes.slice(3, 3 + declaredLen);
-                return new Uint8Array(result);
+                if (rawBytes.length < 3 + declaredLen) throw new Error('解码数据不完整');
+                return new Uint8Array(rawBytes.slice(3, 3 + declaredLen));
             }
 
             // ════════════════════ 格式检测 ════════════════════
@@ -915,7 +1079,8 @@
             const statusEl = $('status'), keyInput = $('key'), inputArea = $('input');
             const outputArea = $('output'), formatSelect = $('format');
             const encryptBtn = $('encryptBtn'), decryptBtn = $('decryptBtn');
-            const copyBtn = $('copyBtn'), toggleVis = $('toggleVis');
+            const copyBtn = $('copyBtn'), toggleVis = $('toggleVis'), clearBtn = $('clearBtn');
+            const kdfArgon2 = $('kdfArgon2'), kdfHint = $('kdfHint'), kdfOption = $('kdfOption');
             const resultHint = $('resultHint'), formatHint = $('formatHint');
             const statsPanel = $('statsPanel'), themeToggle = $('themeToggle');
 
@@ -955,10 +1120,18 @@
             function setBusy(state) { busy=state; encryptBtn.disabled=state; decryptBtn.disabled=state; }
 
             // ════════════════════ 编解码调度 ════════════════════
+            // 分块转换，避免 String.fromCharCode.apply 在大输入下触发栈溢出
+            function bytesToBinary(bytes) {
+                const CHUNK = 0x8000, parts = [];
+                for (let i = 0; i < bytes.length; i += CHUNK) {
+                    parts.push(String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK)));
+                }
+                return parts.join('');
+            }
             function encodeBytes(bytes, format) {
                 switch(format) {
-                    case 'base64': return btoa(String.fromCharCode.apply(null, bytes));
-                    case 'base64url': return btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+                    case 'base64': return btoa(bytesToBinary(bytes));
+                    case 'base64url': return btoa(bytesToBinary(bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
                     case 'hex_upper': return Array.from(bytes, b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
                     case 'hex_lower': return Array.from(bytes, b=>b.toString(16).padStart(2,'0')).join('');
                     case 'chinese': return baseNEncode(bytes, CHINESE_ALPHABET);
@@ -971,7 +1144,7 @@
             }
 
             function decodeBytes(str, format) {
-                const s = str.trim(); if (!s) throw new Error('输入为空');
+                const s = str.replace(/\s+/g,''); if (!s) throw new Error('输入为空'); // 容忍换行与空白
                 switch(format) {
                     case 'base64': return Uint8Array.from(atob(s.replace(/\s+/g,'')), c=>c.charCodeAt(0));
                     case 'base64url': {
@@ -996,49 +1169,95 @@
             }
 
             // ════════════════════ 加密 / 解密 核心 ════════════════════
-            async function encrypt(plaintextStr, password) {
-                const salt = crypto.getRandomValues(new Uint8Array(32));
-                const aesIv = crypto.getRandomValues(new Uint8Array(12));
-                const xnonce = crypto.getRandomValues(new Uint8Array(24));
-                const { aesKey, xKey, checkKey } = await deriveKeys(password, salt);
-                const keyCheck = await computeKeyCheck(checkKey, salt);
-                const aesKeyObj = await crypto.subtle.importKey('raw', aesKey, {name:'AES-GCM'}, false, ['encrypt']);
+            async function encrypt(plaintextStr, password, kdf) {
+                const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+                const aesIv = crypto.getRandomValues(new Uint8Array(AES_IV_LEN));
+                const xnonce = crypto.getRandomValues(new Uint8Array(XNONCE_LEN));
+                const keys = await deriveKeys(password, salt, kdf);
                 const ptBytes = new TextEncoder().encode(plaintextStr);
-                const aesCt = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv:aesIv}, aesKeyObj, ptBytes));
-                const emptyAad = new Uint8Array(0);
-                const xCt = xchacha20Poly1305Encrypt(xKey, xnonce, aesCt, emptyAad);
-                const out = new Uint8Array(32+12+24+16+xCt.length);
-                out.set(salt,0); out.set(aesIv,32); out.set(xnonce,44); out.set(keyCheck,68); out.set(xCt,84);
-                aesKey.fill(0); xKey.fill(0); checkKey.fill(0);
-                return { cipherBytes: out, plainBytes: ptBytes };
+                try {
+                    const keyCheck = await computeKeyCheck(keys.checkKey, salt);
+                    const aesKeyObj = await crypto.subtle.importKey('raw', keys.aesKey, {name:'AES-GCM'}, false, ['encrypt']);
+                    const aesCt = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv:aesIv}, aesKeyObj, ptBytes));
+                    // v2: 头部（魔数+版本+salt+iv+nonce+确认码）整体作为 XChaCha20 的 AAD 显式认证
+                    const header = new Uint8Array(HEADER_LEN);
+                    header.set(MAGIC, 0);
+                    header[4] = (kdf === 'argon2id') ? VERSION_ARGON2ID : VERSION_PBKDF2;
+                    header.set(salt, 5);
+                    header.set(aesIv, 5 + SALT_LEN);
+                    header.set(xnonce, 5 + SALT_LEN + AES_IV_LEN);
+                    header.set(keyCheck, 5 + SALT_LEN + AES_IV_LEN + XNONCE_LEN);
+                    const xCt = xchacha20Poly1305Encrypt(keys.xKey, xnonce, aesCt, header);
+                    const out = new Uint8Array(HEADER_LEN + xCt.length);
+                    out.set(header, 0);
+                    out.set(xCt, HEADER_LEN);
+                    return { cipherBytes: out, plainLen: ptBytes.length };
+                } finally {
+                    keys.zero();
+                    ptBytes.fill(0);
+                }
+            }
+
+            // 解析 v2（魔数头）与 v1（旧版）两种布局
+            function parseCipher(cipherBytes) {
+                if (cipherBytes.length >= 5 &&
+                    cipherBytes[0] === MAGIC[0] && cipherBytes[1] === MAGIC[1] &&
+                    cipherBytes[2] === MAGIC[2] && cipherBytes[3] === MAGIC[3]) {
+                    const ver = cipherBytes[4];
+                    if (ver !== VERSION_PBKDF2 && ver !== VERSION_ARGON2ID) {
+                        throw new Error('不支持的密文版本: 0x' + ver.toString(16).padStart(2,'0'));
+                    }
+                    return {
+                        kdf: ver === VERSION_ARGON2ID ? 'argon2id' : 'pbkdf2', // 版本字节即 KDF 标识
+                        headerLen: HEADER_LEN,
+                        aad: cipherBytes.subarray(0, HEADER_LEN), // v2 头部经 AAD 绑定认证
+                        salt: cipherBytes.subarray(5, 5 + SALT_LEN),
+                        aesIv: cipherBytes.subarray(5 + SALT_LEN, 5 + SALT_LEN + AES_IV_LEN),
+                        xnonce: cipherBytes.subarray(5 + SALT_LEN + AES_IV_LEN, 5 + SALT_LEN + AES_IV_LEN + XNONCE_LEN),
+                        keyCheck: cipherBytes.subarray(HEADER_LEN - KEY_CHECK_LEN, HEADER_LEN),
+                        xCt: cipherBytes.subarray(HEADER_LEN)
+                    };
+                }
+                // v1 旧版布局（无魔数、无 AAD、KDF 恒为 PBKDF2）
+                return {
+                    kdf: 'pbkdf2',
+                    headerLen: LEGACY_HEADER_LEN,
+                    aad: new Uint8Array(0),
+                    salt: cipherBytes.subarray(0, SALT_LEN),
+                    aesIv: cipherBytes.subarray(SALT_LEN, SALT_LEN + AES_IV_LEN),
+                    xnonce: cipherBytes.subarray(SALT_LEN + AES_IV_LEN, SALT_LEN + AES_IV_LEN + XNONCE_LEN),
+                    keyCheck: cipherBytes.subarray(LEGACY_HEADER_LEN - KEY_CHECK_LEN, LEGACY_HEADER_LEN),
+                    xCt: cipherBytes.subarray(LEGACY_HEADER_LEN)
+                };
             }
 
             async function decrypt(cipherBytes, password) {
-                const MIN_LEN = 32+12+24+16+32;
-                if (cipherBytes.length < MIN_LEN) throw new Error('认证失败：密钥错误或数据损坏');
-                const salt = cipherBytes.subarray(0,32);
-                const aesIv = cipherBytes.subarray(32,44);
-                const xnonce = cipherBytes.subarray(44,68);
-                const keyCheck = cipherBytes.subarray(68,84);
-                const xCt = cipherBytes.subarray(84);
-                const { aesKey, xKey, checkKey } = await deriveKeys(password, salt);
-                const expectedKeyCheck = await computeKeyCheck(checkKey, salt);
-                if (!constantTimeEqual(keyCheck, expectedKeyCheck)) {
-                    aesKey.fill(0); xKey.fill(0); checkKey.fill(0);
+                if (cipherBytes.length < LEGACY_HEADER_LEN + AE_OVERHEAD) {
                     throw new Error('认证失败：密钥错误或数据损坏');
                 }
-                let aesCt;
-                try { aesCt = xchacha20Poly1305Decrypt(xKey, xnonce, xCt, new Uint8Array(0)); }
-                catch(e) { aesKey.fill(0); xKey.fill(0); checkKey.fill(0); throw new Error('认证失败：密钥错误或数据损坏'); }
-                try {
-                    const aesKeyObj = await crypto.subtle.importKey('raw', aesKey, {name:'AES-GCM'}, false, ['decrypt']);
-                    const ptBytes = await crypto.subtle.decrypt({name:'AES-GCM', iv:aesIv}, aesKeyObj, aesCt);
-                    const plaintext = new TextDecoder().decode(new Uint8Array(ptBytes));
-                    aesKey.fill(0); xKey.fill(0); checkKey.fill(0);
-                    return { plaintext, cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength };
-                } catch(e) {
-                    aesKey.fill(0); xKey.fill(0); checkKey.fill(0);
+                const parts = parseCipher(cipherBytes);
+                if (cipherBytes.length < parts.headerLen + AE_OVERHEAD) {
                     throw new Error('认证失败：密钥错误或数据损坏');
+                }
+                const keys = await deriveKeys(password, parts.salt, parts.kdf);
+                try {
+                    const expectedKeyCheck = await computeKeyCheck(keys.checkKey, parts.salt);
+                    if (!constantTimeEqual(parts.keyCheck, expectedKeyCheck)) {
+                        throw new Error('认证失败：密钥错误或数据损坏');
+                    }
+                    let aesCt;
+                    try { aesCt = xchacha20Poly1305Decrypt(keys.xKey, parts.xnonce, parts.xCt, parts.aad); }
+                    catch(e) { throw new Error('认证失败：密钥错误或数据损坏'); }
+                    try {
+                        const aesKeyObj = await crypto.subtle.importKey('raw', keys.aesKey, {name:'AES-GCM'}, false, ['decrypt']);
+                        const ptBytes = await crypto.subtle.decrypt({name:'AES-GCM', iv:parts.aesIv}, aesKeyObj, aesCt);
+                        const plaintext = new TextDecoder().decode(new Uint8Array(ptBytes));
+                        return { plaintext, cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength, kdf: parts.kdf };
+                    } catch(e) {
+                        throw new Error('认证失败：密钥错误或数据损坏');
+                    }
+                } finally {
+                    keys.zero();
                 }
             }
 
@@ -1061,6 +1280,31 @@
             applyTheme(getStoredTheme());
             themeToggle.addEventListener('click', toggleTheme);
 
+            // ════════════════════ KDF 选择 (PBKDF2 / Argon2id) ════════════════════
+            const KDF_KEY = 'cipher_kdf_v1';
+            function currentKdf() { return kdfArgon2.checked ? 'argon2id' : 'pbkdf2'; }
+            function refreshKdfHint() {
+                const info = KDF_INFO[currentKdf()];
+                kdfHint.textContent = info.name + ' · ' + info.desc;
+            }
+            try {
+                if (localStorage.getItem(KDF_KEY) === 'argon2id' && argon2Available()) kdfArgon2.checked = true;
+            } catch(e) {}
+            if (!argon2Available()) {
+                // Argon2 库加载失败（离线/CSP/完整性校验未过）→ 禁用复选框，PBKDF2 不受影响
+                kdfArgon2.checked = false;
+                kdfArgon2.disabled = true;
+                kdfOption.classList.add('disabled');
+                kdfOption.title = 'Argon2 库加载失败（需联网），当前仅可用 PBKDF2';
+                kdfHint.textContent = 'PBKDF2-SHA512 · 600,000 轮（Argon2 库未加载）';
+            } else {
+                refreshKdfHint();
+            }
+            kdfArgon2.addEventListener('change', () => {
+                refreshKdfHint();
+                try { localStorage.setItem(KDF_KEY, currentKdf()); } catch(e) {}
+            });
+
             // ════════════════════ 格式持久化 (仅保存手动选择) ════════════════════
             const SAVED_FMT_KEY = 'cipher_fmt_v2';
             try {
@@ -1078,36 +1322,48 @@
                 else { keyInput.type='password'; toggleVis.textContent='显示'; }
             });
 
+            clearBtn.addEventListener('click', ()=>{
+                keyInput.value = '';
+                inputArea.value = '';
+                outputArea.value = '';
+                clearStatus(); clearStats();
+                resultHint.textContent = '就绪';
+                formatHint.textContent = '解密时须与加密输出格式一致';
+                keyInput.focus();
+            });
+
             encryptBtn.addEventListener('click', async ()=>{
                 if (busy) return;
                 clearStatus(); clearStats();
                 const password = keyInput.value, plaintext = inputArea.value;
                 if (!password) { setStatus('请输入密钥','error'); keyInput.focus(); return; }
                 if (!plaintext) { setStatus('请输入需要加密的明文','error'); inputArea.focus(); return; }
+                const kdf = currentKdf();
                 setBusy(true);
-                setStatus('加密中… (PBKDF2 600k 轮 + 双层加密)','info');
+                setStatus('加密中… ('+KDF_INFO[kdf].name+' '+KDF_INFO[kdf].desc+' + 双层加密)','info');
                 resultHint.textContent = '加密中…';
                 await new Promise(r=>setTimeout(r,20));
                 const t0 = performance.now();
                 try {
-                    const { cipherBytes, plainBytes } = await encrypt(plaintext, password);
+                    const { cipherBytes, plainLen } = await encrypt(plaintext, password, kdf);
                     const t1 = performance.now();
                     const elapsed = t1-t0;
                     const fmt = formatSelect.value;
                     const encoded = encodeBytes(cipherBytes, fmt);
                     outputArea.value = encoded;
-                    const overheadBytes = cipherBytes.length - plainBytes.length;
-                    const ratio = plainBytes.length>0 ? cipherBytes.length/plainBytes.length : 0;
-                    const overheadPct = plainBytes.length>0 ? (overheadBytes/plainBytes.length)*100 : 0;
+                    const overheadBytes = cipherBytes.length - plainLen;
+                    const ratio = plainLen>0 ? cipherBytes.length/plainLen : 0;
+                    const overheadPct = plainLen>0 ? (overheadBytes/plainLen)*100 : 0;
                     showStats([
                         { label:'耗时', value:formatMs(elapsed) },
-                        { label:'明文', value:formatBytes(plainBytes.length)+' · '+plainBytes.length+' 字节' },
+                        { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
+                        { label:'明文', value:formatBytes(plainLen)+' · '+plainLen+' 字节' },
                         { label:'明文字符数', value:plaintext.length+' 字符' },
                         { label:'密文', value:formatBytes(cipherBytes.length)+' · '+cipherBytes.length+' 字节' },
                         { label:'编码输出', value:encoded.length+' 字符' },
                         { label:'膨胀率', value:formatRatio(ratio)+' (+'+formatPercent(overheadPct)+')' },
                     ]);
-                    setStatus('加密成功 · '+cipherBytes.length+' 字节密文 · '+encoded.length+' 字符（'+fmt+'）','success');
+                    setStatus('加密成功 · '+KDF_INFO[kdf].name+' · '+cipherBytes.length+' 字节密文 · '+encoded.length+' 字符（'+fmt+'）','success');
                     resultHint.textContent = '加密完成 · '+formatBytes(cipherBytes.length);
                 } catch(e) {
                     setStatus('加密失败：'+(e.message||e),'error');
@@ -1126,41 +1382,46 @@
 
                 const detected = detectFormat(cipherStr);
                 const userFmt = formatSelect.value;
-                let usedFmt = userFmt;
-                let detectNote = '';
-                if (detected && detected !== userFmt) {
-                    usedFmt = detected;
-                    detectNote = ' · 自动识别格式: ' + detected + ' (解码使用该格式)';
-                } else if (detected) {
-                    detectNote = ' · 格式: ' + detected;
-                }
+                // 优先使用用户选择的格式；失败时以自动识别的格式兜底重试
+                const candidates = (detected && detected !== userFmt) ? [userFmt, detected] : [userFmt];
 
                 setBusy(true);
-                setStatus('解密中… (PBKDF2 600k 轮 + 双层解密)'+detectNote,'info');
-                resultHint.textContent = '解密中…'+(detected?' 格式: '+usedFmt:'');
+                setStatus('解密中… (按密文版本自动选择 KDF + 双层解密)','info');
+                resultHint.textContent = '解密中…';
                 await new Promise(r=>setTimeout(r,20));
                 const t0 = performance.now();
+                const tried = [];
+                let result = null, usedFmt = null, cipherLen = 0, lastErr = null;
+                for (const fmt of candidates) {
+                    tried.push(fmt);
+                    try {
+                        const cipherBytes = decodeBytes(cipherStr, fmt);
+                        cipherLen = cipherBytes.length;
+                        result = await decrypt(cipherBytes, password);
+                        usedFmt = fmt;
+                        break;
+                    } catch(e) { lastErr = e; }
+                }
                 try {
-                    let cipherBytes;
-                    try { cipherBytes = decodeBytes(cipherStr, usedFmt); }
-                    catch(e) { throw new Error('输入解析失败：'+e.message+'（当前使用格式: '+usedFmt+'）'); }
-                    const cipherLen = cipherBytes.length;
-                    const { plaintext, plainLen } = await decrypt(cipherBytes, password);
+                    if (!result) throw (lastErr || new Error('解密失败'));
                     const t1 = performance.now();
                     const elapsed = t1-t0;
+                    const { plaintext, plainLen, kdf } = result;
                     outputArea.value = plaintext;
+                    const fmtNote = ' · 格式: ' + usedFmt + (usedFmt !== userFmt ? '（按自动识别）' : '');
                     const compressionRatio = cipherLen>0 ? plainLen/cipherLen : 0;
                     showStats([
                         { label:'耗时', value:formatMs(elapsed) },
+                        { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
                         { label:'密文输入', value:cipherStr.length+' 字符 · '+formatBytes(cipherLen) },
                         { label:'明文', value:formatBytes(plainLen)+' · '+plainLen+' 字节' },
                         { label:'明文字符数', value:plaintext.length+' 字符' },
                         { label:'压缩比', value:formatRatio(compressionRatio) },
                     ]);
-                    setStatus('解密成功 · '+plaintext.length+' 字符明文'+detectNote,'success');
+                    setStatus('解密成功 · '+plaintext.length+' 字符明文'+fmtNote,'success');
                     resultHint.textContent = '解密完成 · '+formatBytes(plainLen)+' 明文';
                 } catch(e) {
-                    setStatus('解密失败：'+(e.message||e),'error');
+                    setStatus('解密失败：'+(e.message||e)+'（已尝试格式: '+tried.join('、')+'）','error');
                     outputArea.value = '';
                     clearStats();
                     resultHint.textContent = '就绪';
