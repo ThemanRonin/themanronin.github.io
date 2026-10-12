@@ -458,8 +458,8 @@
 
         .stats-panel {
             display: flex;
-            flex-wrap: wrap;
-            gap: 6px 18px;
+            flex-direction: column;
+            gap: 10px;
             margin-top: 10px;
             padding: 12px 14px;
             background: var(--surface-elevated);
@@ -469,6 +469,12 @@
             font-size: 11px;
             color: var(--text-secondary);
             transition: all var(--transition-normal);
+        }
+        .stats-panel .stat-chips {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 18px;
         }
         .stats-panel .stat-item {
             display: flex;
@@ -491,6 +497,64 @@
             color: var(--border-strong);
             margin: 0 2px;
             user-select: none;
+        }
+        /* ── 字节布局表：把真实头部/密文结构逐段摊开 ── */
+        .stats-panel .stat-block {
+            border-top: 1px dashed var(--border);
+            padding-top: 9px;
+            min-width: 0;
+        }
+        .stats-panel .stat-block-head {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 7px;
+            color: var(--text-tertiary);
+            font-size: 10px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .stats-panel .stat-block-head .blk-title {
+            color: var(--text-secondary);
+        }
+        .stats-panel .stat-grid {
+            display: grid;
+            grid-template-columns: max-content max-content minmax(0, 1fr);
+            gap: 3px 10px;
+            align-items: baseline;
+        }
+        .stats-panel .seg {
+            display: contents;
+        }
+        .stats-panel .seg-name {
+            color: var(--text);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .stats-panel .seg-len {
+            color: var(--text-tertiary);
+            font-size: 10px;
+            white-space: nowrap;
+        }
+        .stats-panel .seg-hex {
+            color: var(--text-secondary);
+            min-width: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.5;
+        }
+        .stats-panel .seg-hex .seg-idx {
+            color: var(--text-tertiary);
+            font-size: 10px;
+        }
+        .stats-panel .stat-foot {
+            color: var(--text-tertiary);
+            font-size: 10px;
+            line-height: 1.7;
+        }
+        .stats-panel .stat-foot code {
+            font-family: inherit;
+            color: var(--text-secondary);
         }
 
         .meta {
@@ -591,10 +655,21 @@
                 text-align: left;
             }
             .stats-panel {
+                gap: 8px;
+                font-size: 10px;
+            }
+            .stats-panel .stat-chips {
                 gap: 4px 10px;
             }
             .stats-panel .stat-item {
                 font-size: 10px;
+            }
+            .stats-panel .stat-grid {
+                grid-template-columns: max-content max-content minmax(0, 1fr);
+                gap: 2px 6px;
+            }
+            .stats-panel .seg-hex {
+                font-size: 9px;
             }
             .theme-toggle {
                 padding: 5px 10px;
@@ -1159,25 +1234,116 @@
             // 信息框默认常驻：无结果时展示就绪态参数，加解密前后不消失
             function showIdleStats() {
                 const fmtLabel = formatSelect.options[formatSelect.selectedIndex].text;
+                const kdf = currentKdf();
                 showStats([
                     { label:'状态', value:'就绪' },
                     { label:'算法', value:'AES-256-GCM × XChaCha20-Poly1305' },
-                    { label:'KDF', value:KDF_INFO[currentKdf()].name+' · '+KDF_INFO[currentKdf()].desc },
+                    { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
                     { label:'编码', value:fmtLabel },
-                    { label:'头部', value:HEADER_LEN+' B · Salt 256-bit · IV 96-bit · Nonce 192-bit' },
+                ], [
+                    {
+                        title:'HEADER · 头部 '+HEADER_LEN+' B',
+                        note:'实际取值在加解密完成后显示',
+                        segments:[
+                            { name:'magic', len:'[4]', hex:'@0 <span class="seg-idx">"CIPH" 43 49 50 48</span>' },
+                            { name:'ver', len:'[1]', hex:'@4 <span class="seg-idx">'+(kdf==='argon2id'?'0x03':'0x02')+' · '+(kdf==='argon2id'?'Argon2id':'PBKDF2')+'</span>' },
+                            { name:'salt', len:'['+SALT_LEN+']', hex:'@5 <span class="seg-idx">256-bit · 每次加密随机生成</span>' },
+                            { name:'aes_iv', len:'['+AES_IV_LEN+']', hex:'@37 <span class="seg-idx">96-bit · 每次加密随机生成</span>' },
+                            { name:'xnonce', len:'['+XNONCE_LEN+']', hex:'@49 <span class="seg-idx">192-bit · 每次加密随机生成</span>' },
+                            { name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:'@73 <span class="seg-idx">128-bit · HMAC-SHA256 前 16 字节</span>' },
+                        ],
+                        foot:'头部 <code>89 B</code> + 载荷（明文字节数 + <code>32 B</code> 双层认证标签）；头部整体作为 XChaCha20 的 <code>AAD</code> 参与认证。'
+                    }
                 ]);
             }
             function clearStats() { showIdleStats(); }
-            function showStats(items) {
-                const html = items.map((item,i)=>{
-                    const sep = i<items.length-1 ? '<span class="stat-sep" aria-hidden="true">·</span>' : '';
+            // chips: 顶部一行摘要；blocks: 下方逐段摊开的字节布局（真实取值）
+            function showStats(chips, blocks) {
+                const chipsHtml = (chips||[]).map((item,i)=>{
+                    const sep = i<chips.length-1 ? '<span class="stat-sep" aria-hidden="true">·</span>' : '';
                     return '<span class="stat-item"><span class="stat-label">'+escapeHtml(item.label)+'</span><span class="stat-value">'+escapeHtml(item.value)+'</span></span>'+sep;
                 }).join('');
-                statsPanel.innerHTML=html;
+                const blocksHtml = (blocks||[]).map(blk=>{
+                    const head = '<div class="stat-block-head"><span class="blk-title">'+escapeHtml(blk.title)+'</span>'+
+                        (blk.note ? '<span>'+escapeHtml(blk.note)+'</span>' : '')+'</div>';
+                    const segs = blk.segments.map(s=>
+                        '<span class="seg"><span class="seg-name">'+escapeHtml(s.name)+'</span>'+
+                        '<span class="seg-len">'+escapeHtml(s.len)+'</span>'+
+                        '<span class="seg-hex">'+s.hex+'</span></span>'
+                    ).join('');
+                    const foot = blk.foot ? '<div class="stat-foot">'+blk.foot+'</div>' : '';
+                    return '<div class="stat-block">'+head+'<div class="stat-grid">'+segs+'</div>'+foot+'</div>';
+                }).join('');
+                statsPanel.innerHTML = '<div class="stat-chips">'+chipsHtml+'</div>'+blocksHtml;
                 statsPanel.className='stats-panel show';
             }
             function escapeHtml(str) {
                 const div=document.createElement('div'); div.textContent=str; return div.innerHTML;
+            }
+            // hex 预览：优先显示头尾各若干字节，中间以 … 省略（避免刷屏，敏感值不完整外泄）
+            function hexPreview(bytes, head, tail) {
+                const full = bytesToHex(bytes);
+                if (full.length <= (head+tail)*2+1) return full;
+                return full.slice(0, head*2)+'…'+full.slice(-tail*2);
+            }
+            function bytesToHex(bytes) {
+                let out = '';
+                for (let i=0;i<bytes.length;i++) out += bytes[i].toString(16).padStart(2,'0');
+                return out;
+            }
+            // 把本次真实使用的头部/密文逐段渲染成可核对的信息框
+            function buildLayoutBlocks(info) {
+                const blocks = [];
+                const fmtKdf = KDF_INFO[info.kdf];
+                const headerLen = info.isV2 ? HEADER_LEN : LEGACY_HEADER_LEN;
+                // ── 头部段（真实字节值） ──
+                const segs = [];
+                let off = 0;
+                if (info.isV2) {
+                    segs.push({ name:'magic', len:'[4]', hex:'<span class="seg-idx">@0</span> '+escapeHtml(bytesToHex(info.magic))+' <span class="seg-idx">"CIPH"</span>' });
+                    off = 4;
+                    segs.push({ name:'ver', len:'[1]', hex:'<span class="seg-idx">@4</span> 0x'+info.ver.toString(16).padStart(2,'0')+' <span class="seg-idx">'+(info.kdf==='argon2id'?'Argon2id':'PBKDF2')+'</span>' });
+                    off = 5;
+                }
+                segs.push({ name:'salt', len:'['+SALT_LEN+']', hex:'<span class="seg-idx">@'+off+'</span> '+escapeHtml(hexPreview(info.salt,4,4)) });
+                off += SALT_LEN;
+                segs.push({ name:'aes_iv', len:'['+AES_IV_LEN+']', hex:'<span class="seg-idx">@'+off+'</span> '+escapeHtml(hexPreview(info.aesIv,3,3)) });
+                off += AES_IV_LEN;
+                segs.push({ name:'xnonce', len:'['+XNONCE_LEN+']', hex:'<span class="seg-idx">@'+off+'</span> '+escapeHtml(hexPreview(info.xnonce,4,4)) });
+                off += XNONCE_LEN;
+                segs.push({ name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:'<span class="seg-idx">@'+off+'</span> '+escapeHtml(hexPreview(info.keyCheck,4,4)) });
+                off += KEY_CHECK_LEN;
+                blocks.push({
+                    title:'HEADER · 头部 '+headerLen+' B',
+                    note: headerLen+' B + 载荷 '+(info.cipherLen-headerLen)+' B',
+                    segments: segs,
+                    foot:'头部整体作为 XChaCha20 的 <code>AAD</code> 参与认证；<code>key_check = HMAC-SHA256(check_key, "KEYCHECK"‖salt)[0:16]</code>，用于先验密钥校验，避免错误密钥下解出垃圾数据。'
+                });
+                // ── 载荷段 ──
+                blocks.push({
+                    title:'PAYLOAD · 载荷 '+(info.cipherLen-headerLen)+' B',
+                    note:'外层 XChaCha20-Poly1305 包裹内层 AES-GCM 密文',
+                    segments:[
+                        { name:'aes_ct', len:'['+info.plainLen+' B]', hex:info.plainLen>0 ? '明文经 AES-256-GCM 加密，再被 ChaCha20 流二次加密' : '—' },
+                        { name:'gcm_tag', len:'[16]', hex:'内层 GCM 认证标签（随密文一并被流加密）' },
+                        { name:'x_ct', len:'['+(info.plainLen+16)+']', hex:'流加密后的内层密文+内层标签' },
+                        { name:'poly1305_tag', len:'[16]', hex:'外层 Poly1305 认证标签（明文未加密，可校验）' },
+                    ],
+                    foot:'布局：<code>aes_ct['+info.plainLen+'] ‖ gcm_tag[16] ‖ x_ct['+(info.plainLen+16)+'] ‖ poly1305_tag[16]</code>，AEAD 开销固定 <code>'+AE_OVERHEAD+' B</code>。'
+                });
+                // ── 密钥派生 ──
+                blocks.push({
+                    title:'KEY · 密钥派生',
+                    note: fmtKdf.name+' · '+fmtKdf.desc,
+                    segments:[
+                        { name:'input', len:'[salt '+SALT_LEN+' B]', hex:'口令 + 随机 salt → 一条 '+('96')+' B 密钥材料（用后整块擦除）' },
+                        { name:'aes_key', len:'[32]', hex:'km[0:32] → Layer 1 AES-256-GCM 密钥' },
+                        { name:'x_key', len:'[32]', hex:'km[32:64] → Layer 2 XChaCha20-Poly1305 密钥' },
+                        { name:'check_key', len:'[32]', hex:'km[64:96] → HMAC 密钥确认专用，不参与加密' },
+                    ],
+                    foot:'三把子密钥共享同一密钥材料的视图，<code>keys.zero()</code> 一次性整体擦除，避免残留副本。'
+                });
+                return blocks;
             }
             function formatBytes(bytes) {
                 if (bytes<1000) return bytes+' B';
@@ -1277,7 +1443,15 @@
                     const out = new Uint8Array(HEADER_LEN + xCt.length);
                     out.set(header, 0);
                     out.set(xCt, HEADER_LEN);
-                    return { cipherBytes: out, plainLen: ptBytes.length };
+                    // 返回头部各段副本，供信息框展示本次真实取值（密钥材料仍照常擦除）
+                    return {
+                        cipherBytes: out, plainLen: ptBytes.length,
+                        header: {
+                            isV2: true, kdf, ver: header[4], cipherLen: out.length, plainLen: ptBytes.length,
+                            magic: MAGIC.slice(), salt: salt.slice(), aesIv: aesIv.slice(),
+                            xnonce: xnonce.slice(), keyCheck: keyCheck.slice()
+                        }
+                    };
                 } finally {
                     keys.zero();
                     ptBytes.fill(0);
@@ -1338,7 +1512,16 @@
                         const aesKeyObj = await crypto.subtle.importKey('raw', keys.aesKey, {name:'AES-GCM'}, false, ['decrypt']);
                         const ptBytes = await crypto.subtle.decrypt({name:'AES-GCM', iv:parts.aesIv}, aesKeyObj, aesCt);
                         const plaintext = new TextDecoder().decode(new Uint8Array(ptBytes));
-                        return { plaintext, cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength, kdf: parts.kdf };
+                        return {
+                            plaintext, cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength, kdf: parts.kdf,
+                            header: {
+                                isV2: parts.headerLen === HEADER_LEN, kdf: parts.kdf,
+                                ver: parts.headerLen === HEADER_LEN ? cipherBytes[4] : null,
+                                cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength,
+                                magic: MAGIC.slice(), salt: parts.salt.slice(), aesIv: parts.aesIv.slice(),
+                                xnonce: parts.xnonce.slice(), keyCheck: parts.keyCheck.slice()
+                            }
+                        };
                     } catch(e) {
                         throw new Error('认证失败：密钥错误或数据损坏');
                     }
@@ -1509,7 +1692,7 @@
                 await new Promise(r=>setTimeout(r,20));
                 const t0 = performance.now();
                 try {
-                    const { cipherBytes, plainLen } = await encrypt(plaintext, password, kdf);
+                    const { cipherBytes, plainLen, header } = await encrypt(plaintext, password, kdf);
                     const t1 = performance.now();
                     const elapsed = t1-t0;
                     const fmt = formatSelect.value;
@@ -1522,14 +1705,11 @@
                         { label:'耗时', value:formatMs(elapsed) },
                         { label:'吞吐', value:formatThroughput(plainLen, elapsed) },
                         { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
-                        { label:'明文', value:formatBytes(plainLen)+' · '+plainLen+' 字节' },
-                        { label:'明文字符数', value:plaintext.length+' 字符' },
+                        { label:'明文', value:plaintext.length+' 字符 · '+plainLen+' 字节' },
                         { label:'密文', value:formatBytes(cipherBytes.length)+' · '+cipherBytes.length+' 字节' },
-                        { label:'头部', value:HEADER_LEN+' B · Salt 256-bit · IV 96-bit · Nonce 192-bit · 确认码 128-bit' },
-                        { label:'AEAD Tag', value:AE_OVERHEAD+' B · GCM 128-bit + Poly1305 128-bit' },
                         { label:'编码输出', value:encoded.length+' 字符 · '+fmt },
                         { label:'膨胀率', value:formatRatio(ratio)+' (+'+formatPercent(overheadPct)+')' },
-                    ]);
+                    ], buildLayoutBlocks(header));
                     setStatus('加密成功 · '+KDF_INFO[kdf].name+' · '+cipherBytes.length+' 字节密文 · '+encoded.length+' 字符（'+fmt+'）','success');
                     resultHint.textContent = '加密完成 · '+formatBytes(cipherBytes.length);
                 } catch(e) {
@@ -1558,13 +1738,14 @@
                 await new Promise(r=>setTimeout(r,20));
                 const t0 = performance.now();
                 const tried = [];
-                let result = null, usedFmt = null, cipherLen = 0, lastErr = null;
+                let result = null, usedFmt = null, cipherLen = 0, lastErr = null, cipherBytes = null;
                 for (const fmt of candidates) {
                     tried.push(fmt);
                     try {
-                        const cipherBytes = decodeBytes(cipherStr, fmt);
-                        cipherLen = cipherBytes.length;
-                        result = await decrypt(cipherBytes, password);
+                        const bytes = decodeBytes(cipherStr, fmt);
+                        cipherLen = bytes.length;
+                        cipherBytes = bytes;
+                        result = await decrypt(bytes, password);
                         usedFmt = fmt;
                         break;
                     } catch(e) { lastErr = e; }
@@ -1573,30 +1754,21 @@
                     if (!result) throw (lastErr || new Error('解密失败'));
                     const t1 = performance.now();
                     const elapsed = t1-t0;
-                    const { plaintext, plainLen, kdf } = result;
+                    const { plaintext, plainLen, kdf, header } = result;
                     outputArea.value = plaintext;
                     const fmtNote = ' · 格式: ' + usedFmt + (usedFmt !== userFmt ? '（按自动识别）' : '');
                     const compressionRatio = cipherLen>0 ? plainLen/cipherLen : 0;
-                    const isV2 = cipherBytes.length >= 5 &&
-                        cipherBytes[0]===MAGIC[0] && cipherBytes[1]===MAGIC[1] &&
-                        cipherBytes[2]===MAGIC[2] && cipherBytes[3]===MAGIC[3];
-                    const verLabel = !isV2 ? 'v1 · 旧版 (PBKDF2)' : (kdf==='argon2id' ? 'v3 · Argon2id' : 'v2 · PBKDF2');
-                    const headerLen = isV2 ? HEADER_LEN : LEGACY_HEADER_LEN;
-                    const headerDesc = isV2
-                        ? headerLen+' B · 魔数+版本 5 B · Salt 256-bit · IV 96-bit · Nonce 192-bit · 确认码 128-bit'
-                        : headerLen+' B · Salt 256-bit · IV 96-bit · Nonce 192-bit · 确认码 128-bit';
+                    const verLabel = !header.isV2 ? 'v1 · 旧版 (PBKDF2)' : (kdf==='argon2id' ? 'v3 · Argon2id' : 'v2 · PBKDF2');
                     showStats([
                         { label:'耗时', value:formatMs(elapsed) },
                         { label:'吞吐', value:formatThroughput(plainLen, elapsed) },
                         { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
                         { label:'密文版本', value:verLabel },
                         { label:'密文输入', value:cipherStr.length+' 字符 · '+formatBytes(cipherLen) },
-                        { label:'头部', value:headerDesc },
                         { label:'识别格式', value:usedFmt+(usedFmt!==userFmt ? '（自动识别）' : '') },
-                        { label:'明文', value:formatBytes(plainLen)+' · '+plainLen+' 字节' },
-                        { label:'明文字符数', value:plaintext.length+' 字符' },
+                        { label:'明文', value:plaintext.length+' 字符 · '+plainLen+' 字节' },
                         { label:'压缩比', value:formatRatio(compressionRatio) },
-                    ]);
+                    ], buildLayoutBlocks(header));
                     setStatus('解密成功 · '+plaintext.length+' 字符明文'+fmtNote,'success');
                     resultHint.textContent = '解密完成 · '+formatBytes(plainLen)+' 明文';
                 } catch(e) {
