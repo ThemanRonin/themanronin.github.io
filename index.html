@@ -238,6 +238,24 @@
             font-size: 11px;
             color: var(--text-tertiary);
         }
+        /* 页脚个人主页链接：虚线下划线暗示可点击，悬停时加深变为实线 */
+        .footer-link {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            border-bottom: 1px dashed var(--border-strong);
+            padding-bottom: 1px;
+            cursor: pointer;
+            transition: color var(--transition-fast), border-color var(--transition-fast);
+            -webkit-tap-highlight-color: transparent;
+        }
+        .footer-link:hover {
+            color: var(--text);
+            border-bottom-style: solid;
+            border-bottom-color: var(--text);
+        }
+        .footer-link:active {
+            transform: scale(0.98);
+        }
 
         @media (max-width: 480px) {
             .container {
@@ -274,6 +292,26 @@
                 <div class="card-path">/CIPHER</div>
             </a>
 
+            <a class="card" href="./PasswordGenerator/">
+                <div class="card-top">
+                    <span class="card-name">PASSWORD GENERATOR</span>
+                    <span class="card-arrow" aria-hidden="true">→</span>
+                </div>
+                <div class="card-title">密码生成器</div>
+                <div class="card-desc">长度 6–60 可调 · 大小写字母 / 数字 / 常用符号自由组合 · 实时熵值评估与配色分级 · 点击即复制</div>
+                <div class="card-path">/PasswordGenerator</div>
+            </a>
+
+            <a class="card" href="./wordcount/">
+                <div class="card-top">
+                    <span class="card-name">WORD COUNT</span>
+                    <span class="card-arrow" aria-hidden="true">→</span>
+                </div>
+                <div class="card-title">字数统计工具</div>
+                <div class="card-desc">实时统计总字符 / 空白字符 / 英文单词 / 行数 / 段落数 · 中英文标点智能处理 · 纯本地运算</div>
+                <div class="card-path">/wordcount</div>
+            </a>
+
             <div class="card card-placeholder" aria-hidden="true">
                 <div class="card-top">
                     <span class="card-name">MORE</span>
@@ -285,7 +323,7 @@
         </main>
 
         <footer class="footer">
-            <span>© themanronin</span>
+            <a class="footer-link" href="https://github.com/ThemanRonin/themanronin.github.io" target="_blank" rel="noopener noreferrer" title="访问 GitHub 主页">© themanronin ↗</a>
             <span>/ → index.html</span>
         </footer>
     </div>
