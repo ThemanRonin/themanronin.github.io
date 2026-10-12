@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>字数统计工具</title>
+<style>
+    :root {
+        --bg: #f5f5f7;
+        --card: #ffffff;
+        --line: #e8e8ec;
+        --line-strong: #111114;
+        --text: #111114;
+        --muted: #8a8a93;
+        --soft: #f2f2f5;
+        --accent: #ef4444;
+        --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 48px 20px 64px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+        width: 100%;
+        max-width: 720px;
+    }
+
+    /* ---------- 顶部标题 ---------- */
+    .app-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+    .app-header h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: .01em;
+    }
+    .app-header .sub {
+        font-size: 13px;
+        color: var(--muted);
+        letter-spacing: .04em;
+    }
+
+    /* ---------- 输入区 ---------- */
+    textarea {
+        display: block;
+        width: 100%;
+        height: 320px;
+        padding: 18px;
+        font-family: inherit;
+        font-size: 16px;
+        line-height: 1.75;
+        color: var(--text);
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        resize: vertical;
+        outline: none;
+        transition: border-color .18s ease;
+    }
+    textarea::placeholder { color: #b9b9c1; }
+    textarea:focus { border-color: var(--line-strong); }
+    textarea::-webkit-scrollbar { width: 8px; }
+    textarea::-webkit-scrollbar-thumb {
+        background: #d8d8de;
+        border-radius: 4px;
+    }
+    textarea::-webkit-scrollbar-track { background: transparent; }
+
+    /* ---------- 按钮 ---------- */
+    .toolbar {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+    }
+    .btn {
+        flex: 1;
+        padding: 13px 16px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: .02em;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--card);
+        color: var(--text);
+        cursor: pointer;
+        transition: background .15s ease, color .15s ease,
+                    border-color .15s ease, filter .15s ease;
+    }
+    .btn:hover { background: var(--soft); }
+    .btn:active { transform: translateY(1px); }
+
+    .btn.primary {
+        background: var(--text);
+        border-color: var(--text);
+        color: #fff;
+    }
+    .btn.primary:hover { background: #2b2b33; border-color: #2b2b33; }
+
+    .btn.danger {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+    }
+    .btn.danger:hover { filter: brightness(.92); }
+
+    /* ---------- 统计网格 ---------- */
+    .stats {
+        margin-top: 20px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+        gap: 10px;
+    }
+    .stat {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px 16px 14px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        transition: border-color .15s ease;
+    }
+    .stat:hover { border-color: #d6d6dd; }
+
+    .stat .label {
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: .06em;
+        white-space: nowrap;
+    }
+    .stat .value {
+        font-size: 26px;
+        font-weight: 600;
+        line-height: 1.1;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -.01em;
+        word-break: break-all;
+    }
+    /* 阅读时长这类文本值小一点 */
+    .stat .value.text-value { font-size: 20px; }
+
+    ::selection { background: #111114; color: #fff; }
+
+    @media (max-width: 480px) {
+        body { padding: 28px 16px 48px; }
+        textarea { height: 240px; }
+        .stats { grid-template-columns: repeat(2, 1fr); }
+        .stat .value { font-size: 22px; }
+        .stat .value.text-value { font-size: 16px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="app">
+    <header class="app-header">
+        <h1>字数统计工具</h1>
+        <span class="sub">实时统计</span>
+    </header>
+
+    <textarea id="text-input" placeholder="在此输入或粘贴文本…"></textarea>
+
+    <div class="toolbar">
+        <button class="btn primary" id="copy-button" type="button">复制全文</button>
+        <button class="btn danger" id="clear-button" type="button">清空</button>
+    </div>
+
+    <section class="stats">
+        <div class="stat"><span class="label">总字符数</span><span class="value" data-stat="chars">0</span></div>
+        <div class="stat"><span class="label">不含空格</span><span class="value" data-stat="noSpace">0</span></div>
+        <div class="stat"><span class="label">汉字</span><span class="value" data-stat="chinese">0</span></div>
+        <div class="stat"><span class="label">字母</span><span class="value" data-stat="letters">0</span></div>
+        <div class="stat"><span class="label">数字</span><span class="value" data-stat="digits">0</span></div>
+        <div class="stat"><span class="label">标点符号</span><span class="value" data-stat="punct">0</span></div>
+        <div class="stat"><span class="label">空白字符</span><span class="value" data-stat="spaces">0</span></div>
+        <div class="stat"><span class="label">英文单词</span><span class="value" data-stat="words">0</span></div>
+        <div class="stat"><span class="label">行数</span><span class="value" data-stat="lines">0</span></div>
+        <div class="stat"><span class="label">段落数</span><span class="value" data-stat="paragraphs">0</span></div>
+        <div class="stat"><span class="label">阅读时长</span><span class="value text-value" data-stat="reading">0 秒</span></div>
+    </section>
+</div>
+
+<script>
+(function () {
+    "use strict";
+
+    var input   = document.getElementById('text-input');
+    var copyBtn = document.getElementById('copy-button');
+    var clearBtn = document.getElementById('clear-button');
+
+    /* 统计项对应的 DOM 节点 */
+    var statEls = {};
+    document.querySelectorAll('[data-stat]').forEach(function (el) {
+        statEls[el.dataset.stat] = el;
+    });
+
+    /* 中文标点 + 英文标点 */
+    var PUNCT_RE = /[\u3001-\u303F\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF65!-\/:-@\[-`{-~]/g;
+    var CHINESE_RE = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g;
+    var LETTER_RE = /[A-Za-z]/g;
+    var DIGIT_RE = /[0-9]/g;
+    var SPACE_RE = /\s/g;
+    var WORD_RE = /[A-Za-z]+(?:['’-][A-Za-z]+)*/g;
+
+    /* 千分位 */
+    function formatNumber(num) {
+        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    /* 阅读时长估算：汉字 300 字/分钟，英文 200 词/分钟 */
+    function readingTime(chinese, words, hasText) {
+        if (!hasText) return '0 秒';
+        var seconds = (chinese / 300 + words / 200) * 60;
+        var sec = Math.max(1, Math.round(seconds));
+        if (sec < 60) return sec + ' 秒';
+        return (sec / 60).toFixed(1) + ' 分钟';
+    }
+
+    /* 核心统计 */
+    function analyze(text) {
+        var chinese = (text.match(CHINESE_RE) || []).length;
+        var words   = (text.match(WORD_RE) || []).length;
+        var hasText = text.trim().length > 0;
+
+        return {
+            chars:      Array.from(text).length,
+            noSpace:    Array.from(text.replace(SPACE_RE, '')).length,
+            chinese:    chinese,
+            letters:    (text.match(LETTER_RE) || []).length,
+            digits:     (text.match(DIGIT_RE) || []).length,
+            punct:      (text.match(PUNCT_RE) || []).length,
+            spaces:     (text.match(SPACE_RE) || []).length,
+            words:      words,
+            lines:      text.length ? text.split(/\r\n|\r|\n/).length : 0,
+            paragraphs: text.split(/\n+/).filter(function (p) {
+                            return p.trim().length > 0;
+                        }).length,
+            reading:    readingTime(chinese, words, hasText)
+        };
+    }
+
+    /* 渲染 */
+    function update() {
+        var data = analyze(input.value);
+
+        Object.keys(data).forEach(function (key) {
+            var el = statEls[key];
+            if (!el) return;
+            var val = data[key];
+            el.textContent = (typeof val === 'number') ? formatNumber(val) : val;
+        });
+    }
+
+    /* 事件绑定 */
+    input.addEventListener('input', update);
+
+    clearBtn.addEventListener('click', function () {
+        input.value = '';
+        update();
+        input.focus();
+    });
+
+    copyBtn.addEventListener('click', function () {
+        var text = input.value;
+        if (!text) {
+            copyBtn.textContent = '内容为空';
+            setTimeout(function () { copyBtn.textContent = '复制全文'; }, 1200);
+            return;
+        }
+
+        function done() {
+            copyBtn.textContent = '已复制 ✓';
+            setTimeout(function () { copyBtn.textContent = '复制全文'; }, 1400);
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done, function () {
+                input.select();
+                document.execCommand('copy');
+                done();
+            });
+        } else {
+            input.select();
+            document.execCommand('copy');
+            done();
+        }
+    });
+
+    /* 初始化 */
+    update();
+})();
+</script>
+
+</body>
+</html>
