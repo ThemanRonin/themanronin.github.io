@@ -36,6 +36,8 @@
             --error-bg: rgba(220, 38, 38, 0.06);
             --success: #16a34a;
             --success-bg: rgba(22, 163, 74, 0.06);
+            --warning: #d97706;
+            --warning-bg: rgba(217, 119, 6, 0.08);
             --info-bg: rgba(10, 10, 10, 0.04);
             --radius: 8px;
             --radius-sm: 5px;
@@ -64,6 +66,8 @@
             --error-bg: rgba(248, 113, 113, 0.08);
             --success: #4ade80;
             --success-bg: rgba(74, 222, 128, 0.08);
+            --warning: #fbbf24;
+            --warning-bg: rgba(251, 191, 36, 0.1);
             --info-bg: rgba(250, 250, 250, 0.04);
             --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
             --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
@@ -227,10 +231,14 @@
         }
         textarea {
             font-family: var(--mono);
-            min-height: 130px;
+            min-height: 200px;
             resize: vertical;
             line-height: 1.6;
             font-size: 13px;
+        }
+        #output {
+            /* 高度由脚本动态对齐【输入】框底部，禁止手动拖动破坏对齐 */
+            resize: none;
         }
         input:focus,
         textarea:focus,
@@ -323,6 +331,54 @@
             cursor: not-allowed;
         }
 
+        /* ─── 密钥强度 ────────────────────────────── */
+        .strength {
+            margin-top: 10px;
+        }
+        .strength-bar {
+            height: 4px;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            overflow: hidden;
+            transition: border-color var(--transition-normal), background var(--transition-normal);
+        }
+        .strength-fill {
+            height: 100%;
+            width: 0;
+            border-radius: 999px;
+            background: var(--text-tertiary);
+            transition: width var(--transition-normal), background var(--transition-normal);
+        }
+        .strength-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+            margin-top: 6px;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            letter-spacing: 0.03em;
+        }
+        .strength-level {
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            transition: color var(--transition-normal);
+        }
+        .strength-entropy {
+            color: var(--text-secondary);
+            text-align: right;
+            transition: color var(--transition-normal);
+        }
+        .strength.level-weak .strength-fill { background: var(--error); }
+        .strength.level-fair .strength-fill { background: var(--warning); }
+        .strength.level-strong .strength-fill,
+        .strength.level-excellent .strength-fill { background: var(--success); }
+        .strength.level-weak .strength-level { color: var(--error); }
+        .strength.level-fair .strength-level { color: var(--warning); }
+        .strength.level-strong .strength-level,
+        .strength.level-excellent .strength-level { color: var(--success); }
+
         .actions {
             display: flex;
             gap: 8px;
@@ -401,7 +457,9 @@
         }
 
         .stats-panel {
-            display: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 18px;
             margin-top: 10px;
             padding: 12px 14px;
             background: var(--surface-elevated);
@@ -411,11 +469,6 @@
             font-size: 11px;
             color: var(--text-secondary);
             transition: all var(--transition-normal);
-        }
-        .stats-panel.show {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px 18px;
         }
         .stats-panel .stat-item {
             display: flex;
@@ -500,7 +553,7 @@
                 font-size: 28px;
             }
             textarea {
-                min-height: 140px;
+                min-height: 220px;
             }
             .meta div {
                 gap: 24px;
@@ -516,7 +569,7 @@
                 gap: 40px;
             }
             textarea {
-                min-height: 150px;
+                min-height: 240px;
             }
         }
 
@@ -537,7 +590,7 @@
             .meta span {
                 text-align: left;
             }
-            .stats-panel.show {
+            .stats-panel {
                 gap: 4px 10px;
             }
             .stats-panel .stat-item {
@@ -603,6 +656,13 @@
                         <input type="password" id="key" placeholder="输入任意密钥（口令）" autocomplete="off" spellcheck="false">
                         <button class="toggle-visibility" id="toggleVis" type="button">显示</button>
                     </div>
+                    <div class="strength" id="strength">
+                        <div class="strength-bar" aria-hidden="true"><div class="strength-fill" id="strengthFill"></div></div>
+                        <div class="strength-meta">
+                            <span class="strength-level" id="strengthLevel">强度 —</span>
+                            <span class="strength-entropy" id="strengthEntropy" title="">熵值 —</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="field">
@@ -642,6 +702,7 @@
                     <select id="format">
                         <option value="base64">Base64</option>
                         <option value="base64url">Base64URL</option>
+                        <option value="base58">Base58</option>
                         <option value="hex_upper">Hexadecimal (UPPER)</option>
                         <option value="hex_lower">Hexadecimal (lower)</option>
                         <option value="chinese">中文 (CJK 汉字)</option>
@@ -668,6 +729,7 @@
 
         <div class="meta">
             <div><strong>Format</strong><span>"CIPH" 魔数 + 版本字节 · v2=PBKDF2 / v3=Argon2id（兼容 v1）</span></div>
+            <div><strong>Encodings</strong><span>Base64 · Base64URL · Hex · Base58 · 中文 · 日文 · 韩文 · Emoji · 扩展ASCII</span></div>
             <div><strong>KDF</strong><span>PBKDF2-SHA512 · 600,000 轮 或 Argon2id · t=3 / m=64MB / p=4（可选）</span></div>
             <div><strong>Salt</strong><span>256-bit · 每次加密随机生成</span></div>
             <div><strong>密钥确认</strong><span>HMAC-SHA256 · 128-bit 确认码</span></div>
@@ -903,6 +965,8 @@
             const KOREAN_ALPHABET = Array.from({ length: 4096 }, (_, i) => String.fromCodePoint(0xAC00 + i));
             const EMOJI_ALPHABET = Array.from({ length: 256 }, (_, i) => String.fromCodePoint(0x1F600 + i));
             const ASCII_EXTENDED_ALPHABET = Array.from({ length: 94 }, (_, i) => String.fromCodePoint(0x21 + i));
+            // Base58（Bitcoin 字母表）：剔除 0/O/I/l 等易混淆字符
+            const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'.split('');
 
             // ════════════════════ 通用 Base-N 编解码 (分块算法 v2) ════════════════════
             // v2 编码: 0x02 ‖ len32[4](大端) ‖ payload ‖ 零填充至块对齐，逐块定宽编码。
@@ -1069,6 +1133,8 @@
                     if (/^\d+$/.test(s) && s.length < 40) return 'base64';
                     return 'hex_lower';
                 }
+                // Base58：纯字母数字且不含 0/O/I/l（Bitcoin 字母表特征），排除 Base64URL 符号与 Hex
+                if (/^[1-9A-HJ-NP-Za-km-z]+$/.test(s) && s.length >= 12) return 'base58';
                 if (/[g-zG-Z]/.test(s)) return 'base64';
                 return 'base64';
             }
@@ -1090,7 +1156,18 @@
                 statusEl.className='status show '+type; statusEl.textContent=text;
             }
             function clearStatus() { setStatus('',''); }
-            function clearStats() { statsPanel.className='stats-panel'; statsPanel.innerHTML=''; }
+            // 信息框默认常驻：无结果时展示就绪态参数，加解密前后不消失
+            function showIdleStats() {
+                const fmtLabel = formatSelect.options[formatSelect.selectedIndex].text;
+                showStats([
+                    { label:'状态', value:'就绪' },
+                    { label:'算法', value:'AES-256-GCM × XChaCha20-Poly1305' },
+                    { label:'KDF', value:KDF_INFO[currentKdf()].name+' · '+KDF_INFO[currentKdf()].desc },
+                    { label:'编码', value:fmtLabel },
+                    { label:'头部', value:HEADER_LEN+' B · Salt 256-bit · IV 96-bit · Nonce 192-bit' },
+                ]);
+            }
+            function clearStats() { showIdleStats(); }
             function showStats(items) {
                 const html = items.map((item,i)=>{
                     const sep = i<items.length-1 ? '<span class="stat-sep" aria-hidden="true">·</span>' : '';
@@ -1117,6 +1194,13 @@
                 return ratio.toFixed(1)+'×';
             }
             function formatPercent(pct) { return pct.toFixed(1)+'%'; }
+            function formatThroughput(bytes, ms) {
+                if (!(ms > 0) || !(bytes > 0)) return '—';
+                const bps = bytes / (ms / 1000);
+                if (bps < 1000) return bps.toFixed(0)+' B/s';
+                if (bps < 1e6) return (bps/1000).toFixed(1)+' KB/s';
+                return (bps/1e6).toFixed(2)+' MB/s';
+            }
             function setBusy(state) { busy=state; encryptBtn.disabled=state; decryptBtn.disabled=state; }
 
             // ════════════════════ 编解码调度 ════════════════════
@@ -1132,6 +1216,7 @@
                 switch(format) {
                     case 'base64': return btoa(bytesToBinary(bytes));
                     case 'base64url': return btoa(bytesToBinary(bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+                    case 'base58': return baseNEncode(bytes, BASE58_ALPHABET);
                     case 'hex_upper': return Array.from(bytes, b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
                     case 'hex_lower': return Array.from(bytes, b=>b.toString(16).padStart(2,'0')).join('');
                     case 'chinese': return baseNEncode(bytes, CHINESE_ALPHABET);
@@ -1152,6 +1237,7 @@
                         const pad = padded.length%4 ? '='.repeat(4-padded.length%4) : '';
                         return Uint8Array.from(atob(padded+pad), c=>c.charCodeAt(0));
                     }
+                    case 'base58': return baseNDecode(s, BASE58_ALPHABET);
                     case 'hex_upper': case 'hex_lower': {
                         const cleaned = s.replace(/[^0-9a-fA-F]/g,'');
                         if (cleaned.length%2!==0) throw new Error('Hex 长度必须为偶数');
@@ -1302,6 +1388,7 @@
             }
             kdfArgon2.addEventListener('change', () => {
                 refreshKdfHint();
+                if (!outputArea.value) showIdleStats(); // 无结果时同步就绪态参数
                 try { localStorage.setItem(KDF_KEY, currentKdf()); } catch(e) {}
             });
 
@@ -1313,8 +1400,84 @@
                     formatSelect.value = savedFmt;
             } catch(e) {}
             formatSelect.addEventListener('change', () => {
+                if (!outputArea.value) showIdleStats(); // 无结果时同步就绪态参数
                 try { localStorage.setItem(SAVED_FMT_KEY, formatSelect.value); } catch(e) {}
             });
+
+            // ════════════════════ 密钥强度 & 熵值 ════════════════════
+            const strengthEl = $('strength'), strengthFill = $('strengthFill');
+            const strengthLevel = $('strengthLevel'), strengthEntropy = $('strengthEntropy');
+            const STRENGTH_SAMPLE_MAX = 4096; // 超长口令仅取样前 4096 字符，保证输入流畅
+
+            function analyzePassword(pw) {
+                const chars = Array.from(pw.length > STRENGTH_SAMPLE_MAX ? pw.slice(0, STRENGTH_SAMPLE_MAX) : pw);
+                const n = chars.length;
+                // 字符池估计：按出现的字符类别累加可能字符数
+                let pool = 0, hasLower=false, hasUpper=false, hasDigit=false, hasSymbol=false, hasOther=false;
+                for (const ch of chars) {
+                    const cp = ch.codePointAt(0);
+                    if (cp >= 0x61 && cp <= 0x7a) hasLower = true;
+                    else if (cp >= 0x41 && cp <= 0x5a) hasUpper = true;
+                    else if (cp >= 0x30 && cp <= 0x39) hasDigit = true;
+                    else if (cp >= 0x21 && cp <= 0x7e) hasSymbol = true;
+                    else hasOther = true;
+                }
+                if (hasLower) pool += 26;
+                if (hasUpper) pool += 26;
+                if (hasDigit) pool += 10;
+                if (hasSymbol) pool += 32;
+                if (hasOther) pool += 128; // 非 ASCII 字符粗略计入
+                const poolBits = n * Math.log2(Math.max(pool, 2));
+                // 香农熵：按字符频率分布计算，可识别 "aaaaaaaa" 一类低信息量口令
+                const freq = new Map();
+                for (const ch of chars) freq.set(ch, (freq.get(ch) || 0) + 1);
+                let h = 0;
+                for (const c of freq.values()) { const p = c / n; h -= p * Math.log2(p); }
+                const shannonBits = h * n;
+                return { bits: Math.min(poolBits, shannonBits), poolBits, shannonBits, pool, n };
+            }
+
+            function updateStrength() {
+                const pw = keyInput.value;
+                if (!pw) {
+                    strengthEl.className = 'strength';
+                    strengthFill.style.width = '0%';
+                    strengthLevel.textContent = '强度 —';
+                    strengthEntropy.textContent = '熵值 —';
+                    strengthEntropy.title = '';
+                    return;
+                }
+                const a = analyzePassword(pw);
+                // 分档：<40 弱 / 40-60 中 / 60-80 强 / ≥80 极强，进度条按档内插值
+                let idx, lo, hi;
+                if (a.bits < 40) { idx=0; lo=0; hi=40; }
+                else if (a.bits < 60) { idx=1; lo=40; hi=60; }
+                else if (a.bits < 80) { idx=2; lo=60; hi=80; }
+                else { idx=3; lo=80; hi=80; }
+                const frac = hi > lo ? Math.min(1, (a.bits - lo) / (hi - lo)) : 1;
+                strengthEl.className = 'strength level-' + ['weak','fair','strong','excellent'][idx];
+                strengthFill.style.width = Math.max(4, (idx + frac) * 25) + '%';
+                strengthLevel.textContent = '强度 ' + ['弱','中','强','极强'][idx];
+                strengthEntropy.textContent = '熵值 ≈ ' + a.bits.toFixed(1) + ' bits';
+                strengthEntropy.title = '字符池 ' + a.pool + ' 类 ≈ ' + a.poolBits.toFixed(1) + ' bits · 香农熵 ' + a.shannonBits.toFixed(1) + ' bits · 取保守较小值';
+            }
+            keyInput.addEventListener('input', updateStrength);
+
+            // ════════════════════ 【结果】框底部对齐【输入】框 ════════════════════
+            // 宽屏双栏布局下，按【输入】框底边动态调整【结果】框高度；
+            // 窄屏（<820px）为堆叠布局，恢复由 CSS min-height 控制
+            const wideLayout = window.matchMedia('(min-width: 820px)');
+            function syncOutputHeight() {
+                if (!wideLayout.matches) { outputArea.style.height = ''; return; }
+                const delta = inputArea.getBoundingClientRect().bottom - outputArea.getBoundingClientRect().bottom;
+                if (Math.abs(delta) > 1) {
+                    outputArea.style.height = Math.max(120, Math.round(outputArea.offsetHeight + delta)) + 'px';
+                }
+            }
+            window.addEventListener('resize', syncOutputHeight);
+            window.addEventListener('load', syncOutputHeight);
+            setTimeout(syncOutputHeight, 250); // 字体加载与布局稳定后二次校准
+            if (window.ResizeObserver) new ResizeObserver(syncOutputHeight).observe(inputArea); // 用户拖拽【输入】高度时跟随
 
             // ════════════════════ 事件绑定 ════════════════════
             toggleVis.addEventListener('click', ()=>{
@@ -1329,6 +1492,7 @@
                 clearStatus(); clearStats();
                 resultHint.textContent = '就绪';
                 formatHint.textContent = '解密时须与加密输出格式一致';
+                updateStrength();
                 keyInput.focus();
             });
 
@@ -1356,11 +1520,14 @@
                     const overheadPct = plainLen>0 ? (overheadBytes/plainLen)*100 : 0;
                     showStats([
                         { label:'耗时', value:formatMs(elapsed) },
+                        { label:'吞吐', value:formatThroughput(plainLen, elapsed) },
                         { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
                         { label:'明文', value:formatBytes(plainLen)+' · '+plainLen+' 字节' },
                         { label:'明文字符数', value:plaintext.length+' 字符' },
                         { label:'密文', value:formatBytes(cipherBytes.length)+' · '+cipherBytes.length+' 字节' },
-                        { label:'编码输出', value:encoded.length+' 字符' },
+                        { label:'头部', value:HEADER_LEN+' B · Salt 256-bit · IV 96-bit · Nonce 192-bit · 确认码 128-bit' },
+                        { label:'AEAD Tag', value:AE_OVERHEAD+' B · GCM 128-bit + Poly1305 128-bit' },
+                        { label:'编码输出', value:encoded.length+' 字符 · '+fmt },
                         { label:'膨胀率', value:formatRatio(ratio)+' (+'+formatPercent(overheadPct)+')' },
                     ]);
                     setStatus('加密成功 · '+KDF_INFO[kdf].name+' · '+cipherBytes.length+' 字节密文 · '+encoded.length+' 字符（'+fmt+'）','success');
@@ -1410,10 +1577,22 @@
                     outputArea.value = plaintext;
                     const fmtNote = ' · 格式: ' + usedFmt + (usedFmt !== userFmt ? '（按自动识别）' : '');
                     const compressionRatio = cipherLen>0 ? plainLen/cipherLen : 0;
+                    const isV2 = cipherBytes.length >= 5 &&
+                        cipherBytes[0]===MAGIC[0] && cipherBytes[1]===MAGIC[1] &&
+                        cipherBytes[2]===MAGIC[2] && cipherBytes[3]===MAGIC[3];
+                    const verLabel = !isV2 ? 'v1 · 旧版 (PBKDF2)' : (kdf==='argon2id' ? 'v3 · Argon2id' : 'v2 · PBKDF2');
+                    const headerLen = isV2 ? HEADER_LEN : LEGACY_HEADER_LEN;
+                    const headerDesc = isV2
+                        ? headerLen+' B · 魔数+版本 5 B · Salt 256-bit · IV 96-bit · Nonce 192-bit · 确认码 128-bit'
+                        : headerLen+' B · Salt 256-bit · IV 96-bit · Nonce 192-bit · 确认码 128-bit';
                     showStats([
                         { label:'耗时', value:formatMs(elapsed) },
+                        { label:'吞吐', value:formatThroughput(plainLen, elapsed) },
                         { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
+                        { label:'密文版本', value:verLabel },
                         { label:'密文输入', value:cipherStr.length+' 字符 · '+formatBytes(cipherLen) },
+                        { label:'头部', value:headerDesc },
+                        { label:'识别格式', value:usedFmt+(usedFmt!==userFmt ? '（自动识别）' : '') },
                         { label:'明文', value:formatBytes(plainLen)+' · '+plainLen+' 字节' },
                         { label:'明文字符数', value:plaintext.length+' 字符' },
                         { label:'压缩比', value:formatRatio(compressionRatio) },
@@ -1465,6 +1644,8 @@
 
             resultHint.textContent = '就绪';
             clearStats();
+            updateStrength();
+            syncOutputHeight();
         })();
     </script>
 </body>
