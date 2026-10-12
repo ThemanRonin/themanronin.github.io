@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiquidGlass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 展示字体族：一词一字体，构成拼贴排版的多样性 -->
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Bebas+Neue&family=EB+Garamond:ital,wght@1,700&family=Monoton&family=Playfair+Display:ital,wght@1,900&family=Righteous&family=Rubik+Mono+One&family=Six+Caps&family=Space+Grotesk:wght@400;500;700&family=Unbounded:wght@900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #6ad9b8;
+    --panel-bg: rgba(15, 19, 24, 0.88);
+    --text: #e9eef4;
+    --text-dim: #8fa0b0;
+    --line: rgba(255, 255, 255, 0.09);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Space Grotesk', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #ffffff;
+  }
+
+  /* ---------- 画布 ---------- */
+  canvas.webgl {
+    position: fixed; inset: 0; display: block;
+    touch-action: none;          /* 触摸拖动时不触发页面滚动 */
+    cursor: default;
+  }
+  canvas.webgl.hovering  { cursor: grab; }
+  canvas.webgl.grabbing  { cursor: grabbing; }
+
+  /* ---------- 顶部提示 ---------- */
+  .toast {
+    position: fixed; top: 26px; left: 50%;
+    transform: translate(-50%, -10px);
+    background: var(--panel-bg); color: var(--text);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border: 1px solid var(--line);
+    padding: 10px 20px; border-radius: 100px;
+    font-size: 13px; letter-spacing: .05em;
+    opacity: 0; pointer-events: none; z-index: 20;
+    transition: opacity .5s ease, transform .5s ease;
+    white-space: nowrap; max-width: calc(100vw - 32px);
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- 控制面板 ---------- */
+  .panel {
+    position: fixed; left: 50%; bottom: 18px;
+    transform: translateX(-50%);
+    width: min(980px, calc(100vw - 28px));
+    max-height: calc(100vh - 84px);
+    overflow-y: auto;
+    background: var(--panel-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(1.25);
+    backdrop-filter: blur(20px) saturate(1.25);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 16px 22px 18px;
+    z-index: 10;
+    transition: opacity .3s ease, transform .3s ease, visibility 0s;
+  }
+  .panel.hidden {
+    opacity: 0; transform: translate(-50%, 26px);
+    pointer-events: none; visibility: hidden;
+    transition: opacity .3s ease, transform .3s ease, visibility 0s .3s;
+  }
+  .panel::-webkit-scrollbar { width: 8px; }
+  .panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 4px; }
+
+  .panel-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 2px;
+  }
+  .panel-title {
+    font-size: 13.5px; font-weight: 700; letter-spacing: .14em;
+    color: var(--text); display: flex; align-items: center; gap: 9px;
+  }
+  .title-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px rgba(106, 217, 184, .8);
+  }
+  .panel-kbd { font-size: 11px; color: var(--text-dim); letter-spacing: .06em; }
+  @media (max-width: 720px) { .panel-kbd { display: none; } }
+
+  /* ---------- 滑块网格 ---------- */
+  .controls-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 15px 24px; margin-top: 14px;
+  }
+  @media (max-width: 860px) { .controls-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .controls-grid { grid-template-columns: 1fr; } }
+
+  .ctrl-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 7px;
+  }
+  .ctrl-label { font-size: 12px; color: var(--text-dim); letter-spacing: .08em; }
+  .ctrl-value {
+    font-size: 12.5px; font-weight: 700; color: var(--accent);
+    font-variant-numeric: tabular-nums; letter-spacing: .02em;
+  }
+  .ctrl-body { display: flex; align-items: center; gap: 8px; }
+
+  /* 微调按钮 */
+  .nudge {
+    width: 24px; height: 24px; flex: none;
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.05);
+    color: var(--text-dim);
+    font-size: 14px; line-height: 1;
+    display: grid; place-items: center;
+    cursor: pointer; user-select: none;
+    font-family: inherit;
+    transition: color .15s, border-color .15s, background .15s, transform .1s;
+  }
+  .nudge:hover {
+    color: var(--accent); border-color: var(--accent);
+    background: rgba(106, 217, 184, .12);
+  }
+  .nudge:active { transform: scale(.9); }
+
+  /* 滑块 */
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    flex: 1; height: 18px; min-width: 0;
+    background: transparent; cursor: pointer; outline: none;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right,
+      var(--accent) var(--fill, 50%),
+      rgba(255,255,255,.16) var(--fill, 50%));
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px; margin-top: -5px;
+    border-radius: 50%; background: #fff; border: none;
+    box-shadow: 0 1px 5px rgba(0,0,0,.45);
+    transition: transform .12s ease;
+  }
+  input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.18); }
+  input[type="range"]::-moz-range-track {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right,
+      var(--accent) var(--fill, 50%),
+      rgba(255,255,255,.16) var(--fill, 50%));
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #fff; border: none;
+    box-shadow: 0 1px 5px rgba(0,0,0,.45);
+  }
+
+  /* 颜色选择器 */
+  input[type="color"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 30px; padding: 3px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 9px; cursor: pointer;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+  input[type="color"]::-moz-color-swatch { border: none; border-radius: 6px; }
+  input[type="color"]:hover { border-color: var(--accent); }
+
+  /* ---------- 自定义背景工具条 ---------- */
+  .custom-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin-top: 15px; padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 9px;
+    border: 1px solid rgba(255,255,255,.17);
+    background: rgba(255,255,255,.06);
+    color: var(--text);
+    font: 500 12.5px 'Space Grotesk', 'PingFang SC', sans-serif;
+    letter-spacing: .04em;
+    cursor: pointer; white-space: nowrap;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary {
+    background: var(--accent); border-color: transparent;
+    color: #0b2019; font-weight: 700;
+  }
+  .btn.primary:hover { color: #0b2019; filter: brightness(1.08); }
+
+  .text-input {
+    flex: 1; min-width: 140px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.15);
+    color: var(--text); border-radius: 9px;
+    padding: 8px 12px; outline: none;
+    font: 500 13px 'Space Grotesk', 'PingFang SC', sans-serif;
+    transition: border-color .15s;
+  }
+  .text-input:focus { border-color: var(--accent); }
+  .text-input::placeholder { color: var(--text-dim); }
+
+  select.text-input {
+    -webkit-appearance: none; appearance: none;
+    flex: none; width: auto; cursor: pointer;
+    padding-right: 30px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%238fa0b0' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 11px center;
+  }
+  select.text-input option { background: #161b21; color: #e9eef4; }
+
+  .color-mini { width: 40px; height: 36px; flex: none; }
+
+  /* ---------- 折叠按钮 ---------- */
+  .fold-btn {
+    position: fixed; right: 20px; bottom: 20px;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: var(--panel-bg); color: var(--accent);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,.13);
+    display: grid; place-items: center;
+    cursor: pointer; z-index: 11;
+    transition: transform .18s ease, border-color .18s ease;
+  }
+  .fold-btn:hover { transform: scale(1.07); border-color: var(--accent); }
+  .fold-btn:active { transform: scale(.96); }
+</style>
+</head>
+<body>
+
+  <!-- 顶部操作提示（短暂显示后淡出） -->
+  <div class="toast" id="toast"></div>
+
+  <!-- 底部控制面板 -->
+  <div class="panel" id="panel">
+    <div class="panel-head">
+      <div class="panel-title"><span class="title-dot"></span>LiquidGlass</div>
+      <div class="panel-kbd">R 复位 · H 面板 · ←→↑↓ 调整尺寸 · 拖动玻璃</div>
+    </div>
+
+    <div class="controls-grid">
+      <!-- 宽度 -->
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="ctrl-label">宽度</span><output class="ctrl-value" id="widthValue"></output></div>
+        <div class="ctrl-body">
+          <button class="nudge" data-target="width" data-dir="-1" aria-label="减小宽度">−</button>
+          <input type="range" id="widthSlider" data-key="width" min="80" max="500" step="5" value="260">
+          <button class="nudge" data-target="width" data-dir="1" aria-label="增大宽度">+</button>
+        </div>
+      </div>
+      <!-- 高度 -->
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="ctrl-label">高度</span><output class="ctrl-value" id="heightValue"></output></div>
+        <div class="ctrl-body">
+          <button class="nudge" data-target="height" data-dir="-1" aria-label="减小高度">−</button>
+          <input type="range" id="heightSlider" data-key="height" min="40" max="300" step="5" value="100">
+          <button class="nudge" data-target="height" data-dir="1" aria-label="增大高度">+</button>
+        </div>
+      </div>
+      <!-- 圆角 -->
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="ctrl-label">圆角</span><output class="ctrl-value" id="radiusValue"></output></div>
+        <div class="ctrl-body">
+          <button class="nudge" data-target="radius" data-dir="-1" aria-label="减小圆角">−</button>
+          <input type="range" id="radiusSlider" data-key="radius" min="0" max="50" step="1" value="22">
+          <button class="nudge" data-target="radius" data-dir="1" aria-label="增大圆角">+</button>
+        </div>
+      </div>
+      <!-- 折射强度 -->
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="ctrl-label">折射强度</span><output class="ctrl-value" id="refractionValue"></output></div>
+        <div class="ctrl-body">
+          <button class="nudge" data-target="refraction" data-dir="-1" aria-label="减小折射强度">−</button>
+          <input type="range" id="refractionSlider" data-key="refraction" min="0" max="1.5" step="0.005" value="0.20">
+          <button class="nudge" data-target="refraction" data-dir="1" aria-label="增大折射强度">+</button>
+        </div>
+      </div>
+      <!-- 色散强度 -->
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="ctrl-label">色散强度</span><output class="ctrl-value" id="dispersionValue"></output></div>
+        <div class="ctrl-body">
+          <button class="nudge" data-target="dispersion" data-dir="-1" aria-label="减小色散强度">−</button>
+          <input type="range" id="dispersionSlider" data-key="dispersion" min="0" max="1.5" step="0.005" value="0.30">
+          <button class="nudge" data-target="dispersion" data-dir="1" aria-label="增大色散强度">+</button>
+        </div>
+      </div>
+      <!-- 放大倍率：范围 0.9 – 5，步进 0.02（微调按钮自动同步 0.02 步进） -->
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="ctrl-label">放大倍率</span><output class="ctrl-value" id="magnifyValue"></output></div>
+        <div class="ctrl-body">
+          <button class="nudge" data-target="magnify" data-dir="-1" aria-label="减小放大倍率">−</button>
+          <input type="range" id="magnifySlider" data-key="magnify" min="0.9" max="5" step="0.02" value="1.0">
+          <button class="nudge" data-target="magnify" data-dir="1" aria-label="增大放大倍率">+</button>
+        </div>
+      </div>
+      <!-- 边缘光晕 -->
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="ctrl-label">边缘光晕</span><output class="ctrl-value" id="glowValue"></output></div>
+        <div class="ctrl-body">
+          <button class="nudge" data-target="glow" data-dir="-1" aria-label="减小边缘光晕">−</button>
+          <input type="range" id="glowSlider" data-key="glow" min="0" max="1.5" step="0.005" value="0.10">
+          <button class="nudge" data-target="glow" data-dir="1" aria-label="增大边缘光晕">+</button>
+        </div>
+      </div>
+      <!-- 模糊强度 -->
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="ctrl-label">模糊强度</span><output class="ctrl-value" id="blurValue"></output></div>
+        <div class="ctrl-body">
+          <button class="nudge" data-target="blur" data-dir="-1" aria-label="减小模糊强度">−</button>
+          <input type="range" id="blurSlider" data-key="blur" min="0" max="2" step="0.005" value="0.30">
+          <button class="nudge" data-target="blur" data-dir="1" aria-label="增大模糊强度">+</button>
+        </div>
+      </div>
+      <!-- 背景色 -->
+      <div class="ctrl">
+        <div class="ctrl-head"><span class="ctrl-label">背景色</span></div>
+        <input type="color" id="bgColor" value="#ffffff" title="背景色">
+      </div>
+    </div>
+
+    <!-- 自定义背景工具条 -->
+    <div class="custom-bar">
+      <button class="btn" id="importBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        导入背景图片
+      </button>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+      <input type="text" id="textInput" class="text-input" placeholder="输入自定义文本..." maxlength="40">
+      <select id="fontSelect" class="text-input" title="字体">
+        <option value="Arial" selected>Arial</option>
+        <option value="Verdana">Verdana</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Impact">Impact</option>
+        <option value="Comic Sans MS">Comic Sans MS</option>
+        <option value="Trebuchet MS">Trebuchet MS</option>
+        <option value="Arial Black">Arial Black</option>
+        <option value="Palatino Linotype">Palatino Linotype</option>
+      </select>
+      <input type="color" id="textColor" class="color-mini" value="#1e3a8a" title="文本颜色">
+      <button class="btn primary" id="addTextBtn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        添加文本
+      </button>
+    </div>
+  </div>
+
+  <!-- 面板折叠按钮 -->
+  <button class="fold-btn" id="foldBtn" aria-label="隐藏控制面板">
+    <svg width="19" height="19" viewBox="0 0 24 24">
+      <path d="M4 6h16M4 12h16M4 18h16" stroke="rgba(255,255,255,.38)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="15" cy="6" r="2.6" fill="currentColor"/>
+      <circle cx="8" cy="12" r="2.6" fill="currentColor"/>
+      <circle cx="17" cy="18" r="2.6" fill="currentColor"/>
+    </svg>
+  </button>
+
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    /* ================================================================
+     * 一、DOM 缓存与全局参数
+     * ================================================================ */
+    const $ = id => document.getElementById(id);
+    const toastEl = $('toast'), panelEl = $('panel'), foldBtn = $('foldBtn');
+    const fileInput = $('fileInput'), importBtn = $('importBtn');
+    const textInput = $('textInput'), fontSelect = $('fontSelect');
+    const textColor = $('textColor'), addTextBtn = $('addTextBtn'), bgColorInput = $('bgColor');
+
+    const DPR_CAP = 2;
+    const params = { width: 260, height: 100, radius: 22 };
+    let rtDirty = true;   // 背景脏标记：只有背景变化时才重绘离屏目标
+
+    /* ================================================================
+     * 二、渲染器 / 场景 / 相机 / 离屏渲染目标
+     * ================================================================ */
+    // 关闭颜色管理并使用线性输出，保证"离屏背景"与"玻璃内采样"的色彩完全一致
+    THREE.ColorManagement.enabled = false;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+    const pr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+    renderer.setPixelRatio(pr);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.domElement.className = 'webgl';
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#ffffff');
+
+    // 正交相机按像素铺满视口：世界坐标 = 像素坐标，拖动换算最直接
+    const camera = new THREE.OrthographicCamera(
+      -window.innerWidth / 2, window.innerWidth / 2,
+      window.innerHeight / 2, -window.innerHeight / 2,
+      0.1, 100
+    );
+    camera.position.z = 10;
+
+    // 背景专用离屏渲染目标（线性过滤 + 4x MSAA），玻璃着色器采样它实现折射
+    const rt = new THREE.WebGLRenderTarget(
+      window.innerWidth * pr, window.innerHeight * pr,
+      { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, samples: 4 }
+    );
+
+    /* ================================================================
+     * 三、背景元素：几何装饰（立即构建）+ 排版层（字体就绪后构建）
+     * ================================================================ */
+    const bgGroup = new THREE.Group();
+    scene.add(bgGroup);
+
+    // 深色调色板：印刷风格的浓郁色系，在白底下清晰有力
+    const PALETTE = {
+      ink:         '#1c2130',
+      ultramarine: '#1c3fae',
+      crimson:     '#a3123c',
+      viridian:    '#0a6b4c',
+      rust:        '#b4530a',
+      teal:        '#0d5c66'
+    };
+    const PALETTE_LIST = Object.values(PALETTE);
+
+    const SS = 2; // Canvas 2x 超采样，保证文字边缘锐利
+
+    function makeCtx(w, h) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(w * SS);
+      canvas.height = Math.ceil(h * SS);
+      const ctx = canvas.getContext('2d');
+      ctx.scale(SS, SS);
+      return { canvas, ctx };
+    }
+
+    // 整串文本宽度测量（含字距）
+    function measureTracked(font, text, tracking = 0) {
+      const probe = document.createElement('canvas').getContext('2d');
+      probe.font = font;
+      let w = -tracking;
+      for (const ch of text) w += probe.measureText(ch).width + tracking;
+      return Math.max(w, 1);
+    }
+
+    // 逐字符绘制：实现跨浏览器一致的字距控制（不依赖 ctx.letterSpacing）
+    function drawTracked(ctx, text, cx, cy, tracking = 0, stroke = false) {
+      const chars = [...text];
+      const widths = chars.map(ch => ctx.measureText(ch).width);
+      const total = widths.reduce((a, b) => a + b, 0) + tracking * Math.max(0, chars.length - 1);
+      let x = cx - total / 2;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < chars.length; i++) {
+        if (stroke) ctx.strokeText(chars[i], x, cy);
+        else ctx.fillText(chars[i], x, cy);
+        x += widths[i] + tracking;
+      }
+    }
+
+    // 将画布封装为背景平面并挂到背景组
+    function addTexturedMesh(canvas, w, h, x, y, z, rot) {
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+      );
+      mesh.position.set(x, y, z);
+      mesh.rotation.z = rot || 0;
+      bgGroup.add(mesh);
+      return mesh;
+    }
+
+    /* ---------- 多风格文字工厂 ----------
+     * solid   实心字          rule    实心大字 + 强调色粗横线（编辑排版风）
+     * boxed   实心字 + 描边框（印章风） outline 空心描边字
+     * glitch  红青色差边缘（CRT 故障风） offset 双色套印错位（复古印刷风）
+     * slice   水平条带错位切片（故障艺术风） tracked 带字距的实心字
+     */
+    function addStyledWord(spec) {
+      const font = `${spec.italic ? 'italic ' : ''}${spec.weight || '400'} ${spec.size}px '${spec.font}', sans-serif`;
+      const tracking = spec.tracking || 0;
+      const textW = measureTracked(font, spec.text, tracking);
+      const pad = { boxed: 16, slice: 18, offset: 14 }[spec.style] || 10;
+      const W = Math.ceil(textW + pad * 2);
+      const H = Math.ceil(spec.size * 1.3 + pad * 2);
+      const { canvas, ctx } = makeCtx(W, H);
+      ctx.font = font;
+      const cx = W / 2, cy = H / 2;
+
+      switch (spec.style) {
+        case 'solid':
+        case 'tracked':
+          ctx.fillStyle = spec.color;
+          drawTracked(ctx, spec.text, cx, cy, tracking);
+          break;
+
+        case 'rule': { // 大字 + 底部强调色横线
+          ctx.fillStyle = spec.color;
+          drawTracked(ctx, spec.text, cx, cy - spec.size * 0.1, tracking);
+          ctx.fillStyle = spec.accent;
+          ctx.fillRect(cx - textW / 2, cy + spec.size * 0.34, textW, Math.max(5, spec.size * 0.085));
+          break;
+        }
+
+        case 'boxed': { // 文字 + 细描边外框
+          ctx.fillStyle = spec.color;
+          drawTracked(ctx, spec.text, cx, cy, tracking);
+          ctx.strokeStyle = spec.color;
+          ctx.lineWidth = 2.5;
+          ctx.strokeRect(7.5, 7.5, W - 15, H - 15);
+          break;
+        }
+
+        case 'outline': { // 空心字
+          ctx.strokeStyle = spec.color;
+          ctx.lineWidth = Math.max(2, spec.size * 0.055);
+          ctx.lineJoin = 'round';
+          drawTracked(ctx, spec.text, cx, cy, tracking, true);
+          break;
+        }
+
+        case 'glitch': { // 红青色差边缘 + 实心主体
+          ctx.fillStyle = '#cf1f4e';
+          drawTracked(ctx, spec.text, cx - 3.5, cy - 1, tracking);
+          ctx.fillStyle = '#0b7f95';
+          drawTracked(ctx, spec.text, cx + 3.5, cy + 1, tracking);
+          ctx.fillStyle = spec.color;
+          drawTracked(ctx, spec.text, cx, cy, tracking);
+          break;
+        }
+
+        case 'offset': { // 双色套印错位
+          ctx.fillStyle = spec.accent;
+          drawTracked(ctx, spec.text, cx + 4, cy + 4, tracking);
+          ctx.fillStyle = spec.color;
+          drawTracked(ctx, spec.text, cx, cy, tracking);
+          break;
+        }
+
+        case 'slice': { // 条带切片：先画幽灵底字填补缝隙，再把主体按条带错位拼贴
+          ctx.globalAlpha = 0.15;
+          ctx.fillStyle = spec.color;
+          drawTracked(ctx, spec.text, cx, cy, tracking);
+          ctx.globalAlpha = 1.0;
+          const tmp = makeCtx(W, H);
+          tmp.ctx.font = font;
+          tmp.ctx.fillStyle = spec.color;
+          drawTracked(tmp.ctx, spec.text, cx, cy, tracking);
+          const bandH = Math.max(5, Math.round(spec.size / 8));
+          for (let y = 0; y < H; y += bandH) {
+            const h = Math.min(bandH, H - y);
+            const dx = ((y / bandH) % 2 === 0 ? -1 : 1) * (2 + Math.random() * 6);
+            ctx.drawImage(tmp.canvas, 0, y * SS, W * SS, h * SS, dx, y, W, h);
+          }
+          break;
+        }
+      }
+      addTexturedMesh(canvas, W, H, spec.x, spec.y, spec.z ?? -0.05, spec.rot);
+    }
+
+    // 小标签：前置色块 + 细字距说明文字（图纸标注风）
+    function addAnnotation(spec) {
+      const size = spec.size || 13.5;
+      const font = `700 ${size}px 'Space Grotesk', sans-serif`;
+      const tracking = spec.tracking ?? 3;
+      const textW = measureTracked(font, spec.text, tracking);
+      const sq = 6, gap = 9, pad = 6;
+      const W = Math.ceil(pad + sq + gap + textW + pad);
+      const H = Math.ceil(size * 1.7);
+      const { canvas, ctx } = makeCtx(W, H);
+      ctx.font = font;
+      ctx.fillStyle = spec.color;
+      ctx.fillRect(pad, H / 2 - sq / 2, sq, sq);
+      drawTracked(ctx, spec.text, pad + sq + gap + textW / 2, H / 2 + 1, tracking);
+      addTexturedMesh(canvas, W, H, spec.x, spec.y, -0.02, spec.rot);
+    }
+
+    // 十字标记
+    function addPlusMark(x, y, size, color, rot) {
+      const { canvas, ctx } = makeCtx(size, size);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(size / 2, 2.5); ctx.lineTo(size / 2, size - 2.5);
+      ctx.moveTo(2.5, size / 2); ctx.lineTo(size - 2.5, size / 2);
+      ctx.stroke();
+      addTexturedMesh(canvas, size, size, x, y, -0.1, rot);
+    }
+
+    // 虚线圆（LineLoop + 虚线材质）
+    function addDashedCircle(x, y, radius, color, z) {
+      const points = [];
+      for (let i = 0; i < 96; i++) {
+        const a = (i / 96) * Math.PI * 2;
+        points.push(new THREE.Vector3(Math.cos(a) * radius, Math.sin(a) * radius, 0));
+      }
+      const line = new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints(points),
+        new THREE.LineDashedMaterial({ color, dashSize: 7, gapSize: 6 })
+      );
+      line.computeLineDistances();
+      line.position.set(x, y, z);
+      bgGroup.add(line);
+    }
+
+    // 细描边圆环
+    function addRing(x, y, radius, color, z) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(radius - 1.2, radius, 56),
+        new THREE.MeshBasicMaterial({ color })
+      );
+      ring.position.set(x, y, z);
+      bgGroup.add(ring);
+    }
+
+    // 实心圆点（直径 7–20）
+    function addDot(x, y, radius, color, z = -0.12) {
+      const dot = new THREE.Mesh(
+        new THREE.CircleGeometry(radius, 28),
+        new THREE.MeshBasicMaterial({ color })
+      );
+      dot.position.set(x, y, z);
+      bgGroup.add(dot);
+    }
+
+    // ---- 几何装饰：不依赖网络字体，页面一打开就渲染 ----
+    function buildGeometricDecor() {
+      // 中心"观测目标"：虚线圆 + 轨道点（正好藏在玻璃下方，拖开玻璃或开大放大倍率即可发现）
+      addDashedCircle(0, 0, 52, PALETTE.ink, -0.09);
+      addDot(40, 33, 5, PALETTE.crimson, -0.085);
+      addDot(-42, -30, 4, PALETTE.viridian, -0.085);
+
+      // 细描边圆环
+      addRing(208, 66, 26, PALETTE.teal, -0.12);
+      addRing(-212, -98, 34, PALETTE.crimson, -0.12);
+
+      // 十字标记
+      addPlusMark(-214, 100, 18, PALETTE.ultramarine, 0.2);
+      addPlusMark(214, -30, 18, PALETTE.crimson, -0.15);
+      addPlusMark(-36, 214, 18, PALETTE.viridian, 0.1);
+      addPlusMark(42, -212, 18, PALETTE.rust, -0.3);
+
+      // 彩色圆点：随机散布在中央区域
+      for (let i = 0; i < 12; i++) {
+        addDot(
+          (Math.random() * 2 - 1) * 215, (Math.random() * 2 - 1) * 215,
+          3.5 + Math.random() * 6.5,
+          PALETTE_LIST[i % PALETTE_LIST.length]
+        );
+      }
+
+      // 彩色条纹：细长矩形 + 随机旋转
+      for (let i = 0; i < 5; i++) {
+        const stripe = new THREE.Mesh(
+          new THREE.PlaneGeometry(70 + Math.random() * 100, 4 + Math.random() * 2),
+          new THREE.MeshBasicMaterial({ color: PALETTE_LIST[(i * 2 + 1) % PALETTE_LIST.length] })
+        );
+        stripe.position.set((Math.random() * 2 - 1) * 200, (Math.random() * 2 - 1) * 200, -0.18);
+        stripe.rotation.z = (Math.random() * 2 - 1) * 0.7;
+        bgGroup.add(stripe);
+      }
+    }
+
+    // ---- 排版层：一词一字体一风格，等展示字体全部就绪后再绘制 ----
+    function buildTypographyLayer() {
+      // 幽灵底字：超大浅色字铺在最底层，增加海报层次
+      addStyledWord({ text: 'GLASS', font: 'Six Caps', size: 230, style: 'solid',
+        color: '#e4e8f1', x: 0, y: 12, rot: -0.012, z: -0.22, tracking: 4 });
+
+      // 主排版词组
+      addStyledWord({ text: 'GLASS', font: 'Six Caps', size: 92, style: 'rule',
+        color: PALETTE.ink, accent: PALETTE.ultramarine, x: -142, y: 156, rot: -0.035, z: -0.05 });
+      addStyledWord({ text: 'REFRACTION', font: 'Archivo Black', size: 40, style: 'boxed',
+        color: PALETTE.ultramarine, x: 46, y: 114, rot: 0.012, z: -0.06 });
+      addStyledWord({ text: 'DISPERSION', font: 'Bebas Neue', size: 62, style: 'slice',
+        color: PALETTE.crimson, x: -84, y: 44, rot: -0.018, z: -0.07 });
+      addStyledWord({ text: 'OPTICS', font: 'Rubik Mono One', size: 37, style: 'glitch',
+        color: PALETTE.viridian, x: 112, y: 26, rot: 0.030, z: -0.05 });
+      addStyledWord({ text: 'PRISM', font: 'Monoton', size: 54, style: 'solid',
+        color: PALETTE.teal, x: -70, y: -46, rot: -0.030, z: -0.06 });
+      addStyledWord({ text: 'SPECTRUM', font: 'Playfair Display', weight: '900', italic: true,
+        size: 60, style: 'offset', color: PALETTE.ink, accent: PALETTE.crimson,
+        x: 84, y: -78, rot: 0.020, z: -0.05 });
+      addStyledWord({ text: 'CAUSTICS', font: 'Righteous', size: 42, style: 'outline',
+        color: PALETTE.rust, x: -122, y: -152, rot: 0.045, z: -0.05 });
+      addStyledWord({ text: 'SNELL', font: 'Unbounded', weight: '900', size: 24,
+        style: 'tracked', tracking: 8, color: PALETTE.ultramarine, x: 152, y: -158, rot: -0.020, z: -0.04 });
+
+      // 巨型希腊字母 λ：光波长的经典符号（EB Garamond 的希腊斜体非常优雅）
+      addStyledWord({ text: 'λ', font: 'EB Garamond', weight: '700', italic: true,
+        size: 110, style: 'solid', color: PALETTE.crimson, x: 204, y: 186, rot: -0.08, z: -0.06 });
+
+      // 图纸标注：真实的物理数值，让画面像一页光学笔记
+      addAnnotation({ text: "FIG. 01 — SNELL'S LAW", x: -140, y: 62, rot: -0.02, color: '#5a6478' });
+      addAnnotation({ text: 'n = 1.52', x: 46, y: 172, rot: 0.012, color: PALETTE.ultramarine });
+      addAnnotation({ text: 'λ 400 — 700 NM', x: 60, y: -120, rot: 0.02, color: '#5a6478' });
+      addAnnotation({ text: 'θc = 41.14°', x: -70, y: -98, rot: -0.03, color: '#5a6478' });
+      addAnnotation({ text: 'FIG. 02 — CHROMATIC SPLIT', x: 112, y: 70, rot: 0.03, color: '#5a6478' });
+    }
+
+    // 展示字体清单：全部加载完成后再绘制排版层（超时则回退系统字体，绝不阻塞）
+    const DISPLAY_FONT_SPECS = [
+      "400 90px 'Six Caps'",
+      "400 90px 'Archivo Black'",
+      "400 90px 'Bebas Neue'",
+      "400 90px 'Monoton'",
+      "400 90px 'Righteous'",
+      "400 90px 'Rubik Mono One'",
+      "italic 900 90px 'Playfair Display'",
+      "italic 700 110px 'EB Garamond'",
+      "900 90px 'Unbounded'",
+      "700 90px 'Space Grotesk'"
+    ];
+
+    async function loadDisplayFonts() {
+      const sample = 'GLASS REFRACTION λ θ — ° 0123456789';
+      try {
+        await Promise.race([
+          Promise.all(DISPLAY_FONT_SPECS.map(f => document.fonts.load(f, sample))),
+          new Promise((_, reject) => setTimeout(reject, 4500))
+        ]);
+      } catch (err) { /* 加载超时：用回退字体继续绘制 */ }
+    }
+
+    /* ================================================================
+     * 四、玻璃着色器（SDF 圆角 + 折射 / 色散 / 放大 / 模糊 / 光晕）
+     * ================================================================ */
+    const VERT_SRC = /* glsl */`
+      varying vec2 vLocalPos;   // 玻璃局部坐标（用于 SDF 与放大偏移）
+      varying vec2 vUv;
+      void main() {
+        vLocalPos = position.xy;
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+
+    const FRAG_SRC = /* glsl */`
+      uniform sampler2D uBackground;      // 离屏渲染的背景纹理
+      uniform vec2  uResolution;         // 渲染目标分辨率（物理像素）
+      uniform float uHalfWidth;         // 玻璃半宽
+      uniform float uHalfHeight;        // 玻璃半高
+      uniform float uCornerRadius;      // 圆角半径
+      uniform float uRefractionStrength;// 折射强度
+      uniform float uDispersionStrength;// 色散强度
+      uniform float uMagnification;     // 放大倍率（0.9–5，物理映射）
+      uniform float uEdgeGlow;          // 边缘光晕
+      uniform float uBlurStrength;      // 模糊强度
+
+      varying vec2 vLocalPos;
+      varying vec2 vUv;
+
+      // 标准圆角矩形 SDF：负值在内部，正值在外部
+      float sdRoundBox(vec2 p, vec2 halfSize, float radius) {
+        vec2 q = abs(p) - halfSize + vec2(radius);
+        return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
+      }
+
+      float gaussianWeight(vec2 d, float sigma) {
+        return exp(-dot(d, d) / (2.0 * sigma * sigma));
+      }
+
+      // 可变半径高斯模糊采样：pixelRadius / sigma / 循环范围均由模糊强度决定
+      vec3 sampleBlurredBackground(vec2 uv, float blurStrength) {
+        float pixelRadius = blurStrength * 4.0;
+        if (pixelRadius < 0.05) return texture2D(uBackground, uv).rgb;
+        float sigma = max(1.0, pixelRadius / 2.0);
+        int range = int(ceil(pixelRadius)) + 1;
+        vec2 texel = 1.0 / uResolution;
+        vec3 acc = vec3(0.0);
+        float total = 0.0;
+        // 固定上限循环（GLSL ES 1.0 兼容），圆形核内累加高斯权重
+        for (int x = -9; x <= 9; x++) {
+          for (int y = -9; y <= 9; y++) {
+            vec2 d = vec2(float(x), float(y));
+            if (dot(d, d) > float(range * range + 2)) continue;
+            float w = gaussianWeight(d, sigma);
+            acc += texture2D(uBackground, uv + d * texel).rgb * w;
+            total += w;
+          }
+        }
+        return acc / total;
+      }
+
+      void main() {
+        // ---- 形状：圆角矩形 SDF + 屏幕空间导数抗锯齿 ----
+        float sdf = sdRoundBox(vLocalPos, vec2(uHalfWidth, uHalfHeight), uCornerRadius);
+        float aa = fwidth(sdf);
+        float alpha = 1.0 - smoothstep(-aa, aa, sdf);
+        if (alpha < 0.01) discard;   // 完全透明的片元直接丢弃
+
+        // ---- 边缘权重：高斯衰减，令折射效果集中于玻璃边缘 ----
+        float edgeWidth = max(2.0, min(uHalfWidth, uHalfHeight) * 0.12);
+        float edgeWeight = exp(-(sdf * sdf) / (2.0 * edgeWidth * edgeWidth));
+
+        // ---- 径向折射方向：从中心指向外部再取反（即指向中心）----
+        // 安全处理中心奇点：长度过小时方向置零，避免除以零
+        float distFromCenter = length(vLocalPos);
+        vec2 radialDir = vec2(0.0);
+        if (distFromCenter > 1e-6) {
+          radialDir = -vLocalPos / distFromCenter;
+        }
+
+        // ---- 折射 / 色散总量（以像素为单位，边缘加权）----
+        float totalRefraction = uRefractionStrength * edgeWeight * 50.0;
+        float totalDispersion = uDispersionStrength * edgeWeight * 16.0;
+
+        /* ---- 放大：物理正确的透镜映射 + 线性偏移 ----
+         * magBase = 1 - 1/M：滑块值即玻璃中心的真实倍率
+         *   M = 1   → 0（无效果）   M = 5 → 0.8（真实放大 5 倍）
+         *   M < 1   → 轻微缩小
+         * 中心区域保持真实倍率，靠近边缘衰减到 30%，与玻璃外的背景无缝衔接；
+         * 任意倍率下 |scale| < 1，采样点始终落在指向中心的同一侧，绝不镜像翻转。
+         * 偏移基于玻璃自身局部坐标线性缩放（-vLocalPos * scale），与屏幕中心无关。 */
+        float mag = clamp(uMagnification, 0.9, 5.0);
+        float magBase = 1.0 - 1.0 / mag;
+        float magnifyScale = magBase * (0.3 + 0.7 * (1.0 - edgeWeight));
+        vec2 magnifyOffsetVector = -vLocalPos * magnifyScale;
+
+        // ---- RGB 三通道分离偏移（色散 = 红蓝反向分离）----
+        vec2 offsetR = radialDir * (totalRefraction + totalDispersion) + magnifyOffsetVector;
+        vec2 offsetG = radialDir * totalRefraction + magnifyOffsetVector;
+        vec2 offsetB = radialDir * (totalRefraction - totalDispersion) + magnifyOffsetVector;
+
+        // 以当前片元的屏幕像素坐标为基准，加偏移后转 UV 采样背景
+        vec2 screenPos = gl_FragCoord.xy;
+        vec3 refractedColor;
+        refractedColor.r = sampleBlurredBackground((screenPos + offsetR) / uResolution, uBlurStrength).r;
+        refractedColor.g = sampleBlurredBackground((screenPos + offsetG) / uResolution, uBlurStrength).g;
+        refractedColor.b = sampleBlurredBackground((screenPos + offsetB) / uResolution, uBlurStrength).b;
+
+        // ---- 边缘高光 ----
+        float highlight = smoothstep(-edgeWidth, 0.0, sdf) * uEdgeGlow * edgeWeight * 1.5;
+        refractedColor += vec3(highlight);
+
+        // ---- 色散彩虹：正弦调制彩色，只叠加在边缘区域 ----
+        vec3 rainbow = 0.5 + 0.5 * cos(vLocalPos.xyx * vec3(0.052, 0.061, 0.044) + vec3(0.0, 2.094, 4.188));
+        refractedColor += rainbow * uDispersionStrength * edgeWeight * 0.16;
+
+        // ---- 内嵌边框线 ----
+        float borderLine = smoothstep(-1.5, 0.0, sdf) * smoothstep(-4.0, -1.5, sdf);
+        refractedColor += vec3(borderLine * 0.28);
+
+        // ---- 玻璃冷色调 & 边缘暗角 ----
+        refractedColor += vec3(0.02, 0.03, 0.04);
+        refractedColor *= (1.0 - edgeWeight * 0.12);
+
+        gl_FragColor = vec4(refractedColor, alpha);
+      }
+    `;
+
+    /* ================================================================
+     * 五、创建玻璃网格
+     * ================================================================ */
+    const glassUniforms = {
+      uBackground:         { value: rt.texture },
+      uResolution:         { value: new THREE.Vector2(window.innerWidth * pr, window.innerHeight * pr) },
+      uHalfWidth:          { value: params.width / 2 },
+      uHalfHeight:         { value: params.height / 2 },
+      uCornerRadius:       { value: params.radius },
+      uRefractionStrength: { value: 0.20 },
+      uDispersionStrength: { value: 0.30 },
+      uMagnification:      { value: 1.0 },
+      uEdgeGlow:           { value: 0.10 },
+      uBlurStrength:       { value: 0.30 }
+    };
+
+    function createGlassMesh() {
+      const geometry = new THREE.PlaneGeometry(params.width, params.height, 64, 32);
+      const material = new THREE.ShaderMaterial({
+        vertexShader: VERT_SRC,
+        fragmentShader: FRAG_SRC,
+        uniforms: glassUniforms,
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        blending: THREE.NormalBlending,
+        extensions: { derivatives: true }
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(0, 0, 0.1);   // 位于所有背景元素之前，避免背景穿透
+      return mesh;
+    }
+    const glassMesh = createGlassMesh();
+    scene.add(glassMesh);
+
+    // 宽 / 高变化时重建几何体（圆角始终由着色器裁剪，无需重建）
+    function rebuildGlass() {
+      glassMesh.geometry.dispose();
+      glassMesh.geometry = new THREE.PlaneGeometry(params.width, params.height, 64, 32);
+      glassUniforms.uHalfWidth.value = params.width / 2;
+      glassUniforms.uHalfHeight.value = params.height / 2;
+      updateRadiusLimit();
+    }
+
+    /* ================================================================
+     * 六、滑块 / 微调按钮 / 键盘 统一参数系统
+     * ================================================================ */
+    const sliders = {};   // key -> { el, out, refresh, decimals, suffix }
+
+    // 参数应用：宽高触发几何重建，其余直接写入 uniform
+    function applyParam(key, v) {
+      switch (key) {
+        case 'width':      params.width = v;  rebuildGlass(); break;
+        case 'height':     params.height = v; rebuildGlass(); break;
+        case 'radius':     params.radius = v; glassUniforms.uCornerRadius.value = v; break;
+        case 'refraction': glassUniforms.uRefractionStrength.value = v; break;
+        case 'dispersion': glassUniforms.uDispersionStrength.value = v; break;
+        case 'magnify':    glassUniforms.uMagnification.value = v; break;
+        case 'glow':       glassUniforms.uEdgeGlow.value = v; break;
+        case 'blur':       glassUniforms.uBlurStrength.value = v; break;
+      }
+    }
+
+    // 初始化滑块：绑定事件、刷新显示值和 uniform、更新填充轨道
+    function setupSlider(sliderEl, displayEl, uniformKey, decimals, suffix = '') {
+      const refresh = () => {
+        const v = parseFloat(sliderEl.value);
+        displayEl.textContent = v.toFixed(decimals) + suffix;
+        const min = parseFloat(sliderEl.min), max = parseFloat(sliderEl.max);
+        const pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
+        sliderEl.style.setProperty('--fill', pct.toFixed(2) + '%');
+        applyParam(uniformKey, v);
+      };
+      sliderEl.addEventListener('input', refresh);
+      sliders[uniformKey] = { el: sliderEl, out: displayEl, refresh, decimals };
+      refresh();
+    }
+
+    setupSlider($('widthSlider'),      $('widthValue'),      'width',      0, ' px');
+    setupSlider($('heightSlider'),     $('heightValue'),     'height',     0, ' px');
+    setupSlider($('radiusSlider'),    $('radiusValue'),     'radius',     0);
+    setupSlider($('refractionSlider'), $('refractionValue'), 'refraction', 3);
+    setupSlider($('dispersionSlider'), $('dispersionValue'), 'dispersion', 3);
+    setupSlider($('magnifySlider'),    $('magnifyValue'),    'magnify',    2, '×');   // 0.9–5，步进 0.02，保留两位小数
+    setupSlider($('glowSlider'),      $('glowValue'),        'glow',       3);
+    setupSlider($('blurSlider'),      $('blurValue'),        'blur',       3);
+
+    // 圆角上限随宽高变化：max = min(width, height) / 2，超出则自动回落
+    function updateRadiusLimit() {
+      const c = sliders.radius;
+      if (!c) return;
+      const maxR = Math.floor(Math.min(params.width, params.height) / 2);
+      c.el.max = maxR;
+      if (params.radius > maxR) c.el.value = maxR;
+      c.refresh();
+    }
+
+    // 统一的数值微调（键盘方向键与微调按钮共用），带范围钳制与浮点修正
+    function nudge(key, delta) {
+      const c = sliders[key];
+      let v = parseFloat(c.el.value) + delta;
+      const min = parseFloat(c.el.min), max = parseFloat(c.el.max);
+      v = Math.min(max, Math.max(min, v));
+      c.el.value = parseFloat(v.toFixed(c.decimals));
+      c.refresh();
+    }
+
+    // 微调按钮：data-target 指向滑块 key，步进取自滑块自身的 step
+    // （宽高 5 / 圆角 1 / 折射色散光晕模糊 0.005 / 放大倍率 0.02）
+    document.querySelectorAll('.nudge').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const step = parseFloat(sliders[btn.dataset.target].el.step);
+        nudge(btn.dataset.target, step * parseInt(btn.dataset.dir, 10));
+      });
+    });
+
+    // 键盘：R 复位 / H 面板 / 方向键调整宽高
+    window.addEventListener('keydown', e => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'r') {
+        glassMesh.position.set(0, 0, 0.1);
+        showToast('玻璃已复位到中心');
+      } else if (k === 'h') {
+        togglePanel();
+      } else if (e.key === 'ArrowUp')    { nudge('height',  5); e.preventDefault(); }
+        else if (e.key === 'ArrowDown')  { nudge('height', -5); e.preventDefault(); }
+        else if (e.key === 'ArrowLeft') { nudge('width',  -5); e.preventDefault(); }
+        else if (e.key === 'ArrowRight') { nudge('width',   5); e.preventDefault(); }
+    });
+
+    /* ================================================================
+     * 七、提示信息 / 面板折叠
+     * ================================================================ */
+    let toastTimer = null;
+    function showToast(msg, duration = 2400) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration);
+    }
+
+    function togglePanel() {
+      panelEl.classList.toggle('hidden');
+      foldBtn.setAttribute('aria-label',
+        panelEl.classList.contains('hidden') ? '显示控制面板' : '隐藏控制面板');
+    }
+    foldBtn.addEventListener('click', togglePanel);
+
+    /* ================================================================
+     * 八、玻璃拖动（鼠标 + 触摸，Pointer Events 统一处理）
+     * ================================================================ */
+    const raycaster = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    let dragging = false;
+    const dragOffset = new THREE.Vector2();
+
+    // 正交相机按像素铺满视口：世界坐标 = 像素坐标 - 视口一半
+    function screenToWorld(clientX, clientY) {
+      return {
+        x: clientX - window.innerWidth / 2,
+        y: window.innerHeight / 2 - clientY
+      };
+    }
+    function hitGlass(e) {
+      ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      return raycaster.intersectObject(glassMesh, false).length > 0;
+    }
+
+    renderer.domElement.addEventListener('pointerdown', e => {
+      if (!hitGlass(e)) return;
+      dragging = true;
+      const p = screenToWorld(e.clientX, e.clientY);
+      dragOffset.set(glassMesh.position.x - p.x, glassMesh.position.y - p.y);
+      renderer.domElement.setPointerCapture(e.pointerId);
+      renderer.domElement.classList.add('grabbing');
+    });
+    renderer.domElement.addEventListener('pointermove', e => {
+      if (dragging) {
+        const p = screenToWorld(e.clientX, e.clientY);
+        glassMesh.position.set(p.x + dragOffset.x, p.y + dragOffset.y, 0.1);
+      } else {
+        renderer.domElement.classList.toggle('hovering', hitGlass(e));
+      }
+    });
+    const endDrag = () => {
+      dragging = false;
+      renderer.domElement.classList.remove('grabbing');
+    };
+    renderer.domElement.addEventListener('pointerup', endDrag);
+    renderer.domElement.addEventListener('pointercancel', endDrag);
+
+    /* ================================================================
+     * 九、自定义背景：图片导入 / 文本添加 / 背景色
+     * ================================================================ */
+    // 背景色
+    bgColorInput.addEventListener('input', () => {
+      scene.background.set(bgColorInput.value);
+      rtDirty = true;
+    });
+
+    // 导入背景图片（可重复导入，覆盖更新；置于所有背景元素最底层 Z = -0.5）
+    let bgImageMesh = null;
+    const texLoader = new THREE.TextureLoader();
+
+    importBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      texLoader.load(url, tex => {
+        URL.revokeObjectURL(url);
+        if (!bgImageMesh) {
+          bgImageMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(1, 1),
+            new THREE.MeshBasicMaterial()
+          );
+          bgImageMesh.position.z = -0.5;
+          scene.add(bgImageMesh);
+        } else if (bgImageMesh.material.map) {
+          bgImageMesh.material.map.dispose();
+        }
+        bgImageMesh.material.map = tex;
+        bgImageMesh.material.needsUpdate = true;
+        fitBackgroundImage();
+        rtDirty = true;
+        showToast('背景图片已更新');
+      }, undefined, () => URL.revokeObjectURL(url));
+      fileInput.value = '';   // 允许再次导入同一文件
+    });
+
+    // 背景图片按 cover 比例铺满视口
+    function fitBackgroundImage() {
+      if (!bgImageMesh || !bgImageMesh.material.map) return;
+      const img = bgImageMesh.material.map.image;
+      const s = Math.max(window.innerWidth / img.width, window.innerHeight / img.height);
+      bgImageMesh.scale.set(img.width * s, img.height * s, 1);
+    }
+
+    // 用户自定义文本的 Canvas 纹理（系统字体，随选随用）
+    function createTextTexture(text, fontSize, fontFamily, color, weight = 'bold') {
+      const scale = 2, pad = fontSize * 0.35;
+      const font = `${weight} ${fontSize}px '${fontFamily}', sans-serif`;
+      const probe = document.createElement('canvas').getContext('2d');
+      probe.font = font;
+      const w = Math.ceil(probe.measureText(text).width + pad * 2);
+      const h = Math.ceil(fontSize * 1.4);
+      const canvas = document.createElement('canvas');
+      canvas.width = w * scale; canvas.height = h * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+      ctx.font = font;
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, w / 2, h / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return { texture, width: w, height: h };
+    }
+
+    // 添加自定义文本：随机位置 / 旋转 / 字号（50-70），使用选定字体与颜色
+    addTextBtn.addEventListener('click', () => {
+      const text = textInput.value.trim();
+      if (!text) { showToast('请先输入文本内容'); textInput.focus(); return; }
+      const fontSize = 50 + Math.random() * 20;
+      const { texture, width, height } = createTextTexture(text, fontSize, fontSelect.value, textColor.value, 'bold');
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, height),
+        new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+      );
+      mesh.position.set((Math.random() * 2 - 1) * 125, (Math.random() * 2 - 1) * 100, -0.06);
+      mesh.rotation.z = (Math.random() * 2 - 1) * 0.05;
+      bgGroup.add(mesh);
+      textInput.value = '';
+      rtDirty = true;
+      showToast('文本已添加到背景');
+    });
+    // 回车快捷提交
+    textInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') addTextBtn.click();
+    });
+
+    /* ================================================================
+     * 十、窗口尺寸自适应
+     * ================================================================ */
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      const p = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+      renderer.setPixelRatio(p);
+      renderer.setSize(w, h);
+      camera.left = -w / 2; camera.right = w / 2;
+      camera.top = h / 2; camera.bottom = -h / 2;
+      camera.updateProjectionMatrix();
+      rt.setSize(w * p, h * p);
+      glassUniforms.uResolution.value.set(w * p, h * p);
+      fitBackgroundImage();
+      rtDirty = true;
+    });
+
+    /* ================================================================
+     * 十一、启动：几何装饰先上屏，字体就绪后补排版层，随后进入渲染循环
+     * ================================================================ */
+    buildGeometricDecor();
+    showToast('正在加载排版字体…', 4000);
+    loadDisplayFonts().then(() => {
+      buildTypographyLayer();
+      rtDirty = true;
+      showToast('就绪 · 拖动玻璃 · 放大倍率 0.9–5× · R 复位 · H 收起面板', 5200);
+    });
+
+    // 渲染循环（双 pass：背景 → 离屏目标，再整景 → 屏幕）
+    function tick() {
+      requestAnimationFrame(tick);
+      // 第一遍：隐藏玻璃，把背景元素渲染到 render target（仅在背景变化时执行）
+      if (rtDirty) {
+        glassMesh.visible = false;
+        renderer.setRenderTarget(rt);
+        renderer.render(scene, camera);
+        glassMesh.visible = true;
+        renderer.setRenderTarget(null);
+        rtDirty = false;
+      }
+      // 第二遍：整景（含玻璃）渲染到屏幕，玻璃片元采样离屏纹理实现折射
+      renderer.render(scene, camera);
+    }
+    tick();
+  </script>
+</body>
+</html>
