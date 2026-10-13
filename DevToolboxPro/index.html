@@ -262,6 +262,10 @@
         .workbench-muted { font-size:11px; color:var(--text-tertiary); }
         .tool-kicker { font-size:11px; color:var(--text-secondary); margin-bottom:6px; display:block; }
         @media(max-width:700px){.global-tools-top{grid-template-columns:1fr auto}.global-tools-top input{grid-column:1/-1}.global-tools-lists,.workbench-grid,.workbench-grid.three{grid-template-columns:1fr}.workbench-editor{min-height:180px}}
+        .uuid-batch-list { white-space:pre-wrap; overflow-wrap:anywhere; word-break:normal; max-height:320px; overflow:auto; }
+        #utilCharOutput table,#utilWsOutput table,#utilFreqOutput table { min-width:100%; }
+        .util-stat-value { display:block; font-size:18px; font-family:var(--font-mono); margin-top:4px; overflow-wrap:anywhere; }
+        #utilStopwatchLaps { max-height:180px; }
 
     </style>
 </head>
@@ -290,6 +294,7 @@
         <button class="tab-primary" data-tab="smart">智能解码</button>
         <button class="tab-primary" data-tab="extras">实用工具</button>
         <button class="tab-primary" data-tab="workbench">开发工作台</button>
+        <button class="tab-primary" data-tab="utility">文本与效率</button>
     </div>
 
     <!-- ==================== 编解码 ==================== -->
@@ -527,14 +532,27 @@
             <button class="tab-secondary" data-sub="securetools">安全令牌 / 随机整数</button>
         </div>
         <div class="panel active" id="sub-gen-uuid">
-            <div class="section-label mb-sm">UUID v4</div>
+            <div class="section-label mb-sm">UUID 生成器</div>
+            <div class="tool-grid">
+                <div class="tool-field"><label for="uuidVersion">UUID 版本</label><select id="uuidVersion"><option value="v4" selected>UUID v4 · 随机</option><option value="v7">UUID v7 · 时间排序</option><option value="v1">UUID v1 · 时间戳</option><option value="v6">UUID v6 · 时间排序</option><option value="v3">UUID v3 · 名称 + MD5</option><option value="v5">UUID v5 · 名称 + SHA-1</option></select></div>
+                <div class="tool-field"><label for="uuidCase">输出大小写</label><select id="uuidCase"><option value="lower" selected>小写</option><option value="upper">大写</option></select></div>
+            </div>
+            <div id="uuidNameConfig" class="tool-grid mt-sm" style="display:none;">
+                <div class="tool-field"><label for="uuidNamespace">命名空间 UUID</label><input id="uuidNamespace" type="text" value="6ba7b810-9dad-11d1-80b4-00c04fd430c8" spellcheck="false"></div>
+                <div class="tool-field"><label for="uuidName">名称（Name）</label><input id="uuidName" type="text" value="example.com" spellcheck="false"></div>
+            </div>
+            <p class="note mt-sm" id="uuidVersionNote">v4 使用安全随机数；v7 包含 Unix 毫秒时间戳并适合按时间排序。v3 / v5 对相同命名空间与名称会生成相同 UUID。</p>
+            <div class="section-label mt-md mb-sm">单个 UUID</div>
             <div class="result-mono" id="uuidResult">—</div>
             <div class="row mt-sm gap-sm">
-                <button class="btn primary" id="uuidGen">生成</button>
+                <button class="btn primary" id="uuidGen">生成 UUID</button>
                 <button class="btn small copy-btn" data-target="uuidResultText">复制</button>
-                <button class="btn small" id="uuidBatch">批量×10</button>
             </div>
-            <div class="mt-md" id="uuidBatchList" style="font-family:var(--font-mono);font-size:12px;line-height:1.8;color:var(--text-secondary);word-break:break-all;"></div>
+            <hr class="divider">
+            <div class="section-label mb-sm">批量生成</div>
+            <div class="row gap-sm"><div class="flex-1"><label class="tool-kicker" for="uuidBatchCount">生成数量（1–1000）</label><input id="uuidBatchCount" type="number" min="1" max="1000" step="1" value="10"></div><button class="btn primary" id="uuidBatch">批量生成</button><button class="btn small copy-btn" data-target="uuidBatchList">复制批量结果</button><button class="btn small" id="uuidBatchDownload">下载 TXT</button></div>
+            <pre class="result-mono tool-output mt-sm uuid-batch-list" id="uuidBatchList" aria-live="polite">生成后每行显示一个 UUID。</pre>
+            <p class="note mt-sm" id="uuidBatchStatus">每行一个 UUID；批量上限为 1000，防止一次性生成过多内容影响页面响应。</p>
         </div>
         <div class="panel" id="sub-gen-password">
             <div class="section-label mb-sm">配置</div>
@@ -965,6 +983,128 @@ Delta,15</textarea>
         </div>
     </div>
 
+    <!-- ==================== 文本与效率工具 ==================== -->
+    <div class="panel" id="panel-utility">
+        <div class="tabs-secondary-wrap" id="tabsUtilitySub">
+            <button class="tab-secondary active" data-sub="charinfo">字符信息</button>
+            <button class="tab-secondary" data-sub="whitespace">特殊空白</button>
+            <button class="tab-secondary" data-sub="length">文本长度</button>
+            <button class="tab-secondary" data-sub="transpose">转置 / 列操作</button>
+            <button class="tab-secondary" data-sub="frequency">频率分析</button>
+            <button class="tab-secondary" data-sub="lorem">Lorem Ipsum</button>
+            <button class="tab-secondary" data-sub="cleanup">换行 / 空格整理</button>
+            <button class="tab-secondary" data-sub="shuffle">文本乱序</button>
+            <button class="tab-secondary" data-sub="datediff">日期差</button>
+            <button class="tab-secondary" data-sub="dateadd">日期加减</button>
+            <button class="tab-secondary" data-sub="timer">秒表 / 倒计时</button>
+            <button class="tab-secondary" data-sub="units">单位换算</button>
+        </div>
+
+        <div class="panel active" id="sub-utility-charinfo">
+            <div class="section-label mb-sm">输入任意文本</div>
+            <textarea id="utilCharInput" placeholder="输入文本，查看 Unicode 码点、十进制、UTF-16、UTF-8 字节等信息…"></textarea>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilCharRun">分析字符</button><button class="btn" id="utilCharClear">清空</button><span class="note" id="utilCharStatus">为保证浏览器响应，最多分析 2000 个 Unicode 码点。</span></div>
+            <div class="section-label mt-md mb-sm">字符信息</div><div id="utilCharOutput" style="overflow:auto;max-height:440px;"><div class="result-mono empty">输入文本后点击分析。</div></div>
+            <p class="note mt-sm">显示字符本身、Unicode 码点、十进制值、UTF-16 代码单元、UTF-8 字节、HTML 数字实体和 URL 编码。Unicode 官方名称数据库未内置，因此不猜测字符名称。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-whitespace">
+            <div class="section-label mb-sm">检测特殊空白与不可见字符</div><textarea id="utilWsInput" placeholder="粘贴需要检查的文本…"></textarea>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilWsRun">检测字符</button><button class="btn" id="utilWsReplace">将特殊空白替换为普通空格</button><button class="btn small copy-btn" data-target="utilWsCleanedOutput">复制清理结果</button></div>
+            <div class="section-label mt-md mb-sm">检测结果</div><div id="utilWsOutput" class="result-mono tool-output">尚未检测。</div>
+            <div class="section-label mt-md mb-sm">替换结果</div><textarea id="utilWsCleanedOutput" class="output-area" readonly placeholder="清理结果会显示在这里…"></textarea>
+            <p class="note mt-sm">覆盖普通空格、Tab、换行、NBSP、全角空格、零宽空格、BOM 等常见字符；位置按 Unicode 字符的行/列从 1 开始计数。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-length">
+            <div class="section-label mb-sm">实时文本长度统计</div><textarea id="utilLengthInput" placeholder="在此输入或粘贴文本，统计会自动更新…"></textarea>
+            <div class="tool-grid mt-md">
+                <div class="result-mono">用户感知字符数（字素簇）<strong id="utilLenGraphemes">0</strong></div>
+                <div class="result-mono">Unicode 码点数 <strong id="utilLenCodepoints">0</strong></div>
+                <div class="result-mono">UTF-16 代码单元 <strong id="utilLenUtf16">0</strong></div>
+                <div class="result-mono">UTF-8 字节数 <strong id="utilLenUtf8">0</strong></div>
+                <div class="result-mono">单词 / 分词数 <strong id="utilLenWords">0</strong></div>
+                <div class="result-mono">行数 / 段落数 <strong id="utilLenLines">0 / 0</strong></div>
+            </div>
+            <p class="note mt-sm">优先用 Intl.Segmenter 计算字素簇及语言分词；旧浏览器使用近似回退算法，因此中文等无空格分词场景的单词数可能不同。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-transpose">
+            <div class="section-label mb-sm">表格文本 / 分隔符数据</div><textarea id="utilTransposeInput" class="workbench-editor" placeholder="name,age,city
+Alice,20,Tokyo
+Bob,25,Osaka"></textarea>
+            <div class="tool-grid mt-sm"><div class="tool-field"><label for="utilTransposeDelimiter">输入 / 输出分隔符</label><select id="utilTransposeDelimiter"><option value=",">逗号 ,</option><option value="&#9;">制表符 Tab</option><option value=";">分号 ;</option><option value="|">竖线 |</option></select></div><div class="tool-field"><label for="utilTransposeOp">操作</label><select id="utilTransposeOp"><option value="transpose">行列互换（转置）</option><option value="splitcol">拆分指定列</option><option value="mergecols">合并指定列</option><option value="reorder">按顺序重排列</option></select></div><div class="tool-field"><label for="utilTransposeCols">列号（从 1 开始）</label><input id="utilTransposeCols" type="text" value="1,3" placeholder="例如：3,1,2 或 2"></div><div class="tool-field"><label for="utilTransposeSplitBy">拆分列内部分隔符（拆分操作）</label><input id="utilTransposeSplitBy" type="text" value=";" maxlength="1"></div><div class="tool-field"><label for="utilTransposeJoinBy">合并列连接符（合并操作）</label><input id="utilTransposeJoinBy" type="text" value=" / "></div></div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilTransposeRun">执行操作</button><button class="btn" id="utilTransposeSample">载入示例</button><button class="btn small copy-btn" data-target="utilTransposeOutput">复制结果</button></div>
+            <div class="section-label mt-md mb-sm">处理结果</div><textarea id="utilTransposeOutput" class="output-area workbench-editor" readonly placeholder="操作结果…"></textarea><p class="note mt-sm" id="utilTransposeStatus">支持带引号字段、字段内逗号和双引号转义；列号从 1 开始。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-frequency">
+            <div class="section-label mb-sm">文本频率分析</div><textarea id="utilFreqInput" placeholder="输入待分析文本…"></textarea>
+            <div class="tool-grid mt-sm"><div class="tool-field"><label for="utilFreqMode">统计模式</label><select id="utilFreqMode"><option value="chars">字符频率</option><option value="words">单词 / 分词频率</option><option value="keywords">指定关键词出现次数</option></select></div><div class="tool-field"><label for="utilFreqTop">显示前 N 项</label><input id="utilFreqTop" type="number" min="1" max="500" value="50"></div></div>
+            <div class="tool-field mt-sm"><label for="utilFreqKeywords">关键词（关键词模式使用；每行一个）</label><textarea id="utilFreqKeywords" class="small-textarea" placeholder="error
+warning
+timeout"></textarea></div>
+            <div class="row mt-sm gap-sm"><label class="checkbox-label"><input type="checkbox" id="utilFreqCase"> 区分大小写</label><label class="checkbox-label"><input type="checkbox" id="utilFreqIgnoreWs" checked> 字符模式忽略空白</label><button class="btn primary" id="utilFreqRun">分析频率</button><button class="btn small copy-btn" data-target="utilFreqExport">复制结果</button></div>
+            <div class="section-label mt-md mb-sm">分析结果</div><div id="utilFreqOutput" style="overflow:auto;max-height:420px;"><div class="result-mono empty">等待分析。</div></div><textarea id="utilFreqExport" class="output-area mt-sm" readonly placeholder="文本形式的统计结果…"></textarea><p class="note mt-sm" id="utilFreqStatus">按出现次数降序排列；并列时按字符或词语排序。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-lorem">
+            <div class="section-label mb-sm">Lorem Ipsum 占位文本生成器</div>
+            <div class="tool-grid"><div class="tool-field"><label for="utilLoremMode">生成单位</label><select id="utilLoremMode"><option value="words">单词数量</option><option value="sentences">句子数量</option><option value="paragraphs">段落数量</option></select></div><div class="tool-field"><label for="utilLoremCount">数量</label><input id="utilLoremCount" type="number" min="1" max="5000" value="100"></div></div>
+            <div class="row mt-sm gap-sm"><label class="checkbox-label"><input type="checkbox" id="utilLoremStart" checked> 以 Lorem ipsum 开头</label><label class="checkbox-label"><input type="checkbox" id="utilLoremParagraphs"> 句子/单词模式分段</label></div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilLoremGenerate">生成占位文本</button><button class="btn small copy-btn" data-target="utilLoremOutput">复制文本</button><button class="btn" id="utilLoremDownload">下载 TXT</button><span class="note" id="utilLoremStatus"></span></div>
+            <div class="section-label mt-md mb-sm">生成结果</div><textarea id="utilLoremOutput" class="workbench-editor" readonly placeholder="生成的文本会显示在这里…"></textarea><p class="note mt-sm">单词最多 5000 个、句子最多 500 个、段落最多 100 段；文本用于排版占位，不应用于安全随机数据。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-cleanup">
+            <div class="section-label mb-sm">文本换行与空格整理</div><textarea id="utilCleanInput" placeholder="输入待整理文本…"></textarea>
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label class="checkbox-label"><input type="checkbox" id="utilCleanNormalizeNewline" checked> 统一换行符为 LF</label></div>
+                <div class="tool-field"><label class="checkbox-label"><input type="checkbox" id="utilCleanTrimLines"> 去除每行首尾空白</label></div>
+                <div class="tool-field"><label class="checkbox-label"><input type="checkbox" id="utilCleanCollapse"> 连续空格 / Tab 压缩为一个空格</label></div>
+                <div class="tool-field"><label class="checkbox-label"><input type="checkbox" id="utilCleanRemoveSpaces"> 删除普通空格和 Tab</label></div>
+                <div class="tool-field"><label class="checkbox-label"><input type="checkbox" id="utilCleanRemoveAllWs"> 删除所有空白（包括换行）</label></div>
+                <div class="tool-field"><label class="checkbox-label"><input type="checkbox" id="utilCleanRemoveBlank"> 删除空行</label></div>
+            </div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilCleanRun">整理文本</button><button class="btn" id="utilCleanClear">清空</button><button class="btn small copy-btn" data-target="utilCleanOutput">复制结果</button></div>
+            <div class="section-label mt-md mb-sm">整理结果</div><textarea id="utilCleanOutput" class="output-area workbench-editor" readonly placeholder="处理后的文本…"></textarea><p class="note mt-sm">“删除所有空白”优先级最高，会同时移除空格、Tab、换行等 Unicode 空白字符；请检查选项组合后再执行。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-shuffle">
+            <div class="section-label mb-sm">文本乱序 / 位置随机化</div><textarea id="utilShuffleInput" placeholder="输入文本，可按行、段落、单词或字符乱序…"></textarea>
+            <div class="tool-grid mt-sm"><div class="tool-field"><label for="utilShuffleMode">乱序单位</label><select id="utilShuffleMode"><option value="lines">按行乱序</option><option value="paragraphs">按段落乱序</option><option value="words">按单词乱序</option><option value="chars">按 Unicode 字符乱序</option></select></div><div class="tool-field"><label for="utilShuffleCount">重复生成次数（1–20）</label><input id="utilShuffleCount" type="number" min="1" max="20" value="1"></div></div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilShuffleRun">开始乱序</button><button class="btn small copy-btn" data-target="utilShuffleOutput">复制结果</button><button class="btn" id="utilShuffleDownload">下载 TXT</button></div>
+            <div class="section-label mt-md mb-sm">乱序结果</div><textarea id="utilShuffleOutput" class="output-area workbench-editor" readonly placeholder="乱序结果…"></textarea><p class="note mt-sm">仅用于文本重排，不是密码学安全随机化工具。单词模式会统一为单个空格分隔；字符模式按 Unicode 码点打乱，不保证组合字符或 emoji 序列完整。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-datediff">
+            <div class="section-label mb-sm">日期差计算器</div>
+            <div class="tool-grid"><div class="tool-field"><label for="utilDateFrom">开始日期</label><input id="utilDateFrom" type="date"></div><div class="tool-field"><label for="utilDateTo">结束日期</label><input id="utilDateTo" type="date"></div></div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilDateDiffRun">计算日期差</button><button class="btn" id="utilDateDiffSwap">交换日期</button><span class="note" id="utilDateDiffStatus"></span></div>
+            <div class="section-label mt-md mb-sm">计算结果</div><div id="utilDateDiffOutput" class="result-mono tool-output">选择两个日期后计算。</div><p class="note mt-sm">按日历日期计算，不受夏令时导致的 23 / 25 小时自然日影响；同时显示绝对间隔和方向。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-dateadd">
+            <div class="section-label mb-sm">日期加减工具</div>
+            <div class="tool-grid"><div class="tool-field"><label for="utilDateBase">基准日期</label><input id="utilDateBase" type="date"></div><div class="tool-field"><label for="utilDateAmount">数量</label><input id="utilDateAmount" type="number" value="7" step="1"></div><div class="tool-field"><label for="utilDateUnit">单位</label><select id="utilDateUnit"><option value="days">天</option><option value="weeks">周</option><option value="months">月</option><option value="years">年</option></select></div><div class="tool-field"><label for="utilDateDirection">运算</label><select id="utilDateDirection"><option value="add">向后增加</option><option value="subtract">向前减少</option></select></div></div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilDateAddRun">计算目标日期</button><button class="btn" id="utilDateToday">填入今天</button><button class="btn small copy-btn" data-target="utilDateAddOutput">复制结果</button></div>
+            <div class="section-label mt-md mb-sm">计算结果</div><div id="utilDateAddOutput" class="result-mono tool-output">输入日期与偏移量后计算。</div><p class="note mt-sm">按月 / 年加减会尽量保留原日；若目标月份没有对应日期，会自动钳制到该月最后一天，例如 1 月 31 日加 1 个月为 2 月最后一天。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-timer">
+            <div class="section-label mb-sm">秒表</div><div class="result-mono" id="utilStopwatchDisplay" style="font-size:24px;text-align:center;font-variant-numeric:tabular-nums;">00:00:00.00</div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilStopwatchStart">开始</button><button class="btn" id="utilStopwatchLap">分段 / 计次</button><button class="btn" id="utilStopwatchReset">重置</button></div>
+            <div class="section-label mt-md mb-sm">分段记录</div><div id="utilStopwatchLaps" class="result-mono tool-output">暂无分段记录。</div>
+            <hr class="divider"><div class="section-label mb-sm">倒计时</div><div class="tool-grid"><div class="tool-field"><label for="utilTimerHours">小时</label><input id="utilTimerHours" type="number" min="0" max="999" value="0"></div><div class="tool-field"><label for="utilTimerMinutes">分钟</label><input id="utilTimerMinutes" type="number" min="0" max="59" value="1"></div><div class="tool-field"><label for="utilTimerSeconds">秒</label><input id="utilTimerSeconds" type="number" min="0" max="59" value="0"></div></div>
+            <div class="result-mono mt-sm" id="utilCountdownDisplay" style="font-size:24px;text-align:center;font-variant-numeric:tabular-nums;">00:01:00</div><div class="row mt-sm gap-sm"><button class="btn primary" id="utilCountdownStart">开始倒计时</button><button class="btn" id="utilCountdownPause">暂停</button><button class="btn" id="utilCountdownReset">重置</button><span class="note" id="utilCountdownStatus">倒计时结束时页面内提示，不会自动播放声音。</span></div>
+        </div>
+
+        <div class="panel" id="sub-utility-units">
+            <div class="section-label mb-sm">多类别单位换算</div><div class="tool-grid"><div class="tool-field"><label for="utilUnitCategory">换算类别</label><select id="utilUnitCategory"><option value="length">长度</option><option value="area">面积</option><option value="volume">体积</option><option value="mass">质量</option><option value="speed">速度</option><option value="temperature">温度</option><option value="pressure">压力</option><option value="energy">能量</option><option value="power">功率</option><option value="data">数据容量</option><option value="time">时间</option><option value="angle">角度</option></select></div><div class="tool-field"><label for="utilUnitValue">输入数值</label><input id="utilUnitValue" type="number" value="1" step="any"></div><div class="tool-field"><label for="utilUnitFrom">从单位</label><select id="utilUnitFrom"></select></div><div class="tool-field"><label for="utilUnitTo">转换为</label><select id="utilUnitTo"></select></div></div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="utilUnitConvert">换算</button><button class="btn" id="utilUnitSwap">交换单位</button></div><div class="section-label mt-md mb-sm">换算结果</div><div id="utilUnitOutput" class="result-mono tool-output">输入数值后换算。</div><p class="note mt-sm">覆盖长度、面积、体积、质量、速度、温度、压力、能量、功率、数据容量、时间和角度。数值按标准单位比例换算；温度使用单独的偏移公式。</p>
+        </div>
+    </div>
+
     <hr class="divider">
     <p class="note" style="text-align:center;">主要工具逻辑在浏览器端运行；CryptoJS、Markdown、Mermaid、二维码和代码格式化等部分功能依赖外部 CDN。HTML 预览使用隔离沙箱与 CSP；仍请勿运行不可信代码。处理敏感内容前，建议自行托管依赖并配置完整性校验。</p>
 </div>
@@ -1096,6 +1236,7 @@ Delta,15</textarea>
     setupSubTabs('tabsConvertSub', 'convert');
     setupSubTabs('tabsExtrasSub', 'extras');
     setupSubTabs('tabsWorkbenchSub', 'workbench');
+    setupSubTabs('tabsUtilitySub', 'utility');
 
     // ============ 复制按钮事件委托 ============
     document.addEventListener('click', function(e) {
@@ -1497,26 +1638,65 @@ Delta,15</textarea>
         }catch(e){setFileCipherStatus('解密失败：密码错误、文件损坏或格式不兼容。'+(e.message?' '+e.message:''));}
     };
 
-    // ============ 生成器 ============
-    function uuidv4() {
-        if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
-        var bytes = getSecureRandomValues(new Uint8Array(16));
-        bytes[6] = (bytes[6] & 0x0f) | 0x40;
-        bytes[8] = (bytes[8] & 0x3f) | 0x80;
-        var h = Array.from(bytes, function(b) { return b.toString(16).padStart(2, '0'); }).join('');
-        return h.slice(0,8) + '-' + h.slice(8,12) + '-' + h.slice(12,16) + '-' + h.slice(16,20) + '-' + h.slice(20);
+    // ============ UUID 生成器：RFC 9562 常见版本 ============
+    var uuidLastTimestamp100ns = 0n, uuidNodeBytes = null, uuidClockSequence = null;
+    var UUID_GREGORIAN_OFFSET = 0x01B21DD213814000n;
+    function uuidFormatBytes(bytes, upper) {
+        var h = Array.from(bytes, function(b){return b.toString(16).padStart(2,'0');}).join('');
+        var result = h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+        return upper ? result.toUpperCase() : result.toLowerCase();
     }
-    getById('uuidGen').onclick = function() {
-        try { getById('uuidResult').textContent = uuidv4(); getById('uuidBatchList').textContent = ''; }
-        catch(e) { getById('uuidResult').textContent = '生成失败：' + e.message; }
-    };
-    getById('uuidBatch').onclick = function() {
-        try {
-            var list = [];
-            for (var i = 0; i < 10; i++) list.push(uuidv4());
-            getById('uuidBatchList').textContent = list.join('\n');
-        } catch(e) { getById('uuidBatchList').textContent = '生成失败：' + e.message; }
-    };
+    function uuidParseBytes(str) {
+        var compact=String(str||'').trim().replace(/-/g,'');
+        if(!/^[0-9a-fA-F]{32}$/.test(compact)) throw new Error('命名空间必须是合法 UUID（xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx）');
+        var out=new Uint8Array(16);for(var i=0;i<16;i++)out[i]=parseInt(compact.slice(i*2,i*2+2),16);return out;
+    }
+    function uuidRandomBytes(){return getSecureRandomValues(new Uint8Array(16));}
+    function uuidSetVariant(bytes){bytes[8]=(bytes[8]&0x3f)|0x80;return bytes;}
+    function uuidRandomNodeAndClock(){
+        if(!uuidNodeBytes){uuidNodeBytes=getSecureRandomValues(new Uint8Array(6));uuidNodeBytes[0]|=0x01;var c=getSecureRandomValues(new Uint8Array(2));uuidClockSequence=((c[0]<<8)|c[1])&0x3fff;}
+    }
+    function uuidTimestamp100ns(){var ts=BigInt(Date.now())*10000n+UUID_GREGORIAN_OFFSET;if(ts<=uuidLastTimestamp100ns)ts=uuidLastTimestamp100ns+1n;uuidLastTimestamp100ns=ts;return ts;}
+    function uuidTimeBased(version){
+        uuidRandomNodeAndClock();var ts=uuidTimestamp100ns(),out=new Uint8Array(16),seq=uuidClockSequence;
+        if(version==='v1'){
+            var low=Number(ts&0xffffffffn),mid=Number((ts>>32n)&0xffffn),hi=Number((ts>>48n)&0x0fffn)|0x1000;
+            out[0]=low>>>24;out[1]=low>>>16&255;out[2]=low>>>8&255;out[3]=low&255;out[4]=mid>>>8;out[5]=mid&255;out[6]=hi>>>8;out[7]=hi&255;
+        }else{
+            var hi48=Number((ts>>28n)&0xffffffffn),mid12=Number((ts>>12n)&0xffffn),low12=(Number(ts&0x0fffn)|0x6000);
+            out[0]=hi48>>>24;out[1]=hi48>>>16&255;out[2]=hi48>>>8&255;out[3]=hi48&255;out[4]=mid12>>>8;out[5]=mid12&255;out[6]=low12>>>8;out[7]=low12&255;
+        }
+        out[8]=((seq>>>8)&0x3f)|0x80;out[9]=seq&255;out.set(uuidNodeBytes,10);return out;
+    }
+    function uuidV7(){
+        var out=uuidRandomBytes(),ms=BigInt(Date.now());
+        for(var i=5;i>=0;i--){out[i]=Number(ms&255n);ms>>=8n;}
+        out[6]=(out[6]&0x0f)|0x70;out[8]=(out[8]&0x3f)|0x80;return out;
+    }
+    function uuidWordArrayFromBytes(bytes){var words=[];for(var i=0;i<bytes.length;i++)words[i>>>2]=(words[i>>>2]||0)|(bytes[i]<<(24-(i%4)*8));return CryptoJS.lib.WordArray.create(words,bytes.length);}
+    function uuidBytesFromWordArray(wordArray){var out=new Uint8Array(wordArray.sigBytes);for(var i=0;i<out.length;i++)out[i]=(wordArray.words[i>>>2]>>>(24-(i%4)*8))&255;return out;}
+    async function uuidNameBased(version,name,namespace){
+        var ns=uuidParseBytes(namespace),nameBytes=new TextEncoder().encode(String(name)),input=new Uint8Array(ns.length+nameBytes.length);input.set(ns);input.set(nameBytes,ns.length);var digestBytes;
+        if(version==='v5'&&window.crypto&&crypto.subtle){try{digestBytes=new Uint8Array(await crypto.subtle.digest('SHA-1',input));}catch(e){digestBytes=null;}}
+        if(!digestBytes&&window.CryptoJS){var wa=uuidWordArrayFromBytes(input),digest=version==='v3'?CryptoJS.MD5(wa):CryptoJS.SHA1(wa);digestBytes=uuidBytesFromWordArray(digest);}
+        if(!digestBytes)throw new Error(version==='v3'?'UUID v3 需要 CryptoJS（请确认外部库加载成功）':'UUID v5 需要 Web Crypto 或 CryptoJS');
+        var out=digestBytes.slice(0,16);out[6]=(out[6]&0x0f)|(version==='v3'?0x30:0x50);out[8]=(out[8]&0x3f)|0x80;return out;
+    }
+    async function generateUuidBytes(version){
+        if(version==='v4'){var b4=uuidRandomBytes();b4[6]=(b4[6]&0x0f)|0x40;return uuidSetVariant(b4);}
+        if(version==='v7')return uuidV7();
+        if(version==='v1'||version==='v6')return uuidTimeBased(version);
+        if(version==='v3'||version==='v5')return uuidNameBased(version,getById('uuidName').value,getById('uuidNamespace').value);
+        throw new Error('不支持的 UUID 版本');
+    }
+    function updateUuidVersionUI(){var v=getById('uuidVersion').value,named=v==='v3'||v==='v5';getById('uuidNameConfig').style.display=named?'grid':'none';var notes={v1:'v1 使用时间戳和随机生成的节点标识；此实现不会读取真实网卡 MAC。',v3:'v3 使用命名空间 + 名称 + MD5，同一输入必定生成同一 UUID。',v4:'v4 使用密码学安全随机数。',v5:'v5 使用命名空间 + 名称 + SHA-1，同一输入必定生成同一 UUID。',v6:'v6 是重排时间字段的 UUID 版本，适合按字典序排序。',v7:'v7 包含 Unix 毫秒时间戳并适合按时间排序；同一毫秒内的随机部分不保证单调递增。'};getById('uuidVersionNote').textContent=notes[v]||'';}
+    async function uuidOneFormatted(){var b=await generateUuidBytes(getById('uuidVersion').value);return uuidFormatBytes(b,getById('uuidCase').value==='upper');}
+    getById('uuidVersion').addEventListener('change',function(){updateUuidVersionUI();getById('uuidBatchList').textContent='';getById('uuidBatchStatus').textContent='版本已切换；请重新生成结果。';});
+    getById('uuidCase').addEventListener('change',function(){var upper=this.value==='upper',idPattern=/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;var result=getById('uuidResult'),current=result.textContent;if(idPattern.test(current))result.textContent=upper?current.toUpperCase():current.toLowerCase();var host=getById('uuidBatchList'),lines=host.textContent.split('\n');if(lines.length&&lines.every(function(line){return idPattern.test(line.trim());}))host.textContent=lines.map(function(line){return upper?line.toUpperCase():line.toLowerCase();}).join('\n');});
+    getById('uuidGen').onclick=async function(){var out=getById('uuidResult');out.textContent='生成中…';try{out.textContent=await uuidOneFormatted();getById('uuidBatchList').textContent='';getById('uuidBatchStatus').textContent='单个 UUID 已生成。';}catch(e){out.textContent='生成失败：'+e.message;}};
+    getById('uuidBatch').onclick=async function(){var status=getById('uuidBatchStatus'),host=getById('uuidBatchList');try{var count=Number(getById('uuidBatchCount').value);if(!Number.isInteger(count)||count<1||count>1000)throw new Error('数量必须是 1–1000 之间的整数');getById('uuidBatch').disabled=true;status.textContent='正在生成 '+count+' 个 UUID…';var list=[];for(var i=0;i<count;i++){list.push(await uuidOneFormatted());if(i%100===99)await new Promise(function(resolve){setTimeout(resolve,0);});}host.textContent=list.join('\n');status.textContent='生成完成：'+count+' 个，每行一个。';}catch(e){host.textContent='生成失败：'+e.message;status.textContent='请检查版本、命名空间与数量设置。';}finally{getById('uuidBatch').disabled=false;}};
+    getById('uuidBatchDownload').onclick=function(){var text=getById('uuidBatchList').textContent;if(!text||text==='生成后每行显示一个 UUID。'||text.indexOf('生成失败：')===0){getById('uuidBatchStatus').textContent='没有可下载的批量结果。';return;}downloadBlob('uuids.txt',text+'\n','text/plain;charset=utf-8');};
+    updateUuidVersionUI();
 
     // 密码生成：使用安全随机源 + 拒绝采样，避免取模偏差。
     function secureRandomInt(maxExclusive) {
@@ -2343,9 +2523,94 @@ Delta,15</textarea>
     function downloadBlob(filename,content,mime){var blob=content instanceof Blob?content:new Blob([content],{type:mime||'application/octet-stream'});var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);}
 
 
+    // ============ 文本与效率工具 ==========
+    function utilEscapeText(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+    function utilCodePointLabel(ch){var cp=ch.codePointAt(0);return 'U+'+cp.toString(16).toUpperCase().padStart(cp<=0xffff?4:5,'0');}
+    function utilUtf8Bytes(s){return new TextEncoder().encode(s);}
+    function utilByteHex(bytes){return Array.from(bytes,function(b){return b.toString(16).toUpperCase().padStart(2,'0');}).join(' ');}
+    function utilVisibleChar(ch){if(ch===' ')return '␠ [普通空格]';if(ch==='\n')return '↵ [换行 LF]';if(ch==='\r')return '␍ [回车 CR]';if(ch==='\t')return '⇥ [Tab]';if(ch==='\0')return '␀ [NUL]';if(ch==='\u00a0')return '⍽ [NBSP]';if(ch==='\u200b')return '[零宽空格]';if(ch==='\ufeff')return '[BOM / 零宽不换行空格]';return ch;}
+    function utilBuildTable(host,headers,rows){host.replaceChildren();var table=document.createElement('table');table.className='tool-table';var thead=document.createElement('thead'),trh=document.createElement('tr');headers.forEach(function(h){var th=document.createElement('th');th.textContent=h;trh.appendChild(th);});thead.appendChild(trh);table.appendChild(thead);var tbody=document.createElement('tbody');rows.forEach(function(row){var tr=document.createElement('tr');row.forEach(function(value){var td=document.createElement('td');td.textContent=String(value==null?'':value);tr.appendChild(td);});tbody.appendChild(tr);});table.appendChild(tbody);host.appendChild(table);}
+    getById('utilCharRun').onclick=function(){var text=getById('utilCharInput').value,chars=Array.from(text),host=getById('utilCharOutput');if(chars.length>2000){setToolText('utilCharStatus','文本包含 '+chars.length+' 个码点，超出 2000 上限；请缩短后再分析。');return;}var rows=chars.map(function(ch,i){var cp=ch.codePointAt(0),units=[];for(var j=0;j<ch.length;j++)units.push(ch.charCodeAt(j).toString(16).toUpperCase().padStart(4,'0'));return [i+1,utilVisibleChar(ch),utilCodePointLabel(ch),cp,'0x'+cp.toString(16).toUpperCase(),units.map(function(x){return '0x'+x;}).join(' '),utilByteHex(utilUtf8Bytes(ch)),'&#'+cp+';',encodeURIComponent(ch)];});utilBuildTable(host,['序号','字符','Unicode','十进制','码点 Hex','UTF-16 单元','UTF-8 字节','HTML 实体','URL 编码'],rows);setToolText('utilCharStatus','分析完成：'+chars.length+' 个 Unicode 码点；表格中的特殊字符以可见标记显示。');};
+    getById('utilCharClear').onclick=function(){getById('utilCharInput').value='';getById('utilCharOutput').textContent='输入文本后点击分析。';setToolText('utilCharStatus','已清空。');};
+
+    var utilWhitespaceNames={' ':'普通空格','\t':'水平制表符 Tab','\n':'换行 LF','\r':'回车 CR','\u000b':'垂直制表符','\u000c':'换页符','\u00a0':'不换行空格 NBSP','\u1680':'Ogham 空格','\u2000':'En Quad','\u2001':'Em Quad','\u2002':'En Space','\u2003':'Em Space','\u2004':'三分之一 Em 空格','\u2005':'四分之一 Em 空格','\u2006':'六分之一 Em 空格','\u2007':'数字空格 Figure Space','\u2008':'标点空格 Punctuation Space','\u2009':'细空格 Thin Space','\u200a':'极细空格 Hair Space','\u2028':'行分隔符','\u2029':'段落分隔符','\u202f':'窄不换行空格','\u205f':'中等数学空格','\u3000':'全角空格','\u200b':'零宽空格','\u200c':'零宽非连接符','\u200d':'零宽连接符','\u2060':'词连接符','\ufeff':'BOM / 零宽不换行空格'};
+    function utilWhitespaceScan(text){var stats=new Map(),line=1,col=1,idx=0;Array.from(text).forEach(function(ch){if(Object.prototype.hasOwnProperty.call(utilWhitespaceNames,ch)){if(!stats.has(ch))stats.set(ch,{count:0,positions:[]});var item=stats.get(ch);item.count++;if(item.positions.length<20)item.positions.push('第'+line+'行第'+col+'列');}if(ch==='\n'){line++;col=1;}else col++;idx+=ch.length;});return stats;}
+    getById('utilWsRun').onclick=function(){var text=getById('utilWsInput').value;if(text.length>1000000){getById('utilWsOutput').textContent='输入超过 1,000,000 个 UTF-16 代码单元限制，请缩小文本后重试。';return;}var stats=utilWhitespaceScan(text),rows=[];stats.forEach(function(v,ch){rows.push([utilWhitespaceNames[ch],utilCodePointLabel(ch),v.count,v.positions.join('、')+(v.count>20?' …':''),ch==='\u200b'||ch==='\u200c'||ch==='\u200d'||ch==='\u2060'||ch==='\ufeff'?'删除或替换为普通空格':'按需要保留 / 规范化']);});var host=getById('utilWsOutput');host.replaceChildren();if(!rows.length){host.textContent='未检测到所列空白 / 不可见字符。';}else utilBuildTable(host,['字符类型','码点','出现次数','前 20 个位置','建议'],rows);};
+    getById('utilWsReplace').onclick=function(){var map={'\u00a0':' ','\u1680':' ','\u2000':' ','\u2001':' ','\u2002':' ','\u2003':' ','\u2004':' ','\u2005':' ','\u2006':' ','\u2007':' ','\u2008':' ','\u2009':' ','\u200a':' ','\u202f':' ','\u205f':' ','\u3000':' ','\u200b':'','\u200c':'','\u200d':'','\u2060':'','\ufeff':''};var text=getById('utilWsInput').value;getById('utilWsCleanedOutput').value=Array.from(text).map(function(ch){return Object.prototype.hasOwnProperty.call(map,ch)?map[ch]:ch;}).join('');getById('utilWsRun').click();};
+
+    function utilSegmentCount(text,granularity){if(window.Intl&&Intl.Segmenter){try{return Array.from(new Intl.Segmenter(undefined,{granularity:granularity}).segment(text)).filter(function(x){return granularity!=='word'||x.isWordLike;}).length;}catch(e){}}if(granularity==='grapheme')return Array.from(text).length;if(granularity==='word')return (text.match(/[\p{L}\p{N}_]+/gu)||[]).length;return Array.from(text).length;}
+    function utilUpdateLengthStats(){var text=getById('utilLengthInput').value,lines=text.length?text.split(/\r\n|\r|\n/).length:0,paragraphs=text.trim()?(text.trim().split(/\n\s*\n/).filter(function(p){return p.trim()!=='';}).length):0;setToolText('utilLenGraphemes',utilSegmentCount(text,'grapheme'));setToolText('utilLenCodepoints',Array.from(text).length);setToolText('utilLenUtf16',text.length);setToolText('utilLenUtf8',utilUtf8Bytes(text).length);setToolText('utilLenWords',utilSegmentCount(text,'word'));setToolText('utilLenLines',lines+' / '+paragraphs);}
+    getById('utilLengthInput').addEventListener('input',utilUpdateLengthStats);utilUpdateLengthStats();
+
+    function utilGetMatrix(){var delimiter=getById('utilTransposeDelimiter').value,text=getById('utilTransposeInput').value;if(!text.trim())throw new Error('请先输入表格文本');if(text.length>2000000)throw new Error('输入超过 2,000,000 个字符限制');return parseCsv(text,delimiter);}
+    function utilMatrixToText(rows,delimiter){return rows.map(function(row){return row.map(function(x){return csvField(x,delimiter);}).join(delimiter);}).join('\n');}
+    function utilColumnNumbers(text,max){var nums=text.split(',').map(function(x){return Number(x.trim());});if(!nums.length||nums.some(function(n){return !Number.isInteger(n)||n<1||n>max;}))throw new Error('列号必须是 1 到 '+max+' 之间的整数，多个列号用逗号分隔');return nums;}
+    getById('utilTransposeRun').onclick=function(){var out=getById('utilTransposeOutput'),status=getById('utilTransposeStatus');try{var rows=utilGetMatrix(),delimiter=getById('utilTransposeDelimiter').value,cols=Math.max.apply(null,rows.map(function(r){return r.length;})),op=getById('utilTransposeOp').value;rows=rows.map(function(r){var copy=r.slice();while(copy.length<cols)copy.push('');return copy;});if(op==='transpose'){var t=[];for(var c=0;c<cols;c++){var row=[];for(var r=0;r<rows.length;r++)row.push(rows[r][c]);t.push(row);}rows=t;}else if(op==='reorder'){var order=utilColumnNumbers(getById('utilTransposeCols').value,cols);rows=rows.map(function(r){return order.map(function(n){return r[n-1];});});}else if(op==='mergecols'){var select=utilColumnNumbers(getById('utilTransposeCols').value,cols),set=new Set(select.map(function(n){return n-1;})),first=Math.min.apply(null,Array.from(set)),joiner=getById('utilTransposeJoinBy').value;rows=rows.map(function(r){var merged=select.map(function(n){return r[n-1]||'';}).join(joiner),next=[];for(var i=0;i<r.length;i++){if(i===first)next.push(merged);if(!set.has(i))next.push(r[i]);}return next;});}else if(op==='splitcol'){var chosen=Number(getById('utilTransposeCols').value.trim());if(!Number.isInteger(chosen)||chosen<1||chosen>cols)throw new Error('拆分指定列时请只输入一个有效列号');var splitter=getById('utilTransposeSplitBy').value;if(!splitter)throw new Error('请输入拆分列内分隔符');var expanded=[];rows.forEach(function(r){var parts=String(r[chosen-1]||'').split(splitter);parts.forEach(function(part){var copy=r.slice();copy[chosen-1]=part;expanded.push(copy);});});rows=expanded;}if(rows.length>20000)throw new Error('处理结果超过 20,000 行，请缩小输入');out.value=utilMatrixToText(rows,delimiter);setToolText(status,'处理完成：'+rows.length+' 行 × '+(rows[0]||[]).length+' 列。');}catch(e){out.value='';setToolText(status,'处理失败：'+e.message);}};
+    getById('utilTransposeSample').onclick=function(){getById('utilTransposeInput').value='name,age,tags\nAlice,20,red;blue\nBob,25,green;yellow';setToolText('utilTransposeStatus','已载入示例。');};
+
+    function utilCountOccurrences(text,needle,caseSensitive){if(!needle)return 0;var source=caseSensitive?text:text.toLocaleLowerCase(),key=caseSensitive?needle:needle.toLocaleLowerCase(),count=0,from=0,idx;while((idx=source.indexOf(key,from))!==-1){count++;from=idx+Math.max(1,key.length);}return count;}
+    getById('utilFreqRun').onclick=function(){var text=getById('utilFreqInput').value;if(text.length>1000000){setToolText('utilFreqStatus','输入超过 1,000,000 个 UTF-16 代码单元限制，请缩小文本后重试。');return;}var mode=getById('utilFreqMode').value,caseSensitive=getById('utilFreqCase').checked,top=Math.max(1,Math.min(500,Math.floor(Number(getById('utilFreqTop').value)||50))),map=new Map();if(!text){setToolText('utilFreqStatus','请输入待分析文本。');return;}if(mode==='chars'){Array.from(text).forEach(function(ch){if(getById('utilFreqIgnoreWs').checked&&/\s/u.test(ch))return;var k=caseSensitive?ch:ch.toLocaleLowerCase();var item=map.get(k)||{count:0,display:ch};item.count++;map.set(k,item);});}else if(mode==='words'){var tokens=[];if(window.Intl&&Intl.Segmenter){try{tokens=Array.from(new Intl.Segmenter(undefined,{granularity:'word'}).segment(text)).filter(function(x){return x.isWordLike;}).map(function(x){return x.segment;});}catch(e){}}if(!tokens.length)tokens=text.match(/[\p{L}\p{N}_]+/gu)||[];tokens.forEach(function(word){var k=caseSensitive?word:word.toLocaleLowerCase(),item=map.get(k)||{count:0,display:word};item.count++;map.set(k,item);});}else{var keys=getById('utilFreqKeywords').value.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean);if(!keys.length){setToolText('utilFreqStatus','请在关键词模式下输入至少一个关键词。');return;}keys.forEach(function(k){var key=caseSensitive?k:k.toLocaleLowerCase();map.set(key,{count:utilCountOccurrences(text,k,caseSensitive),display:k});});}var freqDenominator=mode==='keywords'?Math.max(1,text.length):Array.from(map.values()).reduce(function(sum,item){return sum+item.count;},0),items=Array.from(map.values()).sort(function(a,b){return b.count-a.count||a.display.localeCompare(b.display);}).slice(0,top),rows=items.map(function(x,i){return [i+1,x.display,x.count,(x.count/Math.max(1,freqDenominator)*100).toFixed(2)+'%'];});var host=getById('utilFreqOutput');if(rows.length)utilBuildTable(host,['排名','字符 / 词 / 关键词','次数','参考比例'],rows);else host.textContent='没有可统计的项目。';getById('utilFreqExport').value=rows.map(function(r){return r.join('\t');}).join('\n');setToolText('utilFreqStatus','统计完成：'+map.size+' 个不同项目，显示前 '+items.length+' 项。关键词模式的比例以字符数为分母，仅供参考。');};
+
+    var utilLoremWords='lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure dolor reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum'.split(' ');
+    function utilLoremSentence(){var n=8+Math.floor(Math.random()*13),words=[];for(var i=0;i<n;i++)words.push(utilLoremWords[Math.floor(Math.random()*utilLoremWords.length)]);words[0]=words[0].charAt(0).toUpperCase()+words[0].slice(1);return words.join(' ')+'.';}
+    getById('utilLoremGenerate').onclick=function(){try{var mode=getById('utilLoremMode').value,count=Math.floor(Number(getById('utilLoremCount').value)),limit=mode==='words'?5000:mode==='sentences'?500:100;if(!Number.isInteger(count)||count<1||count>limit)throw new Error('数量必须为 1–'+limit);var paragraphs=[];if(mode==='words'){var words=[];for(var i=0;i<count;i++)words.push(utilLoremWords[Math.floor(Math.random()*utilLoremWords.length)]);if(getById('utilLoremStart').checked&&words.length){var seed='Lorem ipsum dolor sit amet consectetur adipiscing elit'.split(' ');words=seed.slice(0,Math.min(seed.length,count)).concat(words.slice(Math.min(seed.length,count)));}var text=words.join(' ');if(getById('utilLoremParagraphs').checked){for(var p=0;p<words.length;p+=50)paragraphs.push(words.slice(p,p+50).join(' '));text=paragraphs.join('\n\n');}getById('utilLoremOutput').value=text;}else if(mode==='sentences'){for(var j=0;j<count;j++)paragraphs.push(utilLoremSentence());if(getById('utilLoremStart').checked&&paragraphs.length)paragraphs[0]='Lorem ipsum dolor sit amet.';getById('utilLoremOutput').value=getById('utilLoremParagraphs').checked?paragraphs.map(function(x,i){return x;}).join('\n\n'):paragraphs.join(' ');}else{for(var k=0;k<count;k++){var nSent=3+Math.floor(Math.random()*4),sent=[];for(var q=0;q<nSent;q++)sent.push(utilLoremSentence());paragraphs.push(sent.join(' '));}if(getById('utilLoremStart').checked&&paragraphs.length)paragraphs[0]='Lorem ipsum dolor sit amet, consectetur adipiscing elit. '+paragraphs[0];getById('utilLoremOutput').value=paragraphs.join('\n\n');}setToolText('utilLoremStatus','生成完成：'+count+' '+(mode==='words'?'个单词':mode==='sentences'?'个句子':'个段落')+'；'+getById('utilLoremOutput').value.length+' 字符。');}catch(e){setToolText('utilLoremStatus','生成失败：'+e.message);}};
+    getById('utilLoremDownload').onclick=function(){downloadBlob('lorem-ipsum.txt',getById('utilLoremOutput').value,'text/plain;charset=utf-8');};
+
+    getById('utilCleanRun').onclick=function(){var text=getById('utilCleanInput').value;if(getById('utilCleanNormalizeNewline').checked)text=text.replace(/\r\n?/g,'\n');if(getById('utilCleanRemoveAllWs').checked)text=text.replace(/\s/gu,'');else{if(getById('utilCleanTrimLines').checked)text=text.split('\n').map(function(line){return line.trim();}).join('\n');if(getById('utilCleanRemoveSpaces').checked)text=text.replace(/[ \t]/g,'');else if(getById('utilCleanCollapse').checked)text=text.replace(/[ \t]{2,}/g,' ');if(getById('utilCleanRemoveBlank').checked)text=text.split('\n').filter(function(line){return line.trim()!=='';}).join('\n');}getById('utilCleanOutput').value=text;};
+    getById('utilCleanClear').onclick=function(){getById('utilCleanInput').value='';getById('utilCleanOutput').value='';};
+
+    function utilShuffleArray(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),tmp=a[i];a[i]=a[j];a[j]=tmp;}return a;}
+    getById('utilShuffleRun').onclick=function(){var text=getById('utilShuffleInput').value;if(text.length>500000){getById('utilShuffleOutput').value='错误：输入超过 500,000 个 UTF-16 代码单元限制。';return;}var mode=getById('utilShuffleMode').value,count=Math.floor(Number(getById('utilShuffleCount').value));if(!Number.isInteger(count)||count<1||count>20){getById('utilShuffleOutput').value='错误：重复生成次数必须为 1–20。';return;}var results=[];for(var c=0;c<count;c++){var arr;if(mode==='lines')arr=text.split(/\r?\n/);else if(mode==='paragraphs')arr=text.split(/\n\s*\n/);else if(mode==='words')arr=text.trim()?text.trim().split(/\s+/):[];else arr=Array.from(text);results.push(utilShuffleArray(arr).join(mode==='lines'?'\n':mode==='paragraphs'?'\n\n':mode==='words'?' ':'') );}getById('utilShuffleOutput').value=results.length>1?results.join('\n\n----- 结果分隔线 -----\n\n'):(results[0]||'');};
+    getById('utilShuffleDownload').onclick=function(){downloadBlob('shuffled-text.txt',getById('utilShuffleOutput').value,'text/plain;charset=utf-8');};
+
+    function utilLocalToday(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+    function utilParseDateUTC(value){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(value||'');if(!m)throw new Error('请选择有效日期');var y=Number(m[1]),mo=Number(m[2]),d=Number(m[3]),t=Date.UTC(y,mo-1,d),dt=new Date(t);if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==mo-1||dt.getUTCDate()!==d)throw new Error('日期无效');return dt;}
+    function utilDateISO(d){return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');}
+    function utilDaysBetween(a,b){return Math.round((Date.UTC(b.getUTCFullYear(),b.getUTCMonth(),b.getUTCDate())-Date.UTC(a.getUTCFullYear(),a.getUTCMonth(),a.getUTCDate()))/86400000);}
+    function utilAddMonthsClamped(date,months){var y=date.getUTCFullYear(),m=date.getUTCMonth()+months,day=date.getUTCDate(),first=new Date(Date.UTC(y,m,1)),last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();return new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth(),Math.min(day,last)));}
+    function utilCalendarDiff(start,end){var years=end.getUTCFullYear()-start.getUTCFullYear(),cursor=utilAddMonthsClamped(start,years*12);if(cursor>end){years--;cursor=utilAddMonthsClamped(start,years*12);}var months=(end.getUTCFullYear()-cursor.getUTCFullYear())*12+end.getUTCMonth()-cursor.getUTCMonth(),afterMonths=utilAddMonthsClamped(cursor,months);if(afterMonths>end){months--;afterMonths=utilAddMonthsClamped(cursor,months);}return {years:years,months:months,days:utilDaysBetween(afterMonths,end)};}
+    getById('utilDateFrom').value=utilLocalToday();getById('utilDateTo').value=utilLocalToday();getById('utilDateBase').value=utilLocalToday();
+    getById('utilDateDiffRun').onclick=function(){try{var a=utilParseDateUTC(getById('utilDateFrom').value),b=utilParseDateUTC(getById('utilDateTo').value),days=utilDaysBetween(a,b),start=a<=b?a:b,end=a<=b?b:a,cal=utilCalendarDiff(start,end),direction=days===0?'两日期相同':days>0?'结束日期晚于开始日期':'结束日期早于开始日期';setToolText('utilDateDiffOutput','开始日期：'+utilDateISO(a)+'\n结束日期：'+utilDateISO(b)+'\n方向：'+direction+'\n绝对间隔：'+Math.abs(days)+' 天（'+(Math.abs(days)*24)+' 小时，'+(Math.abs(days)*1440)+' 分钟）\n日历间隔：'+cal.years+' 年 '+cal.months+' 个月 '+cal.days+' 天'+(days<0?'\n有符号天数：'+days:'\n有符号天数：+'+days));setToolText('utilDateDiffStatus','计算完成。');}catch(e){setToolText('utilDateDiffOutput','计算失败：'+e.message);}};
+    getById('utilDateDiffSwap').onclick=function(){var a=getById('utilDateFrom'),b=getById('utilDateTo'),v=a.value;a.value=b.value;b.value=v;getById('utilDateDiffRun').click();};
+    getById('utilDateAddRun').onclick=function(){try{var base=utilParseDateUTC(getById('utilDateBase').value),n=Number(getById('utilDateAmount').value);if(!Number.isFinite(n)||!Number.isInteger(n))throw new Error('数量必须是整数');if(getById('utilDateDirection').value==='subtract')n=-n;var unit=getById('utilDateUnit').value,target;if(unit==='days')target=new Date(base.getTime()+n*86400000);else if(unit==='weeks')target=new Date(base.getTime()+n*7*86400000);else if(unit==='months')target=utilAddMonthsClamped(base,n);else target=utilAddMonthsClamped(base,n*12);setToolText('utilDateAddOutput','基准日期：'+utilDateISO(base)+'\n运算：'+(n<0?'向前 ':'向后 ')+Math.abs(n)+' '+({days:'天',weeks:'周',months:'个月',years:'年'}[unit])+'\n目标日期：'+utilDateISO(target)+'\n星期：'+['星期日','星期一','星期二','星期三','星期四','星期五','星期六'][target.getUTCDay()]);}catch(e){setToolText('utilDateAddOutput','计算失败：'+e.message);}};
+    getById('utilDateToday').onclick=function(){getById('utilDateBase').value=utilLocalToday();getById('utilDateAddRun').click();};
+
+    // Stopwatch and countdown are elapsed-time based, so throttled intervals do not accumulate drift.
+    var utilSwRunning=false,utilSwStartedAt=0,utilSwElapsed=0,utilSwInterval=null,utilSwLaps=[],utilCountdownInterval=null,utilCountdownEnd=0,utilCountdownRemaining=0,utilCountdownRunning=false;
+    function utilFormatStopwatch(ms){var cs=Math.floor(ms/10)%100,sec=Math.floor(ms/1000)%60,min=Math.floor(ms/60000)%60,h=Math.floor(ms/3600000);return String(h).padStart(2,'0')+':'+String(min).padStart(2,'0')+':'+String(sec).padStart(2,'0')+'.'+String(cs).padStart(2,'0');}
+    function utilStopwatchTick(){var ms=utilSwElapsed+(utilSwRunning?Date.now()-utilSwStartedAt:0);setToolText('utilStopwatchDisplay',utilFormatStopwatch(ms));}
+    getById('utilStopwatchStart').onclick=function(){if(utilSwRunning){utilSwElapsed+=Date.now()-utilSwStartedAt;utilSwRunning=false;clearInterval(utilSwInterval);utilSwInterval=null;getById('utilStopwatchStart').textContent='继续';}else{utilSwStartedAt=Date.now();utilSwRunning=true;utilSwInterval=setInterval(utilStopwatchTick,50);getById('utilStopwatchStart').textContent='暂停';}utilStopwatchTick();};
+    getById('utilStopwatchLap').onclick=function(){var ms=utilSwElapsed+(utilSwRunning?Date.now()-utilSwStartedAt:0);if(!ms){setToolText('utilStopwatchLaps','秒表尚未开始。');return;}utilSwLaps.unshift('第'+(utilSwLaps.length+1)+'段：'+utilFormatStopwatch(ms));utilSwLaps=utilSwLaps.slice(0,100);setToolText('utilStopwatchLaps',utilSwLaps.join('\n'));};
+    getById('utilStopwatchReset').onclick=function(){utilSwRunning=false;clearInterval(utilSwInterval);utilSwInterval=null;utilSwElapsed=0;utilSwLaps=[];getById('utilStopwatchStart').textContent='开始';setToolText('utilStopwatchDisplay','00:00:00.00');setToolText('utilStopwatchLaps','暂无分段记录。');};
+    function utilCountdownFormat(ms){var sec=Math.max(0,Math.ceil(ms/1000)),h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
+    function utilCountdownTick(){utilCountdownRemaining=Math.max(0,utilCountdownEnd-Date.now());setToolText('utilCountdownDisplay',utilCountdownFormat(utilCountdownRemaining));if(utilCountdownRemaining<=0){utilCountdownRunning=false;clearInterval(utilCountdownInterval);utilCountdownInterval=null;getById('utilCountdownStart').textContent='重新开始';setToolText('utilCountdownStatus','倒计时结束。');}}
+    getById('utilCountdownStart').onclick=function(){if(utilCountdownRunning)return;if(utilCountdownRemaining<=0){var h=Math.max(0,Math.floor(Number(getById('utilTimerHours').value)||0)),m=Math.max(0,Math.min(59,Math.floor(Number(getById('utilTimerMinutes').value)||0))),s=Math.max(0,Math.min(59,Math.floor(Number(getById('utilTimerSeconds').value)||0)));utilCountdownRemaining=(h*3600+m*60+s)*1000;}if(utilCountdownRemaining<=0){setToolText('utilCountdownStatus','请输入大于 0 的倒计时时长。');return;}utilCountdownEnd=Date.now()+utilCountdownRemaining;utilCountdownRunning=true;getById('utilCountdownStart').textContent='倒计时运行中';clearInterval(utilCountdownInterval);utilCountdownInterval=setInterval(utilCountdownTick,200);utilCountdownTick();setToolText('utilCountdownStatus','倒计时进行中。');};
+    getById('utilCountdownPause').onclick=function(){if(!utilCountdownRunning)return;utilCountdownRemaining=Math.max(0,utilCountdownEnd-Date.now());utilCountdownRunning=false;clearInterval(utilCountdownInterval);utilCountdownInterval=null;setToolText('utilCountdownDisplay',utilCountdownFormat(utilCountdownRemaining));getById('utilCountdownStart').textContent='继续倒计时';setToolText('utilCountdownStatus','倒计时已暂停。');};
+    getById('utilCountdownReset').onclick=function(){clearInterval(utilCountdownInterval);utilCountdownInterval=null;utilCountdownRunning=false;utilCountdownRemaining=0;var h=Math.max(0,Math.floor(Number(getById('utilTimerHours').value)||0)),m=Math.max(0,Math.min(59,Math.floor(Number(getById('utilTimerMinutes').value)||0))),ss=Math.max(0,Math.min(59,Math.floor(Number(getById('utilTimerSeconds').value)||0)));setToolText('utilCountdownDisplay',utilCountdownFormat((h*3600+m*60+ss)*1000));getById('utilCountdownStart').textContent='开始倒计时';setToolText('utilCountdownStatus','倒计时已重置。');};
+
+    var utilUnitData={
+      length:{label:'长度',units:{m:['米',1],km:['千米',1000],cm:['厘米',.01],mm:['毫米',.001],um:['微米',1e-6],nm:['纳米',1e-9],in:['英寸',.0254],ft:['英尺',.3048],yd:['码',.9144],mi:['英里',1609.344]}},
+      area:{label:'面积',units:{m2:['平方米',1],km2:['平方千米',1e6],cm2:['平方厘米',1e-4],mm2:['平方毫米',1e-6],ha:['公顷',10000],acre:['英亩',4046.8564224],ft2:['平方英尺',.09290304]}},
+      volume:{label:'体积',units:{m3:['立方米',1],L:['升',.001],mL:['毫升',1e-6],cm3:['立方厘米',1e-6],galUS:['美制加仑',.003785411784],galUK:['英制加仑',.00454609],cupUS:['美制杯',.0002365882365]}},
+      mass:{label:'质量',units:{kg:['千克',1],g:['克',.001],mg:['毫克',1e-6],t:['公吨',1000],lb:['磅',.45359237],oz:['盎司',.028349523125]}},
+      speed:{label:'速度',units:{'m/s':['米/秒',1],'km/h':['千米/小时',1/3.6],mph:['英里/小时',.44704],knot:['节',.5144444444],ftps:['英尺/秒',.3048]}},
+      temperature:{label:'温度',units:{C:['摄氏度',1],F:['华氏度',1],K:['开尔文',1],Rankine:['兰氏度',1]}},
+      pressure:{label:'压力',units:{Pa:['帕斯卡',1],kPa:['千帕',1000],MPa:['兆帕',1e6],bar:['巴',100000],atm:['标准大气压',101325],psi:['磅力/平方英寸',6894.757293168],mmHg:['毫米汞柱',133.322387415]}},
+      energy:{label:'能量',units:{J:['焦耳',1],kJ:['千焦',1000],cal:['小卡',4.184],kcal:['千卡',4184],Wh:['瓦时',3600],kWh:['千瓦时',3600000],eV:['电子伏特',1.602176634e-19]}},
+      power:{label:'功率',units:{W:['瓦',1],kW:['千瓦',1000],MW:['兆瓦',1e6],hp:['机械马力',745.6998716]}},
+      data:{label:'数据容量',units:{B:['Byte',1],KB:['KB（1000 B）',1000],MB:['MB（1000 KB）',1e6],GB:['GB（1000 MB）',1e9],TB:['TB（1000 GB）',1e12],KiB:['KiB（1024 B）',1024],MiB:['MiB（1024 KiB）',1048576],GiB:['GiB（1024 MiB）',1073741824],TiB:['TiB（1024 GiB）',1099511627776],bit:['bit',.125]}},
+      time:{label:'时间',units:{ms:['毫秒',.001],s:['秒',1],min:['分钟',60],h:['小时',3600],day:['天（24 小时）',86400],week:['周（7 天）',604800]}},
+      angle:{label:'角度',units:{deg:['度',Math.PI/180],rad:['弧度',1],grad:['百分度',Math.PI/200],turn:['整圈',Math.PI*2]}}
+    };
+    function utilPopulateUnits(){var cat=getById('utilUnitCategory').value,units=utilUnitData[cat].units,from=getById('utilUnitFrom'),to=getById('utilUnitTo');from.replaceChildren();to.replaceChildren();Object.keys(units).forEach(function(k,i){[from,to].forEach(function(sel){var o=document.createElement('option');o.value=k;o.textContent=units[k][0]+' ('+k+')';sel.appendChild(o);});});if(Object.keys(units).length>1)to.selectedIndex=1;if(cat==='temperature'){from.value='C';to.value='F';}if(cat==='length'){from.value='m';to.value='km';}if(cat==='data'){from.value='MB';to.value='MiB';} }
+    function utilTempToC(v,u){if(u==='C')return v;if(u==='F')return (v-32)*5/9;if(u==='K')return v-273.15;if(u==='Rankine')return (v-491.67)*5/9;throw new Error('温度单位无效');}
+    function utilCToTemp(c,u){if(u==='C')return c;if(u==='F')return c*9/5+32;if(u==='K')return c+273.15;if(u==='Rankine')return (c+273.15)*9/5;throw new Error('温度单位无效');}
+    function utilConvertUnits(){try{var cat=getById('utilUnitCategory').value,value=Number(getById('utilUnitValue').value),from=getById('utilUnitFrom').value,to=getById('utilUnitTo').value;if(!Number.isFinite(value))throw new Error('请输入有效数值');var units=utilUnitData[cat].units,result=cat==='temperature'?utilCToTemp(utilTempToC(value,from),to):(value*units[from][1])/units[to][1];if(!Number.isFinite(result))throw new Error('换算结果超出可表示范围');var digits=Math.abs(result)<1e-7&&result!==0?8:12;setToolText('utilUnitOutput',value+' '+units[from][0]+' = '+Number(result.toPrecision(digits))+' '+units[to][0]+'\n类别：'+utilUnitData[cat].label+'\n基准结果未进行额外舍入；显示值为有限精度。');}catch(e){setToolText('utilUnitOutput','换算失败：'+e.message);}}
+    getById('utilUnitCategory').addEventListener('change',function(){utilPopulateUnits();utilConvertUnits();});getById('utilUnitConvert').onclick=utilConvertUnits;getById('utilUnitValue').addEventListener('input',utilConvertUnits);getById('utilUnitFrom').addEventListener('change',utilConvertUnits);getById('utilUnitTo').addEventListener('change',utilConvertUnits);getById('utilUnitSwap').onclick=function(){var a=getById('utilUnitFrom'),b=getById('utilUnitTo'),v=a.value;a.value=b.value;b.value=v;utilConvertUnits();};utilPopulateUnits();utilConvertUnits();
+
     // ============ 初始化 ============
     try {
-        getById('uuidResult').textContent = uuidv4();
+        getById('uuidGen').click();
         getById('pwdGen').click();
         getById('randStrGen').click();
         computeHash();
