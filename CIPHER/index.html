@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN" data-theme="light">
 <head>
@@ -919,6 +920,7 @@
                 <div><strong>Layer 2</strong><span>XChaCha20-Poly1305 (IETF) · 192-bit nonce</span></div>
                 <div><strong>Layout</strong><span>magic[4] ‖ ver[1] ‖ salt[32] ‖ aes_iv[12] ‖ xnonce[24] ‖ key_check[16] ‖ ct</span></div>
                 <div><strong>Auth</strong><span>双层 128-bit Poly1305 / GCM tag + HMAC 密钥确认 + 头部 AAD 绑定</span></div>
+                <div><strong>Security</strong><span>XChaCha20-Poly1305 与 ML-KEM/X448 含自实现 JavaScript 代码，非恒定时间且未经独立审计；不建议保护高价值机密</span></div>
             </div>
         </section>
 
@@ -1005,7 +1007,9 @@
                 <div><strong>KeyGen</strong><span>X448 私钥 56 B + ML-KEM dk 3168 B = 3224 B</span></div>
                 <div><strong>PubKey</strong><span>X448 公钥 56 B + ML-KEM ek 1568 B = 1624 B</span></div>
                 <div><strong>Ciphertext</strong><span>1641 B 头部 + 明文长度 + 16 B GCM tag</span></div>
-                <div><strong>Note</strong><span>全部运算在本机完成，密钥与明文不上传</span></div>
+                <div><strong>Key trust</strong><span>加密前须通过可信独立渠道核验公钥指纹；本工具不提供发送者身份认证</span></div>
+                <div><strong>Security</strong><span>此版本含自实现 JavaScript/BigInt 密码学代码，非恒定时间且未经独立审计；不建议用于高价值机密</span></div>
+                <div><strong>Privacy</strong><span>本页未主动上传密钥或明文；网页被篡改、浏览器扩展或本机恶意软件仍可能读取输入</span></div>
             </div>
         </section>
     </div>
@@ -1027,7 +1031,11 @@
             const HEADER_LEN = 4 + 1 + SALT_LEN + AES_IV_LEN + XNONCE_LEN + KEY_CHECK_LEN;
             const LEGACY_HEADER_LEN = SALT_LEN + AES_IV_LEN + XNONCE_LEN + KEY_CHECK_LEN;
             const AE_OVERHEAD = 32;
-            const BASN_MAX_BYTES = 64 * 1024 * 1024;
+            const SYM_MAX_PLAINTEXT_BYTES = 64 * 1024 * 1024;
+            const SYM_MAX_CIPHERTEXT_BYTES = HEADER_LEN + SYM_MAX_PLAINTEXT_BYTES + AE_OVERHEAD;
+            // 编码文本可能比原始数据更长；用较宽松的界限在解码/派生 KDF 前阻止超大输入。
+            const MAX_SYM_INPUT_CHARS = SYM_MAX_CIPHERTEXT_BYTES * 2 + 64;
+            const BASN_MAX_BYTES = SYM_MAX_CIPHERTEXT_BYTES;
 
             // ════════════════════ 通用工具 ════════════════════
             function concatBytes() {
@@ -1055,6 +1063,37 @@
             function b64decode(str) {
                 const s = String(str).replace(/\s+/g, '');
                 return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+            }
+
+            // 非对称密钥/密文只接受标准、规范的 Base64；允许复制时换行，但拒绝忽略非法字符。
+            function b64decodeStrict(str, label) {
+                const s = String(str).replace(/\s+/g, '');
+                if (!s || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(s)) {
+                    throw new Error((label || '输入') + '不是规范的 Base64');
+                }
+                let bytes;
+                try { bytes = Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+                catch (_) { throw new Error((label || '输入') + '不是有效的 Base64'); }
+                if (b64encode(bytes) !== s) throw new Error((label || '输入') + '不是规范的 Base64');
+                return bytes;
+            }
+
+            // 在分配完整 UTF-8 输出缓冲区前计算字节数，避免大量非 ASCII 输入放大内存占用。
+            // TextEncoder 对未配对代理项会编码成 U+FFFD（3 字节），这里按相同规则计算。
+            function utf8ByteLengthAtMost(str, maxBytes) {
+                let bytes = 0;
+                for (let i = 0; i < str.length; i++) {
+                    const c = str.charCodeAt(i);
+                    if (c <= 0x7f) bytes += 1;
+                    else if (c <= 0x7ff) bytes += 2;
+                    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+                        const next = str.charCodeAt(i + 1);
+                        if (next >= 0xdc00 && next <= 0xdfff) { bytes += 4; i++; }
+                        else bytes += 3;
+                    } else bytes += 3;
+                    if (bytes > maxBytes) return -1;
+                }
+                return bytes;
             }
 
             // ════════════════════ Chacha20 / Poly1305 原语 ════════════════════
@@ -1282,7 +1321,7 @@
             function baseNEncode(bytes, alphabet) {
                 if (!bytes) bytes = new Uint8Array(0);
                 if (bytes.length > BASN_MAX_BYTES) {
-                    throw new Error('输入过大：该编码格式上限 64 MiB，大文件请改用 Base64 / Hex');
+                    throw new Error('输入过大：该编码格式只支持本工具 64 MiB 明文上限对应的密文大小，大文件请改用 Base64 / Hex');
                 }
                 const { K, D } = blockParams(alphabet);
                 const A = BigInt(alphabet.length);
@@ -1613,8 +1652,10 @@
                     }
                     case 'base58': return baseNDecode(s, BASE58_ALPHABET);
                     case 'hex_upper': case 'hex_lower': {
-                        const cleaned = s.replace(/[^0-9a-fA-F]/g,'');
-                        if (cleaned.length%2!==0) throw new Error('Hex 长度必须为偶数');
+                        const cleaned = s.replace(/\s+/g, '');
+                        if (!cleaned || !/^(?:[0-9a-fA-F]{2})+$/.test(cleaned)) {
+                            throw new Error('Hex 输入只能包含十六进制字符，且长度必须为正偶数');
+                        }
                         const out = new Uint8Array(cleaned.length/2);
                         for (let i=0;i<cleaned.length;i+=2) out[i/2]=parseInt(cleaned.substr(i,2),16);
                         return out;
@@ -1630,15 +1671,23 @@
 
             // ════════════════════ 对称：加密 / 解密 核心 ════════════════════
             async function encrypt(plaintextStr, password, kdf) {
+                if (utf8ByteLengthAtMost(plaintextStr, SYM_MAX_PLAINTEXT_BYTES) < 0) {
+                    throw new Error('明文过大：对称模式上限为 64 MiB（按 UTF-8 字节计）');
+                }
+                const ptBytes = new TextEncoder().encode(plaintextStr);
+                if (ptBytes.length > SYM_MAX_PLAINTEXT_BYTES) {
+                    ptBytes.fill(0);
+                    throw new Error('明文过大：对称模式上限为 64 MiB（按 UTF-8 字节计）');
+                }
                 const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
                 const aesIv = crypto.getRandomValues(new Uint8Array(AES_IV_LEN));
                 const xnonce = crypto.getRandomValues(new Uint8Array(XNONCE_LEN));
-                const keys = await deriveKeys(password, salt, kdf);
-                const ptBytes = new TextEncoder().encode(plaintextStr);
+                let keys, aesCt, xCt;
                 try {
+                    keys = await deriveKeys(password, salt, kdf);
                     const keyCheck = await computeKeyCheck(keys.checkKey, salt);
                     const aesKeyObj = await crypto.subtle.importKey('raw', keys.aesKey, {name:'AES-GCM'}, false, ['encrypt']);
-                    const aesCt = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv:aesIv}, aesKeyObj, ptBytes));
+                    aesCt = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv:aesIv, tagLength:128}, aesKeyObj, ptBytes));
                     const header = new Uint8Array(HEADER_LEN);
                     header.set(MAGIC, 0);
                     header[4] = (kdf === 'argon2id') ? VERSION_ARGON2ID : VERSION_PBKDF2;
@@ -1646,7 +1695,7 @@
                     header.set(aesIv, 5 + SALT_LEN);
                     header.set(xnonce, 5 + SALT_LEN + AES_IV_LEN);
                     header.set(keyCheck, 5 + SALT_LEN + AES_IV_LEN + XNONCE_LEN);
-                    const xCt = xchacha20Poly1305Encrypt(keys.xKey, xnonce, aesCt, header);
+                    xCt = xchacha20Poly1305Encrypt(keys.xKey, xnonce, aesCt, header);
                     const out = new Uint8Array(HEADER_LEN + xCt.length);
                     out.set(header, 0);
                     out.set(xCt, HEADER_LEN);
@@ -1660,8 +1709,10 @@
                         }
                     };
                 } finally {
-                    keys.zero();
+                    if (keys) keys.zero();
                     ptBytes.fill(0);
+                    if (aesCt) aesCt.fill(0);
+                    if (xCt) xCt.fill(0);
                 }
             }
 
@@ -1697,8 +1748,11 @@
             }
 
             async function decrypt(cipherBytes, password) {
-                if (cipherBytes.length < LEGACY_HEADER_LEN + AE_OVERHEAD) {
+                if (!(cipherBytes instanceof Uint8Array) || cipherBytes.length < LEGACY_HEADER_LEN + AE_OVERHEAD) {
                     throw new Error('认证失败：密钥错误或数据损坏');
+                }
+                if (cipherBytes.length > SYM_MAX_CIPHERTEXT_BYTES) {
+                    throw new Error('密文过大：对称模式上限为 64 MiB 明文');
                 }
                 const parts = parseCipher(cipherBytes);
                 if (cipherBytes.length < parts.headerLen + AE_OVERHEAD) {
@@ -1715,19 +1769,25 @@
                     catch(e) { throw new Error('认证失败：密钥错误或数据损坏'); }
                     try {
                         const aesKeyObj = await crypto.subtle.importKey('raw', keys.aesKey, {name:'AES-GCM'}, false, ['decrypt']);
-                        const ptBytes = await crypto.subtle.decrypt({name:'AES-GCM', iv:parts.aesIv}, aesKeyObj, aesCt);
-                        const plaintext = new TextDecoder().decode(new Uint8Array(ptBytes));
-                        return {
-                            plaintext, cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength, kdf: parts.kdf,
-                            header: {
-                                isV2: parts.headerLen === HEADER_LEN, kdf: parts.kdf,
-                                ver: parts.headerLen === HEADER_LEN ? cipherBytes[4] : null,
-                                cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength,
-                                magic: MAGIC.slice(), salt: parts.salt.slice(), aesIv: parts.aesIv.slice(),
-                                xnonce: parts.xnonce.slice(), keyCheck: parts.keyCheck.slice(),
-                                polyTag: parts.xCt.slice(parts.xCt.length - 16)
-                            }
-                        };
+                        const ptBuffer = await crypto.subtle.decrypt({name:'AES-GCM', iv:parts.aesIv, tagLength:128}, aesKeyObj, aesCt);
+                        const ptBytes = new Uint8Array(ptBuffer);
+                        try {
+                            const plaintext = new TextDecoder('utf-8', { fatal: true }).decode(ptBytes);
+                            return {
+                                plaintext, cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength, kdf: parts.kdf,
+                                header: {
+                                    isV2: parts.headerLen === HEADER_LEN, kdf: parts.kdf,
+                                    ver: parts.headerLen === HEADER_LEN ? cipherBytes[4] : null,
+                                    cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength,
+                                    magic: MAGIC.slice(), salt: parts.salt.slice(), aesIv: parts.aesIv.slice(),
+                                    xnonce: parts.xnonce.slice(), keyCheck: parts.keyCheck.slice(),
+                                    polyTag: parts.xCt.slice(parts.xCt.length - 16)
+                                }
+                            };
+                        } finally {
+                            ptBytes.fill(0);
+                            aesCt.fill(0);
+                        }
                     } catch(e) {
                         throw new Error('认证失败：密钥错误或数据损坏');
                     }
@@ -1996,7 +2056,8 @@
                 for (let i = 0; i < 256; i++) {
                     let v = f[i];
                     for (let b = 0; b < d; b++) {
-                        if (v & 1) out[bitPos >> 3] |= 1 << (bitPos & 7);
+                        // 位值可能来自 KEM 密文/明文相关中间量；用算术掩码写入，避免显式秘密相关分支。
+                        out[bitPos >> 3] |= (v & 1) << (bitPos & 7);
                         v >>= 1;
                         bitPos++;
                     }
@@ -2028,6 +2089,45 @@
             const MLKEM_DK_PKE_LEN = 384 * MLK;         // 1536
             const MLKEM_DK_LEN = 768 * MLK + 96;        // 3168
             const MLKEM_CT_LEN = 32 * (11 * MLK + 5);   // 1568
+
+            // FIPS 203 §7.2: ByteDecode12 公钥系数必须全部落在 [0, q-1]。
+            // 只检查长度不足以验证 ML-KEM 公钥编码；拒绝非规范系数，避免模约简造成歧义。
+            function validateMlKemPublicKey(ek) {
+                if (!(ek instanceof Uint8Array) || ek.length !== MLKEM_EK_LEN) {
+                    throw new Error('ML-KEM-1024 公钥长度无效');
+                }
+                for (let i = 0; i < MLKEM_DK_PKE_LEN; i += 3) {
+                    const a0 = ek[i] | ((ek[i + 1] & 0x0f) << 8);
+                    const a1 = (ek[i + 1] >>> 4) | (ek[i + 2] << 4);
+                    if (a0 >= MLQ || a1 >= MLQ) {
+                        throw new Error('ML-KEM 公钥编码无效：存在超出模数 q-1 的系数');
+                    }
+                }
+                return true;
+            }
+
+            // FIPS 203 §7.3: 解封装前必须校验密钥长度、内嵌公钥编码以及 H(ek)。
+            function validateMlKemSecretKey(dk) {
+                if (!(dk instanceof Uint8Array) || dk.length !== MLKEM_DK_LEN) {
+                    throw new Error('ML-KEM-1024 私钥长度无效');
+                }
+                const dkPKE = dk.subarray(0, MLKEM_DK_PKE_LEN);
+                for (let i = 0; i < dkPKE.length; i += 3) {
+                    const a0 = dkPKE[i] | ((dkPKE[i + 1] & 0x0f) << 8);
+                    const a1 = (dkPKE[i + 1] >>> 4) | (dkPKE[i + 2] << 4);
+                    if (a0 >= MLQ || a1 >= MLQ) {
+                        throw new Error('ML-KEM 私钥编码无效：PKE 私钥包含超出模数 q-1 的系数');
+                    }
+                }
+                const ekStart = MLKEM_DK_PKE_LEN;
+                const ek = dk.subarray(ekStart, ekStart + MLKEM_EK_LEN);
+                const storedHash = dk.subarray(ekStart + MLKEM_EK_LEN, ekStart + MLKEM_EK_LEN + 32);
+                validateMlKemPublicKey(ek);
+                if (!constantTimeEqual(sha3_256(ek), storedHash)) {
+                    throw new Error('ML-KEM 私钥校验失败：内嵌公钥哈希不匹配');
+                }
+                return true;
+            }
 
             function kpkeKeyGen(d) {
                 const gInput = new Uint8Array(33);
@@ -2092,7 +2192,7 @@
                 mlINTT(vacc);
                 for (let c = 0; c < 256; c++) {
                     const bit = (m[c >> 3] >> (c & 7)) & 1;
-                    const mu = bit ? 1665 : 0;
+                    const mu = bit * 1665; // bit 来自封装随机消息，避免三元分支。
                     vacc[c] = (vacc[c] + e2[c] + mu) % MLQ;
                 }
 
@@ -2141,7 +2241,8 @@
                 const m = new Uint8Array(32);
                 for (let i = 0; i < 256; i++) {
                     const w = (v[i] - acc[i] + MLQ) % MLQ;
-                    if (mlCompress(w, 1)) m[i >> 3] |= 1 << (i & 7);
+                    // 避免按秘密相关的明文位走显式分支（JS 仍无法提供严格恒定时间保证）。
+                    m[i >> 3] |= mlCompress(w, 1) << (i & 7);
                 }
                 return m;
             }
@@ -2149,28 +2250,47 @@
             function mlkemKeyGen() {
                 const d = crypto.getRandomValues(new Uint8Array(32));
                 const z = crypto.getRandomValues(new Uint8Array(32));
-                const kp = kpkeKeyGen(d);
-                const dk = new Uint8Array(MLKEM_DK_LEN);
-                dk.set(kp.dk, 0);
-                dk.set(kp.ek, MLKEM_DK_PKE_LEN);
-                dk.set(sha3_256(kp.ek), MLKEM_DK_PKE_LEN + MLKEM_EK_LEN);
-                dk.set(z, MLKEM_DK_PKE_LEN + MLKEM_EK_LEN + 32);
-                return { ek: kp.ek, dk };
+                let kp;
+                try {
+                    kp = kpkeKeyGen(d);
+                    const dk = new Uint8Array(MLKEM_DK_LEN);
+                    dk.set(kp.dk, 0);
+                    dk.set(kp.ek, MLKEM_DK_PKE_LEN);
+                    dk.set(sha3_256(kp.ek), MLKEM_DK_PKE_LEN + MLKEM_EK_LEN);
+                    dk.set(z, MLKEM_DK_PKE_LEN + MLKEM_EK_LEN + 32);
+                    return { ek: kp.ek, dk };
+                } finally {
+                    d.fill(0);
+                    z.fill(0);
+                    if (kp && kp.dk) kp.dk.fill(0);
+                }
             }
 
             function mlkemEncaps(ek) {
+                validateMlKemPublicKey(ek);
                 const m = crypto.getRandomValues(new Uint8Array(32));
-                const gIn = new Uint8Array(64);
-                gIn.set(m, 0);
-                gIn.set(sha3_256(ek), 32);
-                const g = sha3_512(gIn);
-                const shared = g.subarray(0, 32);
-                const r = g.subarray(32, 64);
-                const ciphertext = kpkeEncrypt(ek, m, r);
-                return { shared, ciphertext };
+                let g, gIn;
+                try {
+                    gIn = new Uint8Array(64);
+                    gIn.set(m, 0);
+                    gIn.set(sha3_256(ek), 32);
+                    g = sha3_512(gIn);
+                    const shared = g.slice(0, 32); // 独立副本，便于清理中间值
+                    const r = g.subarray(32, 64);
+                    const ciphertext = kpkeEncrypt(ek, m, r);
+                    return { shared, ciphertext };
+                } finally {
+                    m.fill(0);
+                    if (gIn) gIn.fill(0);
+                    if (g) g.fill(0);
+                }
             }
 
             function mlkemDecaps(dk, c) {
+                if (!(c instanceof Uint8Array) || c.length !== MLKEM_CT_LEN) {
+                    throw new Error('ML-KEM-1024 密文长度无效');
+                }
+                validateMlKemSecretKey(dk);
                 const dkPKE = dk.subarray(0, MLKEM_DK_PKE_LEN);
                 const ek = dk.subarray(MLKEM_DK_PKE_LEN, MLKEM_DK_PKE_LEN + MLKEM_EK_LEN);
                 const h = dk.subarray(MLKEM_DK_PKE_LEN + MLKEM_EK_LEN, MLKEM_DK_PKE_LEN + MLKEM_EK_LEN + 32);
@@ -2196,7 +2316,20 @@
                 for (let i = 0; i < n; i++) diff |= c[i] ^ cPrime[i];
 
                 const out = new Uint8Array(32);
-                for (let i = 0; i < 32; i++) out[i] = diff === 0 ? KPrime[i] : KBar[i];
+                // 隐式拒绝的匹配标志属于秘密中间值；使用掩码选择，避免显式 if/?: 分支。
+                // JavaScript/JIT 与 BigInt 运算不保证恒定时间，不能据此声称侧信道安全。
+                const nonzero = (diff | -diff) >>> 31;
+                const validMask = (nonzero - 1) & 0xff; // diff==0 => 0xff，否则 0x00
+                for (let i = 0; i < 32; i++) {
+                    out[i] = (KPrime[i] & validMask) | (KBar[i] & (validMask ^ 0xff));
+                }
+                // best-effort 清理秘密中间值；JS 引擎可能复制/保留内部表示，不能视为可靠内存擦除。
+                KPrime.fill(0);
+                KBar.fill(0);
+                g.fill(0);
+                mPrime.fill(0);
+                gIn.fill(0);
+                zcIn.fill(0);
                 return out;
             }
 
@@ -2239,16 +2372,18 @@
                 k[0] &= 252;
                 k[55] |= 128;
                 const kBig = bigIntFromLE(k);
+                k.fill(0); // 清理私有标量的可擦除字节副本；BigInt 本身仍由引擎管理。
                 const x1 = mod448(bigIntFromLE(uBytes));
 
                 let x2 = 1n, z2 = 0n, x3 = x1, z3 = 1n, swap = 0n;
                 for (let t = 447; t >= 0; t--) {
                     const kt = (kBig >> BigInt(t)) & 1n;
                     swap ^= kt;
-                    if (swap === 1n) {
-                        let tmp = x2; x2 = x3; x3 = tmp;
-                        tmp = z2; z2 = z3; z3 = tmp;
-                    }
+                    // 掩码条件交换，去掉依赖私有标量位的显式分支。
+                    // 注意：BigInt 算术本身并非恒定时间，不能替代经审计的原生实现。
+                    let mask = -swap;
+                    let tmp = (x2 ^ x3) & mask; x2 ^= tmp; x3 ^= tmp;
+                    tmp = (z2 ^ z3) & mask; z2 ^= tmp; z3 ^= tmp;
                     swap = kt;
 
                     const tA = mod448(x2 + z2), AA = mod448(tA * tA);
@@ -2262,10 +2397,9 @@
                     x2 = mod448(AA * BB);
                     z2 = mod448(E * mod448(AA + A24_448 * E));
                 }
-                if (swap === 1n) {
-                    let tmp = x2; x2 = x3; x3 = tmp;
-                    tmp = z2; z2 = z3; z3 = tmp;
-                }
+                let mask = -swap;
+                let tmp = (x2 ^ x3) & mask; x2 ^= tmp; x3 ^= tmp;
+                tmp = (z2 ^ z3) & mask; z2 ^= tmp; z3 ^= tmp;
                 return bigIntToLE(mod448(x2 * modPow448(z2, P448 - 2n)), 56);
             }
 
@@ -2278,7 +2412,15 @@
             const ASYM_PK_LEN = X448_KEY_LEN + MLKEM_EK_LEN;      // 1624
             const ASYM_SK_LEN = X448_KEY_LEN + MLKEM_DK_LEN;      // 3224
             const ASYM_HDR_LEN = 4 + 1 + X448_KEY_LEN + MLKEM_CT_LEN + 12; // 1641
+            const ASYM_MAX_PLAINTEXT_BYTES = 64 * 1024 * 1024;
+            const ASYM_MAX_CIPHERTEXT_BYTES = ASYM_HDR_LEN + ASYM_MAX_PLAINTEXT_BYTES + 16;
             const HKDF_INFO = new TextEncoder().encode('X448-ML-KEM-1024 hybrid v1 / AES-256-GCM');
+
+            function isAllZero(bytes) {
+                let acc = 0;
+                for (let i = 0; i < bytes.length; i++) acc |= bytes[i];
+                return acc === 0;
+            }
 
             // ─── 密钥 JSON 序列化 / 反序列化 ───
             const PUBKEY_TYPE = 'X448-ML-KEM-1024-PublicKey';
@@ -2304,113 +2446,157 @@
             function parsePublicKey(str) {
                 const s = String(str || '').trim();
                 if (!s) throw new Error('公钥为空');
+                if (s.length > 12000) throw new Error('公钥文本过大或格式异常');
                 if (s.startsWith('{')) {
                     let obj;
                     try { obj = JSON.parse(s); } catch(e) { throw new Error('JSON 解析失败：' + e.message); }
+                    if (!obj || typeof obj !== 'object' || Array.isArray(obj) ||
+                        obj.type !== PUBKEY_TYPE || obj.version !== 1) {
+                        throw new Error('公钥类型或版本不受支持');
+                    }
                     if (typeof obj.x448 !== 'string' || typeof obj.mlkem !== 'string') {
                         throw new Error('JSON 缺少 x448 或 mlkem 字段');
                     }
                     let x, ml;
-                    try { x = b64decode(obj.x448); } catch(e) { throw new Error('x448 字段不是有效 Base64'); }
-                    try { ml = b64decode(obj.mlkem); } catch(e) { throw new Error('mlkem 字段不是有效 Base64'); }
+                    try { x = b64decodeStrict(obj.x448, 'x448 字段'); } catch(e) { throw new Error(e.message); }
+                    try { ml = b64decodeStrict(obj.mlkem, 'mlkem 字段'); } catch(e) { throw new Error(e.message); }
                     if (x.length !== X448_KEY_LEN) throw new Error('x448 字段长度无效（期望 ' + X448_KEY_LEN + ' 字节，实际 ' + x.length + '）');
                     if (ml.length !== MLKEM_EK_LEN) throw new Error('mlkem 字段长度无效（期望 ' + MLKEM_EK_LEN + ' 字节，实际 ' + ml.length + '）');
+                    validateMlKemPublicKey(ml);
                     return concatBytes(x, ml);
                 }
-                // 向后兼容：裸 Base64
+                // 向后兼容：裸 Base64（但同样要求规范编码）。
                 let raw;
-                try { raw = b64decode(s); } catch(e) { throw new Error('无法识别的公钥格式'); }
-                if (raw.length === ASYM_PK_LEN) return raw;
+                try { raw = b64decodeStrict(s, '公钥'); } catch(e) { throw new Error('无法识别的公钥格式：' + e.message); }
+                if (raw.length === ASYM_PK_LEN) {
+                    validateMlKemPublicKey(raw.subarray(X448_KEY_LEN));
+                    return raw;
+                }
                 throw new Error('公钥格式无法识别（应为 JSON 或 ' + ASYM_PK_LEN + ' 字节 Base64）');
             }
 
             function parseSecretKey(str) {
                 const s = String(str || '').trim();
                 if (!s) throw new Error('私钥为空');
+                if (s.length > 12000) throw new Error('私钥文本过大或格式异常');
                 if (s.startsWith('{')) {
                     let obj;
                     try { obj = JSON.parse(s); } catch(e) { throw new Error('JSON 解析失败：' + e.message); }
+                    if (!obj || typeof obj !== 'object' || Array.isArray(obj) ||
+                        obj.type !== PRIVKEY_TYPE || obj.version !== 1) {
+                        throw new Error('私钥类型或版本不受支持');
+                    }
                     if (typeof obj.x448 !== 'string' || typeof obj.mlkem !== 'string') {
                         throw new Error('JSON 缺少 x448 或 mlkem 字段');
                     }
                     let x, ml;
-                    try { x = b64decode(obj.x448); } catch(e) { throw new Error('x448 字段不是有效 Base64'); }
-                    try { ml = b64decode(obj.mlkem); } catch(e) { throw new Error('mlkem 字段不是有效 Base64'); }
+                    try { x = b64decodeStrict(obj.x448, 'x448 字段'); } catch(e) { throw new Error(e.message); }
+                    try { ml = b64decodeStrict(obj.mlkem, 'mlkem 字段'); } catch(e) { throw new Error(e.message); }
                     if (x.length !== X448_KEY_LEN) throw new Error('x448 字段长度无效（期望 ' + X448_KEY_LEN + ' 字节，实际 ' + x.length + '）');
                     if (ml.length !== MLKEM_DK_LEN) throw new Error('mlkem 字段长度无效（期望 ' + MLKEM_DK_LEN + ' 字节，实际 ' + ml.length + '）');
+                    validateMlKemSecretKey(ml);
                     return concatBytes(x, ml);
                 }
                 let raw;
-                try { raw = b64decode(s); } catch(e) { throw new Error('无法识别的私钥格式'); }
-                if (raw.length === ASYM_SK_LEN) return raw;
+                try { raw = b64decodeStrict(s, '私钥'); } catch(e) { throw new Error('无法识别的私钥格式：' + e.message); }
+                if (raw.length === ASYM_SK_LEN) {
+                    validateMlKemSecretKey(raw.subarray(X448_KEY_LEN));
+                    return raw;
+                }
                 throw new Error('私钥格式无法识别（应为 JSON 或 ' + ASYM_SK_LEN + ' 字节 Base64）');
             }
 
             function asymKeyGen() {
                 const kp = mlkemKeyGen();
                 const xSk = crypto.getRandomValues(new Uint8Array(56));
-                const xPk = x448(xSk, X448_BASEPOINT);
-                return {
-                    publicKey: concatBytes(xPk, kp.ek),
-                    secretKey: concatBytes(xSk, kp.dk)
-                };
+                try {
+                    const xPk = x448(xSk, X448_BASEPOINT);
+                    return {
+                        publicKey: concatBytes(xPk, kp.ek),
+                        secretKey: concatBytes(xSk, kp.dk)
+                    };
+                } finally {
+                    xSk.fill(0);
+                    kp.dk.fill(0);
+                }
             }
 
             async function hkdfAesKey(mlK, xShared, ephPk, mlCt, usage) {
                 const ikm = concatBytes(mlK, xShared);
                 const salt = concatBytes(ephPk, mlCt);
-                const baseKey = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveKey']);
-                return crypto.subtle.deriveKey(
-                    { name: 'HKDF', hash: 'SHA-256', salt, info: HKDF_INFO },
-                    baseKey,
-                    { name: 'AES-GCM', length: 256 },
-                    false,
-                    [usage]
-                );
+                try {
+                    const baseKey = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveKey']);
+                    return await crypto.subtle.deriveKey(
+                        { name: 'HKDF', hash: 'SHA-256', salt, info: HKDF_INFO },
+                        baseKey,
+                        { name: 'AES-GCM', length: 256 },
+                        false,
+                        [usage]
+                    );
+                } finally {
+                    ikm.fill(0);
+                    salt.fill(0); // salt 不属于秘密，清理它也能减少临时数据残留
+                }
             }
 
             async function asymEncrypt(plaintextStr, publicKeyBytes) {
                 if (publicKeyBytes.length !== ASYM_PK_LEN) {
                     throw new Error('公钥长度无效：期望 ' + ASYM_PK_LEN + ' 字节，实际 ' + publicKeyBytes.length + ' 字节');
                 }
+                if (typeof plaintextStr !== 'string' || plaintextStr.length > ASYM_MAX_PLAINTEXT_BYTES ||
+                    utf8ByteLengthAtMost(plaintextStr, ASYM_MAX_PLAINTEXT_BYTES) < 0) {
+                    throw new Error('明文过大：本工具非对称模式上限为 64 MiB（按 UTF-8 字节计）');
+                }
                 const xPk = publicKeyBytes.subarray(0, X448_KEY_LEN);
                 const ek = publicKeyBytes.subarray(X448_KEY_LEN, X448_KEY_LEN + MLKEM_EK_LEN);
+                validateMlKemPublicKey(ek);
 
-                const enc = mlkemEncaps(ek);
-                const ephSk = crypto.getRandomValues(new Uint8Array(56));
-                const ephPk = x448(ephSk, X448_BASEPOINT);
-                const xShared = x448(ephSk, xPk);
+                let enc, ephSk, ephPk, xShared, ptBytes;
+                try {
+                    // 字节数已预检；先编码明文，再执行较昂贵的 KEM 运算。
+                    ptBytes = new TextEncoder().encode(plaintextStr);
+                    if (ptBytes.length > ASYM_MAX_PLAINTEXT_BYTES) {
+                        throw new Error('UTF-8 编码后的明文超过 64 MiB 限制');
+                    }
+                    enc = mlkemEncaps(ek);
+                    ephSk = crypto.getRandomValues(new Uint8Array(56));
+                    ephPk = x448(ephSk, X448_BASEPOINT);
+                    xShared = x448(ephSk, xPk);
+                    if (isAllZero(xShared)) throw new Error('X448 共享密钥无效（全零）：公钥可能不安全');
 
-                let allZero = true;
-                for (let i = 0; i < xShared.length; i++) { if (xShared[i] !== 0) { allZero = false; break; } }
-                if (allZero) throw new Error('X448 共享密钥无效（全零）：公钥可能不安全');
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const header = new Uint8Array(ASYM_HDR_LEN);
+                    header.set(ASYM_MAGIC, 0);
+                    header[4] = ASYM_VERSION;
+                    header.set(ephPk, 5);
+                    header.set(enc.ciphertext, 5 + X448_KEY_LEN);
+                    header.set(iv, 5 + X448_KEY_LEN + MLKEM_CT_LEN);
 
-                const iv = crypto.getRandomValues(new Uint8Array(12));
-                const header = new Uint8Array(ASYM_HDR_LEN);
-                header.set(ASYM_MAGIC, 0);
-                header[4] = ASYM_VERSION;
-                header.set(ephPk, 5);
-                header.set(enc.ciphertext, 5 + X448_KEY_LEN);
-                header.set(iv, 5 + X448_KEY_LEN + MLKEM_CT_LEN);
-
-                const aesKey = await hkdfAesKey(enc.shared, xShared, ephPk, enc.ciphertext, 'encrypt');
-                const ptBytes = new TextEncoder().encode(plaintextStr);
-                const ct = new Uint8Array(await crypto.subtle.encrypt(
-                    { name: 'AES-GCM', iv, additionalData: header }, aesKey, ptBytes
-                ));
-
-                const out = new Uint8Array(ASYM_HDR_LEN + ct.length);
-                out.set(header, 0);
-                out.set(ct, ASYM_HDR_LEN);
-                return { cipherBytes: out, plainLen: ptBytes.length };
+                    const aesKey = await hkdfAesKey(enc.shared, xShared, ephPk, enc.ciphertext, 'encrypt');
+                    const ct = new Uint8Array(await crypto.subtle.encrypt(
+                        { name: 'AES-GCM', iv, additionalData: header, tagLength: 128 }, aesKey, ptBytes
+                    ));
+                    const out = new Uint8Array(ASYM_HDR_LEN + ct.length);
+                    out.set(header, 0);
+                    out.set(ct, ASYM_HDR_LEN);
+                    return { cipherBytes: out, plainLen: ptBytes.length };
+                } finally {
+                    if (ephSk) ephSk.fill(0);
+                    if (xShared) xShared.fill(0);
+                    if (ptBytes) ptBytes.fill(0);
+                    if (enc && enc.shared) enc.shared.fill(0);
+                }
             }
 
             async function asymDecrypt(cipherBytes, secretKeyBytes) {
-                if (secretKeyBytes.length !== ASYM_SK_LEN) {
-                    throw new Error('私钥长度无效：期望 ' + ASYM_SK_LEN + ' 字节，实际 ' + secretKeyBytes.length + ' 字节');
+                if (!(secretKeyBytes instanceof Uint8Array) || secretKeyBytes.length !== ASYM_SK_LEN) {
+                    throw new Error('私钥长度无效：期望 ' + ASYM_SK_LEN + ' 字节，实际 ' + (secretKeyBytes && secretKeyBytes.length));
                 }
-                if (cipherBytes.length < ASYM_HDR_LEN + 16) {
+                if (!(cipherBytes instanceof Uint8Array) || cipherBytes.length < ASYM_HDR_LEN + 16) {
                     throw new Error('解密失败：密文长度不足或已损坏');
+                }
+                if (cipherBytes.length > ASYM_MAX_CIPHERTEXT_BYTES) {
+                    throw new Error('密文过大：本工具非对称模式上限为 64 MiB 明文');
                 }
                 for (let i = 0; i < 4; i++) {
                     if (cipherBytes[i] !== ASYM_MAGIC[i]) throw new Error('解密失败：密文魔数不匹配（非本工具密文）');
@@ -2421,27 +2607,34 @@
 
                 const xSk = secretKeyBytes.subarray(0, X448_KEY_LEN);
                 const dk = secretKeyBytes.subarray(X448_KEY_LEN, X448_KEY_LEN + MLKEM_DK_LEN);
-
                 const ephPk = cipherBytes.subarray(5, 5 + X448_KEY_LEN);
                 const mlCt = cipherBytes.subarray(5 + X448_KEY_LEN, 5 + X448_KEY_LEN + MLKEM_CT_LEN);
                 const iv = cipherBytes.subarray(5 + X448_KEY_LEN + MLKEM_CT_LEN, ASYM_HDR_LEN);
-
-                const xShared = x448(xSk, ephPk);
-                const mlK = mlkemDecaps(dk, mlCt);
-
-                const aesKey = await hkdfAesKey(mlK, xShared, ephPk, mlCt, 'decrypt');
                 const header = cipherBytes.subarray(0, ASYM_HDR_LEN);
                 const ct = cipherBytes.subarray(ASYM_HDR_LEN);
+
+                let xShared, mlK;
                 try {
-                    const ptBytes = await crypto.subtle.decrypt(
-                        { name: 'AES-GCM', iv, additionalData: header }, aesKey, ct
-                    );
-                    return {
-                        plaintext: new TextDecoder().decode(new Uint8Array(ptBytes)),
-                        plainLen: ptBytes.byteLength
-                    };
-                } catch (e) {
-                    throw new Error('解密失败：私钥不匹配或密文已被篡改');
+                    xShared = x448(xSk, ephPk);
+                    if (isAllZero(xShared)) throw new Error('解密失败：X448 共享密钥为全零，拒绝无效输入');
+                    mlK = mlkemDecaps(dk, mlCt);
+                    const aesKey = await hkdfAesKey(mlK, xShared, ephPk, mlCt, 'decrypt');
+                    try {
+                        const ptBytes = new Uint8Array(await crypto.subtle.decrypt(
+                            { name: 'AES-GCM', iv, additionalData: header, tagLength: 128 }, aesKey, ct
+                        ));
+                        try {
+                            const plaintext = new TextDecoder('utf-8', { fatal: true }).decode(ptBytes);
+                            return { plaintext, plainLen: ptBytes.byteLength };
+                        } finally {
+                            ptBytes.fill(0);
+                        }
+                    } catch (_) {
+                        throw new Error('解密失败：私钥不匹配、明文不是有效 UTF-8，或密文已被篡改');
+                    }
+                } finally {
+                    if (xShared) xShared.fill(0);
+                    if (mlK) mlK.fill(0);
                 }
             }
 
@@ -2671,6 +2864,9 @@
                 const password = keyInput.value, cipherStr = inputArea.value;
                 if (!password) { setStatus('请输入密钥','error'); keyInput.focus(); return; }
                 if (!cipherStr) { setStatus('请输入需要解密的密文','error'); inputArea.focus(); return; }
+                if (cipherStr.length > MAX_SYM_INPUT_CHARS) {
+                    setStatus('输入过大：对称模式最多处理 64 MiB 明文对应的密文','error'); return;
+                }
 
                 const detected = detectFormat(cipherStr);
                 const userFmt = formatSelect.value;
@@ -2743,8 +2939,10 @@
                         btn.textContent = '已复制'; btn.classList.add('copied');
                         setTimeout(()=>{ btn.textContent=restoreText; btn.classList.remove('copied'); },1400);
                     } catch(e) {
-                        btn.textContent = '已复制'; btn.classList.add('copied');
-                        setTimeout(()=>{ btn.textContent=restoreText; btn.classList.remove('copied'); },1400);
+                        btn.textContent = '复制失败';
+                        btn.classList.remove('copied');
+                        setStatus('浏览器未允许访问剪贴板，请手动选择并复制内容','error');
+                        setTimeout(()=>{ btn.textContent=restoreText; },1800);
                     }
                 });
             }
@@ -2769,6 +2967,10 @@
                 try {
                     return isPublic ? parsePublicKey(str).length : parseSecretKey(str).length;
                 } catch(e) { return 0; }
+            }
+            async function publicKeyFingerprint(publicKeyBytes) {
+                const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', publicKeyBytes));
+                return Array.from(digest, b => b.toString(16).padStart(2, '0')).join('');
             }
             function refreshAsymStatsIdle() {
                 const pkLen = keyByteLen(pubKey.value, true);
@@ -2806,6 +3008,7 @@
                         throw new Error('ML-KEM 自检失败：封装/解封装结果不一致');
                     }
 
+                    const fingerprint = await publicKeyFingerprint(kp.publicKey);
                     pubKey.value = publicKeyToJson(kp.publicKey);
                     privKey.value = secretKeyToJson(kp.secretKey);
 
@@ -2818,6 +3021,7 @@
                         { label:'公钥', value:ASYM_PK_LEN + ' 字节 · JSON ' + pubKey.value.length + ' 字符' },
                         { label:'私钥', value:ASYM_SK_LEN + ' 字节 · JSON ' + privKey.value.length + ' 字符' },
                         { label:'密钥格式', value:'JSON' },
+                        { label:'公钥 SHA-256 指纹', value:fingerprint },
                         { label:'自检', value:'ML-KEM 封装/解封装 通过' },
                     ]);
                 } catch(e) {
@@ -2854,6 +3058,7 @@
             dlPrivBtn.addEventListener('click', ()=>{
                 const v = privKey.value.trim();
                 if (!v) { setStatus('没有可下载的私钥，请先生成密钥对或粘贴私钥','error'); return; }
+                if (!window.confirm('私钥将以未加密的 JSON 文件下载。请确保设备和下载目录可信，且不要把文件上传或发送给他人。继续下载吗？')) return;
                 downloadText('x448-mlkem1024-private-key.json', v, 'application/json');
                 setStatus('私钥已导出：x448-mlkem1024-private-key.json','success');
             });
@@ -2880,6 +3085,7 @@
                 const t0 = performance.now();
                 try {
                     const { cipherBytes, plainLen } = await asymEncrypt(plaintext, pkBytes);
+                    const fingerprint = await publicKeyFingerprint(pkBytes);
                     const t1 = performance.now();
                     const encoded = b64encode(cipherBytes);
                     asymOutput.value = encoded;
@@ -2891,6 +3097,7 @@
                         { label:'吞吐', value:formatThroughput(plainLen, elapsed) },
                         { label:'KEM', value:'X448 + ML-KEM-1024' },
                         { label:'DEM', value:'AES-256-GCM' },
+                        { label:'公钥 SHA-256 指纹', value:fingerprint },
                         { label:'明文', value:plaintext.length+' 字符 · '+plainLen+' 字节' },
                         { label:'密文', value:cipherBytes.length+' 字节' },
                         { label:'编码输出', value:encoded.length+' 字符 · Base64' },
@@ -2917,8 +3124,11 @@
                 catch(e) { setStatus('私钥解析失败：'+(e.message||e),'error'); return; }
 
                 let ctBytes;
-                try { ctBytes = b64decode(cipherStr); }
-                catch(e) { setStatus('密文不是有效的 Base64 字符串','error'); return; }
+                if (cipherStr.length > Math.ceil(ASYM_MAX_CIPHERTEXT_BYTES * 4 / 3) + 16) {
+                    setStatus('密文文本过大：本工具非对称模式上限为 64 MiB 明文','error'); return;
+                }
+                try { ctBytes = b64decodeStrict(cipherStr, '密文'); }
+                catch(e) { setStatus('密文不是有效的规范 Base64 字符串：' + (e.message || e),'error'); return; }
 
                 setBusy(true);
                 setStatus('解密中… (ML-KEM-1024 解封装 + X448 密钥交换 + AES-256-GCM)','info');
@@ -2949,7 +3159,11 @@
                     asymOutput.value = '';
                     refreshAsymStatsIdle();
                     setHint(asymResultHint, '就绪');
-                } finally { setBusy(false); }
+                } finally {
+                    if (skBytes) skBytes.fill(0);
+                    if (ctBytes) ctBytes.fill(0);
+                    setBusy(false);
+                }
             });
 
             asymInput.addEventListener('input', ()=>{
