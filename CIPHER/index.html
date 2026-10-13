@@ -105,7 +105,7 @@
             min-width: 0;
         }
         .brand {
-            font-size: 11px;
+            font-size: 25px;
             font-weight: 600;
             letter-spacing: 0.14em;
             color: var(--text-tertiary);
@@ -539,22 +539,12 @@
         .stats-panel .seg-hex {
             color: var(--text-secondary);
             min-width: 0;
-            white-space: pre-wrap;
-            word-break: break-word;
+            overflow-wrap: anywhere;
             line-height: 1.5;
         }
         .stats-panel .seg-hex .seg-idx {
             color: var(--text-tertiary);
             font-size: 10px;
-        }
-        .stats-panel .stat-foot {
-            color: var(--text-tertiary);
-            font-size: 10px;
-            line-height: 1.7;
-        }
-        .stats-panel .stat-foot code {
-            font-family: inherit;
-            color: var(--text-secondary);
         }
 
         .meta {
@@ -626,7 +616,7 @@
 
         @media (min-width: 1100px) {
             .container {
-                max-width: 1040px;
+                max-width: 1200px;
                 padding: 60px 40px 92px;
             }
             .main-content {
@@ -643,6 +633,9 @@
             }
             .header h1 {
                 font-size: 21px;
+            }
+            .brand {
+                font-size: 19px;
             }
             .header .subtitle {
                 font-size: 11px;
@@ -687,6 +680,9 @@
             }
             .header h1 {
                 font-size: 19px;
+            }
+            .brand {
+                font-size: 17px;
             }
             .actions {
                 gap: 6px;
@@ -778,8 +774,8 @@
                         <option value="base64">Base64</option>
                         <option value="base64url">Base64URL</option>
                         <option value="base58">Base58</option>
-                        <option value="hex_upper">Hexadecimal (UPPER)</option>
-                        <option value="hex_lower">Hexadecimal (lower)</option>
+<option value="hex_upper">Hex (UPPER)</option>
+                    <option value="hex_lower">Hex (lower)</option>
                         <option value="chinese">中文 (CJK 汉字)</option>
                         <option value="japanese">日文 (仮名)</option>
                         <option value="korean">韩文 (한글)</option>
@@ -1243,16 +1239,14 @@
                 ], [
                     {
                         title:'HEADER · 头部 '+HEADER_LEN+' B',
-                        note:'实际取值在加解密完成后显示',
                         segments:[
-                            { name:'magic', len:'[4]', hex:'@0 <span class="seg-idx">"CIPH" 43 49 50 48</span>' },
-                            { name:'ver', len:'[1]', hex:'@4 <span class="seg-idx">'+(kdf==='argon2id'?'0x03':'0x02')+' · '+(kdf==='argon2id'?'Argon2id':'PBKDF2')+'</span>' },
-                            { name:'salt', len:'['+SALT_LEN+']', hex:'@5 <span class="seg-idx">256-bit · 每次加密随机生成</span>' },
-                            { name:'aes_iv', len:'['+AES_IV_LEN+']', hex:'@37 <span class="seg-idx">96-bit · 每次加密随机生成</span>' },
-                            { name:'xnonce', len:'['+XNONCE_LEN+']', hex:'@49 <span class="seg-idx">192-bit · 每次加密随机生成</span>' },
-                            { name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:'@73 <span class="seg-idx">128-bit · HMAC-SHA256 前 16 字节</span>' },
-                        ],
-                        foot:'头部 <code>89 B</code> + 载荷（明文字节数 + <code>32 B</code> 双层认证标签）；头部整体作为 XChaCha20 的 <code>AAD</code> 参与认证。'
+                            { name:'magic', len:'[4]', hex:offPad(0)+'<span class="seg-idx">"CIPH" 43495048</span>' },
+                            { name:'ver', len:'[1]', hex:offPad(4)+'<span class="seg-idx">'+(kdf==='argon2id'?'0x03':'0x02')+' · '+(kdf==='argon2id'?'Argon2id':'PBKDF2')+'</span>' },
+                            { name:'salt', len:'['+SALT_LEN+']', hex:offPad(5)+'<span class="seg-idx">—</span>' },
+                            { name:'aes_iv', len:'['+AES_IV_LEN+']', hex:offPad(5+SALT_LEN)+'<span class="seg-idx">—</span>' },
+                            { name:'xnonce', len:'['+XNONCE_LEN+']', hex:offPad(5+SALT_LEN+AES_IV_LEN)+'<span class="seg-idx">—</span>' },
+                            { name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:offPad(5+SALT_LEN+AES_IV_LEN+XNONCE_LEN)+'<span class="seg-idx">—</span>' },
+                        ]
                     }
                 ]);
             }
@@ -1264,15 +1258,13 @@
                     return '<span class="stat-item"><span class="stat-label">'+escapeHtml(item.label)+'</span><span class="stat-value">'+escapeHtml(item.value)+'</span></span>'+sep;
                 }).join('');
                 const blocksHtml = (blocks||[]).map(blk=>{
-                    const head = '<div class="stat-block-head"><span class="blk-title">'+escapeHtml(blk.title)+'</span>'+
-                        (blk.note ? '<span>'+escapeHtml(blk.note)+'</span>' : '')+'</div>';
+                    const head = '<div class="stat-block-head"><span class="blk-title">'+escapeHtml(blk.title)+'</span></div>';
                     const segs = blk.segments.map(s=>
                         '<span class="seg"><span class="seg-name">'+escapeHtml(s.name)+'</span>'+
                         '<span class="seg-len">'+escapeHtml(s.len)+'</span>'+
                         '<span class="seg-hex">'+s.hex+'</span></span>'
                     ).join('');
-                    const foot = blk.foot ? '<div class="stat-foot">'+blk.foot+'</div>' : '';
-                    return '<div class="stat-block">'+head+'<div class="stat-grid">'+segs+'</div>'+foot+'</div>';
+                    return '<div class="stat-block">'+head+'<div class="stat-grid">'+segs+'</div></div>';
                 }).join('');
                 statsPanel.innerHTML = '<div class="stat-chips">'+chipsHtml+'</div>'+blocksHtml;
                 statsPanel.className='stats-panel show';
@@ -1280,71 +1272,41 @@
             function escapeHtml(str) {
                 const div=document.createElement('div'); div.textContent=str; return div.innerHTML;
             }
-            // hex 预览：优先显示头尾各若干字节，中间以 … 省略（避免刷屏，敏感值不完整外泄）
-            function hexPreview(bytes, head, tail) {
-                const full = bytesToHex(bytes);
-                if (full.length <= (head+tail)*2+1) return full;
-                return full.slice(0, head*2)+'…'+full.slice(-tail*2);
-            }
             function bytesToHex(bytes) {
                 let out = '';
                 for (let i=0;i<bytes.length;i++) out += bytes[i].toString(16).padStart(2,'0');
                 return out;
             }
-            // 把本次真实使用的头部/密文逐段渲染成可核对的信息框
+            // 把本次真实使用的头部/密文逐段渲染成可核对的信息框（只给实际取值，不写解释性文案）
             function buildLayoutBlocks(info) {
                 const blocks = [];
-                const fmtKdf = KDF_INFO[info.kdf];
                 const headerLen = info.isV2 ? HEADER_LEN : LEGACY_HEADER_LEN;
-                // ── 头部段（真实字节值） ──
                 const segs = [];
                 let off = 0;
                 if (info.isV2) {
-                    segs.push({ name:'magic', len:'[4]', hex:'<span class="seg-idx">@0</span> '+escapeHtml(bytesToHex(info.magic))+' <span class="seg-idx">"CIPH"</span>' });
+                    segs.push({ name:'magic', len:'[4]', hex:offPad(off)+'<span class="seg-idx">"CIPH"</span> '+escapeHtml(bytesToHex(info.magic)) });
                     off = 4;
-                    segs.push({ name:'ver', len:'[1]', hex:'<span class="seg-idx">@4</span> 0x'+info.ver.toString(16).padStart(2,'0')+' <span class="seg-idx">'+(info.kdf==='argon2id'?'Argon2id':'PBKDF2')+'</span>' });
+                    segs.push({ name:'ver', len:'[1]', hex:offPad(off)+escapeHtml((info.kdf==='argon2id'?'0x03':'0x02')+' · '+(info.kdf==='argon2id'?'Argon2id':'PBKDF2')) });
                     off = 5;
                 }
-                segs.push({ name:'salt', len:'['+SALT_LEN+']', hex:'<span class="seg-idx">@'+off+'</span> '+escapeHtml(hexPreview(info.salt,4,4)) });
+                segs.push({ name:'salt', len:'['+SALT_LEN+']', hex:offPad(off)+escapeHtml(bytesToHex(info.salt)) });
                 off += SALT_LEN;
-                segs.push({ name:'aes_iv', len:'['+AES_IV_LEN+']', hex:'<span class="seg-idx">@'+off+'</span> '+escapeHtml(hexPreview(info.aesIv,3,3)) });
+                segs.push({ name:'aes_iv', len:'['+AES_IV_LEN+']', hex:offPad(off)+escapeHtml(bytesToHex(info.aesIv)) });
                 off += AES_IV_LEN;
-                segs.push({ name:'xnonce', len:'['+XNONCE_LEN+']', hex:'<span class="seg-idx">@'+off+'</span> '+escapeHtml(hexPreview(info.xnonce,4,4)) });
+                segs.push({ name:'xnonce', len:'['+XNONCE_LEN+']', hex:offPad(off)+escapeHtml(bytesToHex(info.xnonce)) });
                 off += XNONCE_LEN;
-                segs.push({ name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:'<span class="seg-idx">@'+off+'</span> '+escapeHtml(hexPreview(info.keyCheck,4,4)) });
-                off += KEY_CHECK_LEN;
-                blocks.push({
-                    title:'HEADER · 头部 '+headerLen+' B',
-                    note: headerLen+' B + 载荷 '+(info.cipherLen-headerLen)+' B',
-                    segments: segs,
-                    foot:'头部整体作为 XChaCha20 的 <code>AAD</code> 参与认证；<code>key_check = HMAC-SHA256(check_key, "KEYCHECK"‖salt)[0:16]</code>，用于先验密钥校验，避免错误密钥下解出垃圾数据。'
-                });
-                // ── 载荷段 ──
-                blocks.push({
-                    title:'PAYLOAD · 载荷 '+(info.cipherLen-headerLen)+' B',
-                    note:'外层 XChaCha20-Poly1305 包裹内层 AES-GCM 密文',
-                    segments:[
-                        { name:'aes_ct', len:'['+info.plainLen+' B]', hex:info.plainLen>0 ? '明文经 AES-256-GCM 加密，再被 ChaCha20 流二次加密' : '—' },
-                        { name:'gcm_tag', len:'[16]', hex:'内层 GCM 认证标签（随密文一并被流加密）' },
-                        { name:'x_ct', len:'['+(info.plainLen+16)+']', hex:'流加密后的内层密文+内层标签' },
-                        { name:'poly1305_tag', len:'[16]', hex:'外层 Poly1305 认证标签（明文未加密，可校验）' },
-                    ],
-                    foot:'布局：<code>aes_ct['+info.plainLen+'] ‖ gcm_tag[16] ‖ x_ct['+(info.plainLen+16)+'] ‖ poly1305_tag[16]</code>，AEAD 开销固定 <code>'+AE_OVERHEAD+' B</code>。'
-                });
-                // ── 密钥派生 ──
-                blocks.push({
-                    title:'KEY · 密钥派生',
-                    note: fmtKdf.name+' · '+fmtKdf.desc,
-                    segments:[
-                        { name:'input', len:'[salt '+SALT_LEN+' B]', hex:'口令 + 随机 salt → 一条 '+('96')+' B 密钥材料（用后整块擦除）' },
-                        { name:'aes_key', len:'[32]', hex:'km[0:32] → Layer 1 AES-256-GCM 密钥' },
-                        { name:'x_key', len:'[32]', hex:'km[32:64] → Layer 2 XChaCha20-Poly1305 密钥' },
-                        { name:'check_key', len:'[32]', hex:'km[64:96] → HMAC 密钥确认专用，不参与加密' },
-                    ],
-                    foot:'三把子密钥共享同一密钥材料的视图，<code>keys.zero()</code> 一次性整体擦除，避免残留副本。'
-                });
+                segs.push({ name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:offPad(off)+escapeHtml(bytesToHex(info.keyCheck)) });
+                blocks.push({ title:'HEADER · 头部 '+headerLen+' B', segments: segs });
+                // ── 载荷：外层认证标签是密文中仅存的明文字节，可直接核对 ──
+                if (info.polyTag && info.polyTag.length) {
+                    blocks.push({
+                        title:'PAYLOAD · 载荷 '+(info.cipherLen-headerLen)+' B',
+                        segments:[{ name:'poly1305_tag', len:'[16]', hex:offPad(info.cipherLen-16)+escapeHtml(bytesToHex(info.polyTag)) }]
+                    });
+                }
                 return blocks;
             }
+            function offPad(off) { return '<span class="seg-idx">@'+off+'</span> '; }
             function formatBytes(bytes) {
                 if (bytes<1000) return bytes+' B';
                 if (bytes<1000000) return (bytes/1000).toFixed(1)+' KB';
@@ -1449,7 +1411,8 @@
                         header: {
                             isV2: true, kdf, ver: header[4], cipherLen: out.length, plainLen: ptBytes.length,
                             magic: MAGIC.slice(), salt: salt.slice(), aesIv: aesIv.slice(),
-                            xnonce: xnonce.slice(), keyCheck: keyCheck.slice()
+                            xnonce: xnonce.slice(), keyCheck: keyCheck.slice(),
+                            polyTag: xCt.slice(xCt.length - 16)
                         }
                     };
                 } finally {
@@ -1519,7 +1482,8 @@
                                 ver: parts.headerLen === HEADER_LEN ? cipherBytes[4] : null,
                                 cipherLen: cipherBytes.length, plainLen: ptBytes.byteLength,
                                 magic: MAGIC.slice(), salt: parts.salt.slice(), aesIv: parts.aesIv.slice(),
-                                xnonce: parts.xnonce.slice(), keyCheck: parts.keyCheck.slice()
+                                xnonce: parts.xnonce.slice(), keyCheck: parts.keyCheck.slice(),
+                                polyTag: parts.xCt.slice(parts.xCt.length - 16)
                             }
                         };
                     } catch(e) {
