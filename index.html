@@ -3,11 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+
+    <meta
+        http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'"
+    >
     <meta name="referrer" content="no-referrer">
+
     <title>索引 · themanronin.github.io</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗂</text></svg>">
+
+    <meta
+        name="description"
+        content="ThemanRonin 个人项目导航，收录 CIPHER 加密工具、DevToolbox Pro 开发者工具箱、LiquidGlass 玻璃效果模拟器、密码生成器和字数统计工具。"
+    >
+
+    <link
+        rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗂</text></svg>"
+    >
+
     <style>
+        /* =========================================================
+           全局基础样式
+           ========================================================= */
+
         *,
         *::before,
         *::after {
@@ -18,50 +37,69 @@
 
         :root {
             color-scheme: light;
+
             --bg: #fafafa;
             --surface: #ffffff;
             --surface-elevated: #f5f5f5;
+
             --text: #0a0a0a;
             --text-secondary: #525252;
             --text-tertiary: #a3a3a3;
+
             --border: #e5e5e5;
             --border-strong: #d4d4d4;
+
             --accent: #0a0a0a;
             --accent-hover: #262626;
             --accent-text: #fafafa;
-            --error: #dc2626;
-            --error-bg: rgba(220, 38, 38, 0.06);
-            --success: #16a34a;
-            --success-bg: rgba(22, 163, 74, 0.06);
-            --info-bg: rgba(10, 10, 10, 0.04);
+
             --radius: 8px;
             --radius-sm: 5px;
-            --mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Menlo', 'Monaco', monospace;
-            --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'Inter', sans-serif;
+
+            --mono:
+                'SF Mono',
+                'JetBrains Mono',
+                'Fira Code',
+                'Consolas',
+                'Menlo',
+                'Monaco',
+                monospace;
+
+            --sans:
+                -apple-system,
+                BlinkMacSystemFont,
+                'Segoe UI',
+                'Helvetica Neue',
+                'Inter',
+                sans-serif;
+
             --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
             --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+
             --transition-fast: 0.12s ease;
             --transition-normal: 0.18s ease;
         }
 
+        /* 深色模式 */
+
         [data-theme="dark"] {
             color-scheme: dark;
+
             --bg: #0a0a0a;
             --surface: #141414;
             --surface-elevated: #1a1a1a;
+
             --text: #fafafa;
             --text-secondary: #a3a3a3;
-            --text-tertiary: #525252;
+            --text-tertiary: #737373;
+
             --border: #262626;
             --border-strong: #404040;
+
             --accent: #fafafa;
             --accent-hover: #e5e5e5;
             --accent-text: #0a0a0a;
-            --error: #f87171;
-            --error-bg: rgba(248, 113, 71, 0.08);
-            --success: #4ade80;
-            --success-bg: rgba(74, 222, 128, 0.08);
-            --info-bg: rgba(250, 250, 250, 0.04);
+
             --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
             --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
         }
@@ -71,80 +109,142 @@
             min-height: 100%;
             background: var(--bg);
             color: var(--text);
+
             font-family: var(--sans);
             font-size: 14px;
             line-height: 1.5;
+
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-            transition: background var(--transition-normal), color var(--transition-normal);
+
+            transition:
+                background var(--transition-normal),
+                color var(--transition-normal);
         }
 
+        body {
+            min-height: 100vh;
+        }
+
+        button,
+        a {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        a:focus-visible,
+        button:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 4px;
+        }
+
+        /* =========================================================
+           页面容器
+           ========================================================= */
+
         .container {
+            width: 100%;
             max-width: 720px;
+
             margin: 0 auto;
             padding: 64px 28px 96px;
         }
 
+        /* =========================================================
+           页面头部
+           ========================================================= */
+
         .header {
-            margin-bottom: 44px;
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 16px;
+
+            margin-bottom: 44px;
         }
+
         .header-left {
             min-width: 0;
         }
+
         .brand {
+            margin-bottom: 10px;
+
+            color: var(--text-tertiary);
+
             font-size: 11px;
             font-weight: 600;
             letter-spacing: 0.14em;
-            color: var(--text-tertiary);
             text-transform: uppercase;
-            margin-bottom: 10px;
-            transition: color var(--transition-normal);
+
+            overflow-wrap: anywhere;
         }
+
         .header h1 {
+            margin-bottom: 6px;
+
             font-size: 26px;
             font-weight: 600;
             letter-spacing: -0.02em;
-            margin-bottom: 6px;
-            transition: color var(--transition-normal);
         }
+
         .header .subtitle {
-            font-size: 12.5px;
             color: var(--text-secondary);
+
             font-family: var(--mono);
-            transition: color var(--transition-normal);
+            font-size: 12.5px;
+
+            overflow-wrap: anywhere;
         }
+
+        /* =========================================================
+           深色/浅色模式切换按钮
+           ========================================================= */
 
         .theme-toggle {
             flex-shrink: 0;
+
+            padding: 7px 14px;
+
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
-            padding: 7px 14px;
-            font-size: 11px;
-            font-family: var(--sans);
+
             color: var(--text-secondary);
-            cursor: pointer;
+
+            font-family: var(--sans);
+            font-size: 11px;
             letter-spacing: 0.03em;
-            transition: all var(--transition-fast);
-            white-space: nowrap;
+
+            cursor: pointer;
             user-select: none;
-            -webkit-tap-highlight-color: transparent;
+            white-space: nowrap;
+
+            transition:
+                color var(--transition-fast),
+                background var(--transition-fast),
+                border-color var(--transition-fast),
+                transform var(--transition-fast);
         }
+
         .theme-toggle:hover {
+            background: var(--surface-elevated);
             border-color: var(--border-strong);
             color: var(--text);
-            background: var(--surface-elevated);
         }
+
         .theme-toggle:active {
             transform: scale(0.97);
         }
 
-        /* ─── 页面卡片列表 ────────────────────────────── */
+        /* =========================================================
+           项目列表
+           ========================================================= */
+
         .page-list {
             display: flex;
             flex-direction: column;
@@ -153,21 +253,33 @@
 
         .card {
             display: block;
+
+            padding: 20px 22px;
+
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 20px 22px;
-            text-decoration: none;
+
             color: inherit;
+            text-decoration: none;
+
             box-shadow: var(--shadow-sm);
-            transition: all var(--transition-fast);
+
+            transition:
+                background var(--transition-fast),
+                border-color var(--transition-fast),
+                box-shadow var(--transition-fast),
+                transform var(--transition-fast);
         }
+
         .card:hover {
-            border-color: var(--border-strong);
             background: var(--surface-elevated);
+            border-color: var(--border-strong);
+
             transform: translateY(-1px);
             box-shadow: var(--shadow-md);
         }
+
         .card:active {
             transform: scale(0.995);
         }
@@ -176,178 +288,487 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 12px;
+
             margin-bottom: 10px;
         }
+
         .card-name {
+            color: var(--text-tertiary);
+
             font-family: var(--mono);
             font-size: 11px;
             font-weight: 600;
             letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: var(--text-tertiary);
+
+            overflow-wrap: anywhere;
         }
+
         .card-arrow {
+            flex-shrink: 0;
+
+            color: var(--text-tertiary);
+
             font-family: var(--mono);
             font-size: 13px;
-            color: var(--text-tertiary);
-            transition: transform var(--transition-fast), color var(--transition-fast);
+
+            transition:
+                transform var(--transition-fast),
+                color var(--transition-fast);
         }
+
         .card:hover .card-arrow {
-            transform: translateX(3px);
             color: var(--text);
+            transform: translateX(3px);
         }
 
         .card-title {
+            margin-bottom: 6px;
+
             font-size: 16px;
             font-weight: 600;
             letter-spacing: -0.01em;
-            margin-bottom: 6px;
+
+            overflow-wrap: anywhere;
         }
+
         .card-desc {
-            font-size: 12.5px;
             color: var(--text-secondary);
-            line-height: 1.6;
+
+            font-size: 12.5px;
+            line-height: 1.7;
+
+            overflow-wrap: anywhere;
         }
+
         .card-path {
             margin-top: 12px;
+
+            color: var(--text-tertiary);
+
             font-family: var(--mono);
             font-size: 11px;
-            color: var(--text-tertiary);
+
+            overflow-wrap: anywhere;
         }
 
-        /* 占位卡片：预告后续页面，不可点击 */
-        .card-placeholder {
-            border-style: dashed;
-            box-shadow: none;
-            cursor: default;
-        }
-        .card-placeholder:hover {
-            transform: none;
-            box-shadow: none;
-            border-color: var(--border);
-            background: var(--surface);
-        }
+        /* =========================================================
+           页脚
+           ========================================================= */
 
         .footer {
-            margin-top: 48px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
             gap: 8px;
+
+            margin-top: 48px;
+
+            color: var(--text-tertiary);
+
             font-family: var(--mono);
             font-size: 11px;
-            color: var(--text-tertiary);
         }
-        /* 页脚个人主页链接：虚线下划线暗示可点击，悬停时加深变为实线 */
+
         .footer-link {
+            padding-bottom: 1px;
+
             color: var(--text-tertiary);
             text-decoration: none;
+
             border-bottom: 1px dashed var(--border-strong);
-            padding-bottom: 1px;
-            cursor: pointer;
-            transition: color var(--transition-fast), border-color var(--transition-fast);
-            -webkit-tap-highlight-color: transparent;
+
+            transition:
+                color var(--transition-fast),
+                border-color var(--transition-fast);
         }
+
         .footer-link:hover {
             color: var(--text);
             border-bottom-style: solid;
             border-bottom-color: var(--text);
         }
-        .footer-link:active {
-            transform: scale(0.98);
-        }
+
+        /* =========================================================
+           移动端适配
+           ========================================================= */
 
         @media (max-width: 480px) {
             .container {
                 padding: 44px 20px 72px;
             }
+
+            .header {
+                margin-bottom: 32px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
             .card {
                 padding: 16px 18px;
+            }
+
+            .card-title {
+                font-size: 15px;
+            }
+
+            .card-desc {
+                font-size: 12px;
+            }
+
+            .footer {
+                margin-top: 36px;
+            }
+        }
+
+        /* 减少动态效果 */
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
+
+        <!-- =====================================================
+             页面头部
+             ===================================================== -->
+
         <header class="header">
             <div class="header-left">
                 <div class="brand">THEMANRONIN.GITHUB.IO</div>
+
                 <h1>索引</h1>
-                <div class="subtitle">站内页面目录 · /INDEX</div>
+
+                <div class="subtitle">
+                    站内页面目录 · 5 PROJECTS
+                </div>
             </div>
-            <button class="theme-toggle" id="themeToggle" type="button" title="切换深色/浅色模式">
+
+            <button
+                class="theme-toggle"
+                id="themeToggle"
+                type="button"
+                title="切换深色/浅色模式"
+                aria-label="切换深色或浅色模式"
+                aria-pressed="false"
+            >
                 🌙 深色模式
             </button>
         </header>
 
-        <main class="page-list">
-            <!-- ▼ 新增页面时，复制下面整块 <a class="card"> … </a>，修改 名称/链接/标题/描述/路径 即可 -->
-            <a class="card" href="./CIPHER/">
+        <!-- =====================================================
+             项目目录
+
+             当前仓库中的五个网页项目。
+
+             所有项目链接均使用：
+             target="_blank"
+             rel="noopener noreferrer"
+
+             点击项目卡片将在新标签页中打开，不会覆盖当前索引页。
+             ===================================================== -->
+
+        <main class="page-list" aria-label="项目目录">
+
+            <!-- =================================================
+                 CIPHER：对称加密 + 非对称加密
+                 ================================================= -->
+
+            <a
+                class="card"
+                href="./CIPHER/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="在新标签页打开 CIPHER 加密解密工具"
+            >
                 <div class="card-top">
                     <span class="card-name">CIPHER</span>
-                    <span class="card-arrow" aria-hidden="true">→</span>
+
+                    <span class="card-arrow" aria-hidden="true">↗</span>
                 </div>
-                <div class="card-title">对称加密 / 解密</div>
-                <div class="card-desc">AES-256-GCM × XChaCha20-Poly1305 · PBKDF2 / Argon2id 密钥派生 · 密文格式自动识别 · 全程本地运算，零网络上传</div>
-                <div class="card-path">/CIPHER</div>
+
+                <div class="card-title">
+                    加密 / 解密工具箱
+                </div>
+
+                <div class="card-desc">
+                    对称加密：AES-256-GCM × XChaCha20-Poly1305，
+                    支持 PBKDF2 / Argon2id 密钥派生。
+                    非对称混合加密：X448 + ML-KEM-1024 + AES-256-GCM，
+                    支持公私钥生成、JSON 密钥管理、加解密及运算统计。
+                </div>
+
+                <div class="card-path">
+                    /CIPHER
+                </div>
             </a>
 
-            <a class="card" href="./PasswordGenerator/">
+            <!-- =================================================
+                 DevToolboxPro：在线开发者工具箱
+                 ================================================= -->
+
+            <a
+                class="card"
+                href="./DevToolboxPro/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="在新标签页打开 DevToolbox Pro 开发者工具箱"
+            >
                 <div class="card-top">
-                    <span class="card-name">PASSWORD GENERATOR</span>
-                    <span class="card-arrow" aria-hidden="true">→</span>
+                    <span class="card-name">DevToolbox Pro</span>
+
+                    <span class="card-arrow" aria-hidden="true">↗</span>
                 </div>
-                <div class="card-title">密码生成器</div>
-                <div class="card-desc">长度 6–60 可调 · 大小写字母 / 数字 / 常用符号自由组合 · 实时熵值评估与配色分级 · 点击即复制</div>
-                <div class="card-path">/PasswordGenerator</div>
+
+                <div class="card-title">
+                    全能开发者工具箱
+                </div>
+
+                <div class="card-desc">
+                    编解码、哈希、加解密、生成器、格式转换、
+                    智能解码与开发辅助工具。
+                    支持 Base64 / Base64URL / URL / Hex、
+                    多种摘要算法、AES-GCM、RSA-OAEP、
+                    混合加密、文件加密、UUID、密码与安全令牌生成，
+                    以及 JSON、CSV、时间戳、文本批处理、
+                    YAML、XML、JSONPath、URL 分析和 HMAC 等实用功能。
+                </div>
+
+                <div class="card-path">
+                    /DevToolboxPro
+                </div>
             </a>
 
-            <a class="card" href="./wordcount/">
+            <!-- =================================================
+                 LiquidGlass：实时玻璃效果模拟器
+                 ================================================= -->
+
+            <a
+                class="card"
+                href="./LiquidGlass/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="在新标签页打开 LiquidGlass 玻璃效果模拟器"
+            >
                 <div class="card-top">
-                    <span class="card-name">WORD COUNT</span>
-                    <span class="card-arrow" aria-hidden="true">→</span>
+                    <span class="card-name">LiquidGlass</span>
+
+                    <span class="card-arrow" aria-hidden="true">↗</span>
                 </div>
-                <div class="card-title">字数统计工具</div>
-                <div class="card-desc">实时统计总字符 / 空白字符 / 英文单词 / 行数 / 段落数 · 中英文标点智能处理 · 纯本地运算</div>
-                <div class="card-path">/wordcount</div>
+
+                <div class="card-title">
+                    实时玻璃折射效果模拟器
+                </div>
+
+                <div class="card-desc">
+                    基于 WebGL 和 GLSL 着色器的实时视觉演示。
+                    支持玻璃折射、RGB 色散、放大、背景模糊、
+                    边缘高光及光晕等效果，可交互调整玻璃参数，
+                    实时观察不同参数组合产生的视觉变化。
+                </div>
+
+                <div class="card-path">
+                    /LiquidGlass
+                </div>
             </a>
 
-            <div class="card card-placeholder" aria-hidden="true">
+            <!-- =================================================
+                 PasswordGenerator：密码生成器
+                 ================================================= -->
+
+            <a
+                class="card"
+                href="./PasswordGenerator/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="在新标签页打开 PasswordGenerator 密码生成器"
+            >
                 <div class="card-top">
-                    <span class="card-name">MORE</span>
+                    <span class="card-name">Password Generator</span>
+
+                    <span class="card-arrow" aria-hidden="true">↗</span>
                 </div>
-                <div class="card-title">更多页面规划中</div>
-                <div class="card-desc">后续新增的网页将收录在这里</div>
-            </div>
-            <!-- ▲ 新增页面块结束 -->
+
+                <div class="card-title">
+                    密码生成器
+                </div>
+
+                <div class="card-desc">
+                    自定义密码长度及字符组合，
+                    支持大小写字母、数字和特殊符号。
+                    提供密码生成、复制及相应的交互式操作，
+                    方便快速生成符合所需规则的密码。
+                </div>
+
+                <div class="card-path">
+                    /PasswordGenerator
+                </div>
+            </a>
+
+            <!-- =================================================
+                 Word Count：字数统计工具
+                 ================================================= -->
+
+            <a
+                class="card"
+                href="./wordcount/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="在新标签页打开 Word Count 字数统计工具"
+            >
+                <div class="card-top">
+                    <span class="card-name">Word Count</span>
+
+                    <span class="card-arrow" aria-hidden="true">↗</span>
+                </div>
+
+                <div class="card-title">
+                    字数统计工具
+                </div>
+
+                <div class="card-desc">
+                    实时统计文本字符、空白字符、英文单词、
+                    行数及段落数等信息。
+                    适用于中英文文本统计、文本长度检查
+                    以及日常写作和文字处理。
+                </div>
+
+                <div class="card-path">
+                    /wordcount
+                </div>
+            </a>
+
         </main>
 
+        <!-- =====================================================
+             页脚
+             ===================================================== -->
+
         <footer class="footer">
-            <a class="footer-link" href="https://github.com/ThemanRonin/themanronin.github.io" target="_blank" rel="noopener noreferrer" title="访问 GitHub 主页">© themanronin ↗</a>
+            <a
+                class="footer-link"
+                href="https://github.com/ThemanRonin/themanronin.github.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="在新标签页访问 GitHub 仓库"
+            >
+                © themanronin ↗
+            </a>
+
             <span>/ → index.html</span>
         </footer>
+
     </div>
+
+    <!-- =========================================================
+         主题切换逻辑
+
+         保留 cipher_theme_v2 存储键，
+         与 CIPHER 现有页面的主题偏好保持一致。
+         ========================================================= -->
 
     <script>
         (function () {
-            // 与 CIPHER 页共用同一主题偏好（localStorage key 保持一致）
-            var THEME_KEY = 'cipher_theme_v2';
-            var toggle = document.getElementById('themeToggle');
+            'use strict';
 
+            const THEME_KEY = 'cipher_theme_v2';
+
+            const root = document.documentElement;
+            const toggle = document.getElementById('themeToggle');
+
+            /**
+             * 安全读取主题。
+             *
+             * 如果浏览器禁用 localStorage，
+             * 则默认使用浅色模式。
+             */
             function getStoredTheme() {
-                try { var v = localStorage.getItem(THEME_KEY); if (v === 'dark' || v === 'light') return v; } catch (e) {}
+                try {
+                    const theme = localStorage.getItem(THEME_KEY);
+
+                    if (theme === 'light' || theme === 'dark') {
+                        return theme;
+                    }
+                } catch (error) {
+                    // 存储不可用时使用默认主题。
+                }
+
                 return 'light';
             }
+
+            /**
+             * 应用主题，并同步按钮状态。
+             */
             function applyTheme(theme) {
-                document.documentElement.setAttribute('data-theme', theme);
-                toggle.innerHTML = theme === 'light' ? '🌙 深色模式' : '☀ 浅色模式';
-                try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+                const normalizedTheme =
+                    theme === 'dark' ? 'dark' : 'light';
+
+                root.setAttribute(
+                    'data-theme',
+                    normalizedTheme
+                );
+
+                const isDark = normalizedTheme === 'dark';
+
+                toggle.textContent = isDark
+                    ? '☀ 浅色模式'
+                    : '🌙 深色模式';
+
+                toggle.setAttribute(
+                    'aria-label',
+                    isDark
+                        ? '切换到浅色模式'
+                        : '切换到深色模式'
+                );
+
+                toggle.setAttribute(
+                    'aria-pressed',
+                    String(isDark)
+                );
+
+                try {
+                    localStorage.setItem(
+                        THEME_KEY,
+                        normalizedTheme
+                    );
+                } catch (error) {
+                    // 即使无法保存主题，也允许本次切换生效。
+                }
             }
+
+            /**
+             * 点击按钮切换主题。
+             */
             toggle.addEventListener('click', function () {
-                var current = document.documentElement.getAttribute('data-theme') || 'light';
-                applyTheme(current === 'light' ? 'dark' : 'light');
+                const currentTheme =
+                    root.getAttribute('data-theme') || 'light';
+
+                applyTheme(
+                    currentTheme === 'light'
+                        ? 'dark'
+                        : 'light'
+                );
             });
+
+            /**
+             * 初始化页面主题。
+             */
             applyTheme(getStoredTheme());
+
         })();
     </script>
 </body>
