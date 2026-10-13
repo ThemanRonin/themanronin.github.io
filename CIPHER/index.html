@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval' https://unpkg.com; style-src 'unsafe-inline'; img-src data:; connect-src https://unpkg.com; base-uri 'none'; form-action 'none'">
-    <meta name="referrer" content="no-referrer">
-    <title>Cipher — AES-256-GCM × XChaCha20-Poly1305</title>
-    <!-- Argon2id KDF 库（WASM 由 unpkg 同源目录自动加载）；加载失败时仅 Argon2id 不可用，PBKDF2 不受影响 -->
-    <script src="https://unpkg.com/argon2-browser@1.18.0/dist/argon2-bundled.min.js"
-            integrity="sha384-XOR3aNvHciLPIf6r+2glkrmbBbLmIJ1EChMXjw8eBKBf8gE0rDq1TyUNuRdorOqi"
-            crossorigin="anonymous"></script>
+    <!-- 1. CSP 放行本地脚本 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+
+    <!-- 2. 删掉 integrity / crossorigin（本地文件不需要 SRI） -->
+    <script src="./js/argon2/argon2-bundled.min.js"></script>
     <style>
         *,
         *::before,
