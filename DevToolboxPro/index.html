@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevToolbox Pro · 功能扩展版</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <style>
+        :root {
+            --bg: #fafafa;
+            --surface: #fff;
+            --text: #1a1a1a;
+            --text-secondary: #6e6e6e;
+            --text-tertiary: #999;
+            --border: #e0e0e0;
+            --border-light: #eee;
+            --accent: #1a1a1a;
+            --accent-hover: #3a3a3a;
+            --danger: #c0392b;
+            --radius: 4px;
+            --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', 'Menlo', monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --transition: 120ms ease;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 16px 60px;
+        }
+        .container { width: 100%; max-width: 820px; }
+        .header { margin-bottom: 36px; display: flex; align-items: baseline; gap: 12px; }
+        .header-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+        .header-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text); flex-shrink: 0; }
+        .header-subtitle { font-size: 12px; color: var(--text-tertiary); }
+        .tabs-primary {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 0;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .tabs-primary::-webkit-scrollbar { display: none; }
+        .tab-primary {
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            color: var(--text-secondary);
+            border: none;
+            background: none;
+            white-space: nowrap;
+            position: relative;
+            font-family: var(--font-sans);
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .tab-primary.active { color: var(--text); }
+        .tab-primary.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 16px;
+            right: 16px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 1px 1px 0 0;
+        }
+        .tabs-secondary-wrap { padding: 14px 0 10px; display: flex; gap: 4px; flex-wrap: wrap; }
+        .tab-secondary {
+            padding: 6px 14px;
+            font-size: 12px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            border: 1px solid transparent;
+            background: none;
+            border-radius: 20px;
+            white-space: nowrap;
+            font-family: var(--font-sans);
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .tab-secondary.active { color: var(--text); border-color: var(--border); background: var(--surface); font-weight: 500; }
+        .panel { display: none; animation: fadeIn 150ms ease; }
+        .panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-tertiary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
+        textarea, input[type="text"], input[type="password"], input[type="number"], select {
+            width: 100%;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.55;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            color: var(--text);
+            resize: vertical;
+            transition: border-color var(--transition);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        textarea:focus, input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(26,26,26,0.08); }
+        textarea { min-height: 110px; max-height: 380px; }
+        textarea.output-area { background: #f9f9f9; cursor: default; }
+        select { padding: 8px 12px; font-size: 12px; font-family: var(--font-sans); background: var(--surface); cursor: pointer; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            color: var(--text);
+            transition: all var(--transition);
+            font-family: var(--font-sans);
+            white-space: nowrap;
+            outline: none;
+            user-select: none;
+        }
+        .btn:hover { background: #f4f4f4; border-color: #c0c0c0; }
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.primary:hover { background: var(--accent-hover); }
+        .btn.danger { border-color: var(--danger); color: var(--danger); }
+        .btn.danger:hover { background: #fdf2f2; border-color: #c0392b; }
+        .btn.small { padding: 5px 10px; font-size: 11px; }
+        .btn.copy-btn { min-width: 52px; }
+        .btn.copy-btn.copied { background: #f0faf0; border-color: #b7d9b7; color: #2d6a2d; pointer-events: none; }
+        .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .gap-sm { gap: 8px; }
+        .mt-sm { margin-top: 10px; }
+        .mt-md { margin-top: 18px; }
+        .mb-sm { margin-bottom: 8px; }
+        .flex-1 { flex: 1; min-width: 140px; }
+        .result-mono {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            padding: 12px 14px;
+            background: #f9f9f9;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            word-break: break-all;
+            line-height: 1.55;
+            min-height: 42px;
+            color: var(--text);
+        }
+        .result-mono.empty { color: var(--text-tertiary); font-style: italic; }
+        .note { font-size: 11px; color: var(--text-tertiary); letter-spacing: 0.02em; }
+        .divider { height: 1px; background: var(--border-light); margin: 20px 0; border: none; }
+        .strength-bar-wrap { height: 3px; background: var(--border-light); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+        .strength-bar-fill { height: 100%; border-radius: 2px; transition: width 200ms ease, background 200ms ease; }
+        .smart-result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 8px 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+        }
+        .smart-result-item .method { font-size: 11px; font-weight: 600; color: var(--text-tertiary); min-width: 100px; }
+        .smart-result-item .content { font-family: var(--font-mono); font-size: 12px; word-break: break-all; flex: 1; margin-right: 12px; }
+        .smart-result-item .confidence { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: #f0f0f0; white-space: nowrap; }
+        .confidence.high { background: #e0f2e0; color: #1e7a1e; }
+        .confidence.medium { background: #fff3cd; color: #856404; }
+        .confidence.low { background: #f8d7da; color: #721c24; }
+        .tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .tool-field { min-width: 0; }
+        .tool-field > label { display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
+        .tool-output { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 420px; overflow: auto; }
+        .tool-note { margin-top: 8px; }
+        .diff-line { display: block; white-space: pre-wrap; overflow-wrap: anywhere; padding: 1px 5px; border-radius: 2px; }
+        .diff-line.added { background: #e8f6e8; color: #145c21; }
+        .diff-line.removed { background: #fdeaea; color: #8c2020; }
+        .diff-line.context { color: #666; }
+        .tool-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
+        .tool-table th, .tool-table td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--border-light); overflow-wrap: anywhere; }
+        .tool-table th { color: var(--text-secondary); font-family: var(--font-sans); font-weight: 600; }
+        .color-swatch { width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 4px; flex: 0 0 44px; background: transparent; }
+        .small-textarea { min-height: 76px; }
+        .checkbox-label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-secondary); }
+        .checkbox-label input { accent-color: var(--accent); }
+        #smartResults .smart-result-item { gap: 10px; flex-wrap: wrap; }
+        #smartResults .smart-result-item .content { min-width: 160px; white-space: pre-wrap; overflow-wrap: anywhere; }
+        #hashVerifyFeedback { font-weight: 600; }
+        #fileCipherStatus { white-space: pre-wrap; }
+        @media (max-width: 600px) { .tool-grid { grid-template-columns: 1fr; } .tool-table { font-size: 11px; } .tool-table th, .tool-table td { padding: 6px 4px; } }
+        @media (max-width: 600px) { body { padding: 20px 10px 40px; } .tab-primary { padding: 8px 12px; font-size: 12px; } .btn { padding: 6px 12px; font-size: 11px; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header"><span class="header-title">DevToolbox Pro</span><span class="header-dot"></span><span class="header-subtitle">编码·哈希·加密·生成·转换·智能解码·开发辅助</span></div>
+
+    <div class="tabs-primary" id="tabsPrimary">
+        <button class="tab-primary active" data-tab="encode">编解码</button>
+        <button class="tab-primary" data-tab="hash">哈希</button>
+        <button class="tab-primary" data-tab="cipher">加解密</button>
+        <button class="tab-primary" data-tab="generate">生成器</button>
+        <button class="tab-primary" data-tab="convert">转换</button>
+        <button class="tab-primary" data-tab="smart">智能解码</button>
+        <button class="tab-primary" data-tab="extras">实用工具</button>
+    </div>
+
+    <!-- ==================== 编解码 ==================== -->
+    <div class="panel active" id="panel-encode">
+        <div class="tabs-secondary-wrap" id="tabsEncodeSub">
+            <button class="tab-secondary active" data-sub="base64">Base64</button>
+            <button class="tab-secondary" data-sub="base64url">Base64URL</button>
+            <button class="tab-secondary" data-sub="url">URL</button>
+            <button class="tab-secondary" data-sub="htmlentity">HTML实体</button>
+            <button class="tab-secondary" data-sub="unicode">Unicode转义</button>
+            <button class="tab-secondary" data-sub="hextext">Hex文本</button>
+        </div>
+        <div class="panel active" id="sub-encode-base64">
+            <div class="section-label mb-sm">输入</div>
+            <textarea id="b64Input" placeholder="输入要编码/解码的文本..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="b64Enc">编码</button>
+                <button class="btn" id="b64Dec">解码</button>
+                <button class="btn small copy-btn" data-target="b64Output">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="b64Output" class="output-area" readonly placeholder="结果..."></textarea>
+        </div>
+        <div class="panel" id="sub-encode-base64url">
+            <div class="section-label mb-sm">输入</div>
+            <textarea id="b64urlInput" placeholder="输入文本；Base64URL 适合 URL、JWT 等场景..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="b64urlEnc">编码</button>
+                <button class="btn" id="b64urlDec">解码</button>
+                <button class="btn small copy-btn" data-target="b64urlOutput">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="b64urlOutput" class="output-area" readonly placeholder="Base64URL 结果..." ></textarea>
+            <p class="note mt-sm">使用 URL 安全字符 - 和 _，并移除尾部填充符 =。Base64 / Base64URL 只是编码，不是加密。</p>
+        </div>
+        <div class="panel" id="sub-encode-url">
+            <div class="section-label mb-sm">输入</div>
+            <textarea id="urlInput" placeholder="输入文本或URL..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="urlEnc">编码</button>
+                <button class="btn" id="urlDec">解码</button>
+                <button class="btn small copy-btn" data-target="urlOutput">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="urlOutput" class="output-area" readonly placeholder="结果..."></textarea>
+        </div>
+        <div class="panel" id="sub-encode-htmlentity">
+            <div class="section-label mb-sm">输入</div>
+            <textarea id="htmlEntityInput" placeholder="输入HTML特殊字符文本..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="htmlEntityEnc">编码实体</button>
+                <button class="btn" id="htmlEntityDec">解码实体</button>
+                <button class="btn small copy-btn" data-target="htmlEntityOutput">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="htmlEntityOutput" class="output-area" readonly placeholder="结果..."></textarea>
+        </div>
+        <div class="panel" id="sub-encode-unicode">
+            <div class="section-label mb-sm">输入</div>
+            <textarea id="uniInput" placeholder="输入文本..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="uniEnc">转为\uXXXX</button>
+                <button class="btn" id="uniDec">解析\uXXXX</button>
+                <button class="btn small copy-btn" data-target="uniOutput">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="uniOutput" class="output-area" readonly placeholder="结果..."></textarea>
+        </div>
+        <div class="panel" id="sub-encode-hextext">
+            <div class="section-label mb-sm">输入</div>
+            <textarea id="hexInput" placeholder="输入文本..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="hexEnc">文本→Hex</button>
+                <button class="btn" id="hexDec">Hex→文本</button>
+                <button class="btn small copy-btn" data-target="hexOutput">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="hexOutput" class="output-area" readonly placeholder="结果..."></textarea>
+        </div>
+    </div>
+
+    <!-- ==================== 哈希 ==================== -->
+    <div class="panel" id="panel-hash">
+        <div class="tabs-secondary-wrap" id="tabsHashSub">
+            <button class="tab-secondary active" data-sub="md5">MD5</button>
+            <button class="tab-secondary" data-sub="sha1">SHA-1</button>
+            <button class="tab-secondary" data-sub="sha256">SHA-256</button>
+            <button class="tab-secondary" data-sub="sha512">SHA-512</button>
+            <button class="tab-secondary" data-sub="sha224">SHA-224</button>
+            <button class="tab-secondary" data-sub="sha384">SHA-384</button>
+            <button class="tab-secondary" data-sub="sha3">Keccak-256</button>
+            <button class="tab-secondary" data-sub="sha3512">Keccak-512</button>
+            <button class="tab-secondary" data-sub="ripemd160">RIPEMD-160</button>
+        </div>
+        <div class="section-label mb-sm">输入</div>
+        <textarea id="hashInput" placeholder="输入任意文本..."></textarea>
+        <div class="row mt-md gap-sm">
+            <div class="flex-1"><label class="section-label mb-sm" for="hashOutputFormat">摘要输出格式</label><select id="hashOutputFormat"><option value="hex">Hex（小写）</option><option value="HEX">HEX（大写）</option><option value="base64">Base64</option></select></div>
+            <div class="flex-1"><label class="section-label mb-sm" for="hashExpected">预期摘要（可选）</label><input id="hashExpected" type="text" placeholder="粘贴已知摘要进行校验"></div>
+        </div>
+        <div class="section-label mt-md mb-sm" id="hashAlgoLabel">MD5</div>
+        <div class="result-mono" id="hashResult">—</div>
+        <div class="row mt-sm gap-sm">
+            <button class="btn small copy-btn" data-target="hashResultText">复制哈希</button>
+            <button class="btn small" id="hashVerify">校验预期摘要</button>
+            <span class="note" id="hashNote"></span>
+            <span class="note" id="hashVerifyFeedback"></span>
+        </div>
+        <p class="note mt-sm">MD5、SHA-1、RIPEMD-160 和 Keccak 变体不应被当作 SHA-2 / 标准 SHA-3 的替代品用于新安全协议。摘要校验仅做字符串比较，不等于数字签名验证。</p>
+    </div>
+
+    <!-- ==================== 加解密 ==================== -->
+    <div class="panel" id="panel-cipher">
+        <div class="tabs-secondary-wrap" id="tabsCipherSub">
+            <button class="tab-secondary active" data-sub="aes">AES</button>
+            <button class="tab-secondary" data-sub="rsa">RSA</button>
+            <button class="tab-secondary" data-sub="hybrid">RSA混合加密</button>
+            <button class="tab-secondary" data-sub="file">文件加密</button>
+        </div>
+        <!-- AES -->
+        <div class="panel active" id="sub-cipher-aes">
+            <div class="section-label mb-sm">明文 / 密文</div>
+            <textarea id="aesInput" placeholder="加密时输入明文，解密时输入Base64密文..."></textarea>
+            <div class="row mt-sm gap-sm flex-1">
+                <div class="flex-1">
+                    <label class="section-label mb-sm" style="font-size:11px;">密码</label>
+                    <input type="password" id="aesPassword" class="mono-input" placeholder="输入密码" autocomplete="new-password" spellcheck="false">
+                </div>
+                <div class="flex-1">
+                    <label class="section-label mb-sm" style="font-size:11px;">模式</label>
+                    <select id="aesMode">
+                        <option value="GCM" selected>GCM（推荐；新加密）</option>
+                        <option value="CBC">CBC（仅旧数据解密）</option>
+                        <option value="CTR">CTR（仅旧数据解密）</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-sm gap-sm">
+                <div class="flex-1">
+                    <label class="section-label mb-sm" style="font-size:11px;">密钥长度</label>
+                    <select id="aesKeyLen">
+                        <option value="128">128位</option>
+                        <option value="192">192位</option>
+                        <option value="256" selected>256位</option>
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <label class="section-label mb-sm" style="font-size:11px;">输出格式</label>
+                    <div class="result-mono" style="font-size:11px;min-height:38px;padding:8px 10px;">自动携带盐、IV、KDF 参数与版本标识</div>
+                </div>
+            </div>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="aesEnc">加密</button>
+                <button class="btn" id="aesDec">解密</button>
+                <button class="btn small copy-btn" data-target="aesOutput">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="aesOutput" class="output-area" readonly placeholder="加密结果(Base64)..."></textarea>
+            <p class="note mt-sm">新加密固定使用 AES-GCM + PBKDF2-HMAC-SHA-256（600,000 次迭代），并将参数写入密文头部。CBC/CTR 仅用于尝试解密旧格式，不提供完整性认证；不要用它们新加密。旧版 GCM 密文仍可尝试解密。</p>
+        </div>
+        <!-- RSA -->
+        <div class="panel" id="sub-cipher-rsa">
+            <div class="section-label mb-sm">RSA 密钥管理</div>
+            <div class="row gap-sm mb-sm">
+                <button class="btn" id="rsaGenKey">生成密钥对</button>
+                <span class="note">（2048位，用于测试）</span>
+            </div>
+            <div class="row gap-sm flex-1">
+                <div class="flex-1">
+                    <label class="section-label mb-sm" style="font-size:11px;">公钥 (SPKI PEM)</label>
+                    <textarea id="rsaPublicKey" class="small" placeholder="粘贴公钥..."></textarea>
+                </div>
+                <div class="flex-1">
+                    <label class="section-label mb-sm" style="font-size:11px;">私钥 (PKCS8 PEM)</label>
+                    <textarea id="rsaPrivateKey" class="small" placeholder="粘贴私钥..."></textarea>
+                </div>
+            </div>
+            <div class="section-label mt-md mb-sm">明文 / 密文</div>
+            <textarea id="rsaInput" placeholder="加密时输入明文，解密时输入Base64密文..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="rsaEnc">公钥加密</button>
+                <button class="btn" id="rsaDec">私钥解密</button>
+                <button class="btn small copy-btn" data-target="rsaOutput">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="rsaOutput" class="output-area" readonly placeholder="结果..."></textarea>
+            <p class="note mt-sm">使用RSA-OAEP (SHA-256)。明文长度有限（2048位密钥最多190字节左右）。</p>
+        </div>
+        <div class="panel" id="sub-cipher-hybrid">
+            <div class="section-label mb-sm">RSA-OAEP + AES-GCM 混合加密</div>
+            <p class="note mb-sm">复用「RSA」页的公钥 / 私钥。RSA 只加密随机 AES 密钥，正文由 AES-GCM 加密，因此不受 RSA 直接加密的短明文长度限制。</p>
+            <div class="section-label mt-md mb-sm">明文 / 混合密文 JSON</div>
+            <textarea id="hybridInput" placeholder="加密时输入任意长度文本；解密时粘贴完整的混合密文 JSON..." style="min-height:140px;"></textarea>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="hybridEncrypt">公钥加密</button><button class="btn" id="hybridDecrypt">私钥解密</button><button class="btn small copy-btn" data-target="hybridOutput">复制</button></div>
+            <div class="section-label mt-md mb-sm">输出</div><textarea id="hybridOutput" class="output-area" readonly placeholder="混合加密结果或解密明文..." style="min-height:160px;"></textarea>
+            <p class="note mt-sm">密文包含格式标识、包装后的 AES 密钥、IV 和密文；格式标识参与 GCM 认证。请保护私钥，并保留完整 JSON 密文。</p>
+        </div>
+        <div class="panel" id="sub-cipher-file">
+            <div class="section-label mb-sm">文件 AES-GCM 加密 / 解密</div>
+            <div class="section-label mt-md mb-sm">选择文件</div><input id="fileCipherInput" type="file" style="font-family:var(--font-sans);font-size:12px;max-width:100%;">
+            <div class="section-label mt-md mb-sm">密码</div><input id="fileCipherPassword" type="password" placeholder="设置足够强的文件加密密码" autocomplete="new-password" spellcheck="false">
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="fileCipherEncrypt">加密并下载</button><button class="btn" id="fileCipherDecrypt">解密并下载</button></div>
+            <div id="fileCipherStatus" class="result-mono tool-output mt-sm">文件在本地处理，不会上传。当前限制单文件不超过 50 MiB。</div>
+            <p class="note mt-sm">采用 AES-GCM + PBKDF2-HMAC-SHA-256（600,000 次迭代）。输出 .dtpf 文件包含盐、IV 和认证标签；解密必须使用原密码与完整文件。请务必备份重要原文件。</p>
+        </div>
+    </div>
+
+    <!-- ==================== 生成器 ==================== -->
+    <div class="panel" id="panel-generate">
+        <div class="tabs-secondary-wrap" id="tabsGenSub">
+            <button class="tab-secondary active" data-sub="uuid">UUID v4</button>
+            <button class="tab-secondary" data-sub="password">密码</button>
+            <button class="tab-secondary" data-sub="randomstr">随机字符串</button>
+            <button class="tab-secondary" data-sub="securetools">安全令牌 / 随机整数</button>
+        </div>
+        <div class="panel active" id="sub-gen-uuid">
+            <div class="section-label mb-sm">UUID v4</div>
+            <div class="result-mono" id="uuidResult">—</div>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="uuidGen">生成</button>
+                <button class="btn small copy-btn" data-target="uuidResultText">复制</button>
+                <button class="btn small" id="uuidBatch">批量×10</button>
+            </div>
+            <div class="mt-md" id="uuidBatchList" style="font-family:var(--font-mono);font-size:12px;line-height:1.8;color:var(--text-secondary);word-break:break-all;"></div>
+        </div>
+        <div class="panel" id="sub-gen-password">
+            <div class="section-label mb-sm">配置</div>
+            <div class="row gap-md mb-md" style="align-items:center;">
+                <span style="font-size:12px;color:var(--text-secondary);">长度</span>
+                <input type="range" id="pwdLength" min="6" max="128" value="20" style="flex:1;">
+                <span id="pwdLengthVal" style="font-size:13px;font-weight:600;">20</span>
+            </div>
+            <div class="row gap-sm mb-md">
+                <label class="checkbox-label"><input type="checkbox" id="pwdUpper" checked> A-Z</label>
+                <label class="checkbox-label"><input type="checkbox" id="pwdLower" checked> a-z</label>
+                <label class="checkbox-label"><input type="checkbox" id="pwdDigits" checked> 0-9</label>
+                <label class="checkbox-label"><input type="checkbox" id="pwdSymbols" checked> !@#$</label>
+                <label class="checkbox-label"><input type="checkbox" id="pwdExclude"> 排除易混淆</label>
+            </div>
+            <div class="section-label mb-sm">结果</div>
+            <div class="result-mono" id="pwdResult">—</div>
+            <div class="strength-bar-wrap"><div class="strength-bar-fill" id="pwdStrengthBar" style="width:0%;background:#ccc;"></div></div>
+            <span class="note" id="pwdStrengthLabel"></span>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="pwdGen">生成</button>
+                <button class="btn small copy-btn" data-target="pwdResultText">复制</button>
+            </div>
+        </div>
+        <div class="panel" id="sub-gen-randomstr">
+            <div class="section-label mb-sm">配置</div>
+            <div class="row gap-md mb-md">
+                <span style="font-size:12px;">长度</span>
+                <input type="range" id="randStrLen" min="4" max="256" value="32" style="flex:1;">
+                <span id="randStrLenVal" style="font-size:13px;font-weight:600;">32</span>
+            </div>
+            <div class="row gap-sm mb-md">
+                <label class="checkbox-label"><input type="checkbox" id="randAlpha" checked> 字母</label>
+                <label class="checkbox-label"><input type="checkbox" id="randDigits" checked> 数字</label>
+                <label class="checkbox-label"><input type="checkbox" id="randHexOnly"> 仅十六进制</label>
+                <label class="checkbox-label"><input type="checkbox" id="randCustom"> 自定义</label>
+            </div>
+            <input type="text" id="randCustomSet" class="mono-input" placeholder="自定义字符集（勾选后生效）" style="display:none;">
+            <div class="section-label mt-md mb-sm">结果</div>
+            <div class="result-mono" id="randStrResult">—</div>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="randStrGen">生成</button>
+                <button class="btn small copy-btn" data-target="randStrResultText">复制</button>
+            </div>
+        </div>
+        <div class="panel" id="sub-gen-securetools">
+            <div class="section-label mb-sm">安全随机令牌</div>
+            <div class="tool-grid">
+                <div class="tool-field"><label for="tokenBytes">令牌长度</label><select id="tokenBytes"><option value="16">16 字节（128 bit）</option><option value="24">24 字节（192 bit）</option><option value="32" selected>32 字节（256 bit）</option><option value="48">48 字节（384 bit）</option><option value="64">64 字节（512 bit）</option></select></div>
+                <div class="tool-field"><label for="tokenFormat">输出编码</label><select id="tokenFormat"><option value="base64url">Base64URL</option><option value="hex">Hex</option></select></div>
+            </div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="tokenGenerate">生成令牌</button><button class="btn small copy-btn" data-target="tokenResult">复制令牌</button></div>
+            <div class="result-mono mt-sm" id="tokenResult">—</div>
+            <div class="divider"></div>
+            <div class="section-label mb-sm">安全随机整数（包含最小值和最大值）</div>
+            <div class="tool-grid">
+                <div class="tool-field"><label for="randIntMin">最小值（安全整数）</label><input id="randIntMin" type="number" value="1" step="1"></div>
+                <div class="tool-field"><label for="randIntMax">最大值（安全整数）</label><input id="randIntMax" type="number" value="100" step="1"></div>
+            </div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="randIntGenerate">生成随机整数</button><button class="btn small copy-btn" data-target="randIntResult">复制</button></div>
+            <div class="result-mono mt-sm" id="randIntResult">—</div>
+            <p class="note mt-sm">使用 crypto.getRandomValues 和拒绝采样，不会降级到 Math.random()。令牌适合测试或本地生成；生产系统的密钥发放、轮换与存储仍应由安全的密钥管理流程负责。</p>
+        </div>
+    </div>
+
+    <!-- ==================== 转换 ==================== -->
+    <div class="panel" id="panel-convert">
+        <div class="tabs-secondary-wrap" id="tabsConvertSub">
+            <button class="tab-secondary active" data-sub="timestamp">时间戳</button>
+            <button class="tab-secondary" data-sub="jsonfmt">JSON</button>
+            <button class="tab-secondary" data-sub="caseconv">大小写</button>
+            <button class="tab-secondary" data-sub="numconv">进制</button>
+            <button class="tab-secondary" data-sub="csvjson">CSV / JSON</button>
+            <button class="tab-secondary" data-sub="texttools">文本批处理</button>
+        </div>
+        <div class="panel active" id="sub-convert-timestamp">
+            <div class="row gap-md mb-md">
+                <div class="flex-1">
+                    <div class="section-label mb-sm">时间戳→日期</div>
+                    <input type="text" id="tsInput" placeholder="秒或毫秒时间戳">
+                    <button class="btn primary mt-sm" id="tsToDate" style="width:100%;">转换</button>
+                    <div class="result-mono mt-sm" id="tsDateResult">—</div>
+                </div>
+                <div class="flex-1">
+                    <div class="section-label mb-sm">日期→时间戳</div>
+                    <input type="text" id="dateInput" placeholder="ISO格式">
+                    <button class="btn primary mt-sm" id="dateToTs" style="width:100%;">转换</button>
+                    <div class="result-mono mt-sm" id="dateTsResult">—</div>
+                </div>
+            </div>
+            <div class="result-mono">当前毫秒时间戳：<span id="tsNow">—</span></div>
+            <button class="btn small mt-sm copy-btn" data-target="tsNowText">复制当前时间戳</button>
+        </div>
+        <div class="panel" id="sub-convert-jsonfmt">
+            <textarea id="jsonInput" placeholder="粘贴JSON..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="jsonFormat">格式化</button>
+                <button class="btn" id="jsonCompact">压缩</button>
+                <button class="btn" id="jsonValidate">验证</button>
+                <button class="btn small copy-btn" data-target="jsonOutput">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="jsonOutput" class="output-area" readonly placeholder="结果..."></textarea>
+            <span class="note" id="jsonFeedback"></span>
+        </div>
+        <div class="panel" id="sub-convert-caseconv">
+            <textarea id="caseInput" placeholder="输入文本..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn case-btn" data-action="upper">全大写</button>
+                <button class="btn case-btn" data-action="lower">全小写</button>
+                <button class="btn case-btn" data-action="title">首字母大写</button>
+                <button class="btn case-btn" data-action="sentence">句首大写</button>
+                <button class="btn case-btn" data-action="camel">驼峰</button>
+                <button class="btn case-btn" data-action="snake">蛇形</button>
+                <button class="btn case-btn" data-action="kebab">短横线</button>
+                <button class="btn small copy-btn" data-target="caseOutput">复制</button>
+            </div>
+            <div class="section-label mt-md mb-sm">输出</div>
+            <textarea id="caseOutput" class="output-area" readonly placeholder="结果..."></textarea>
+        </div>
+        <div class="panel" id="sub-convert-numconv">
+            <div class="section-label mb-sm">输入</div>
+            <div class="row gap-sm">
+                <input type="text" id="numInput" class="flex-1" placeholder="数字">
+                <select id="numFromBase">
+                    <option value="10">十进制</option>
+                    <option value="16">十六进制</option>
+                    <option value="8">八进制</option>
+                    <option value="2">二进制</option>
+                </select>
+            </div>
+            <button class="btn primary mt-sm" id="numConvert">转换</button>
+            <div class="result-mono mt-md" style="line-height:2;">
+                <div>十进制：<strong id="numDec">—</strong></div>
+                <div>十六进制：<strong id="numHex">—</strong></div>
+                <div>八进制：<strong id="numOct">—</strong></div>
+                <div>二进制：<strong id="numBin">—</strong></div>
+            </div>
+            <span class="note" id="numFeedback"></span>
+        </div>
+        <div class="panel" id="sub-convert-csvjson">
+            <div class="section-label mb-sm">CSV / JSON 转换</div>
+            <div class="row gap-sm"><div class="flex-1"><label class="section-label mb-sm" for="csvDelimiter">CSV 分隔符</label><select id="csvDelimiter"><option value=",">逗号 ,</option><option value=";">分号 ;</option><option value="	">制表符 Tab</option></select></div><div class="flex-1"><label class="section-label mb-sm" for="csvHasHeader">CSV 第一行</label><select id="csvHasHeader"><option value="yes">作为字段名</option><option value="no">作为普通数据</option></select></div></div>
+            <div class="tool-grid mt-md"><div class="tool-field"><label for="csvJsonInput">输入 CSV 或 JSON</label><textarea id="csvJsonInput" placeholder="CSV：name,age
+Alice,20
+Bob,25"></textarea></div><div class="tool-field"><label for="csvJsonOutput">转换结果</label><textarea id="csvJsonOutput" class="output-area" readonly placeholder="结果..." ></textarea></div></div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="csvToJson">CSV → JSON</button><button class="btn" id="jsonToCsv">JSON → CSV</button><button class="btn small copy-btn" data-target="csvJsonOutput">复制</button></div>
+            <p class="note mt-sm">CSV 解析支持引号字段、字段内换行和双引号转义。CSV → JSON 可选首行是否为字段名；JSON → CSV 需要对象数组，嵌套值会序列化为 JSON 字符串。</p>
+        </div>
+        <div class="panel" id="sub-convert-texttools">
+            <div class="section-label mb-sm">输入文本（按行处理）</div><textarea id="textToolsInput" placeholder="每行一条记录..."></textarea>
+            <div class="row mt-sm gap-sm"><button class="btn" id="textTrimLines">去除每行首尾空格</button><button class="btn" id="textRemoveBlank">删除空行</button><button class="btn" id="textDedupe">去重（保留首次）</button><button class="btn" id="textSort">排序</button><button class="btn" id="textReverse">反转行序</button><button class="btn" id="textLineNumbers">添加行号</button></div>
+            <div class="section-label mt-md mb-sm">处理结果</div><textarea id="textToolsOutput" class="output-area" readonly placeholder="结果..."></textarea><div class="row mt-sm gap-sm"><button class="btn small copy-btn" data-target="textToolsOutput">复制结果</button><button class="btn small" id="textToolsClear">清空</button></div>
+            <p class="note mt-sm">排序按本地语言环境的字符串顺序进行；去重默认区分大小写，不会自动合并相似内容。</p>
+        </div>
+    </div>
+
+    <!-- ==================== 智能解码 ==================== -->
+    <div class="panel" id="panel-smart">
+        <div class="section-label mb-sm">输入可疑字符串</div>
+        <textarea id="smartInput" placeholder="粘贴任意字符串，尝试自动检测并解码..."></textarea>
+        <div class="row mt-sm gap-sm"><label class="checkbox-label"><input type="checkbox" id="smartRecursive" checked> 多层递归解码</label><div class="flex-1"><label class="section-label mb-sm" for="smartDepth">最大层数</label><select id="smartDepth"><option value="1">1 层</option><option value="2">2 层</option><option value="3" selected>3 层</option><option value="4">4 层</option><option value="5">5 层</option></select></div></div>
+        <div class="row mt-sm gap-sm"><button class="btn primary" id="smartDecode">智能解码</button><button class="btn" id="smartClear">清空</button><span class="note" id="smartFeedback"></span></div>
+        <div class="section-label mt-md mb-sm">解码结果（按置信度排序）</div>
+        <div id="smartResults" style="margin-top:8px;">
+            <div class="result-mono empty">点击“智能解码”开始分析</div>
+        </div>
+        <p class="note mt-sm">自动尝试 Base64 / Base64URL、URL、HTML 实体、Unicode 与 \xNN 转义、Hex、JSON 字符串、JWT 片段及 Latin1→UTF-8 修复；可递归处理多层编码。结果仅为启发式判断，请自行核验。</p>
+    </div>
+
+    <!-- ==================== 实用工具 ==================== -->
+    <div class="panel" id="panel-extras">
+        <div class="tabs-secondary-wrap" id="tabsExtrasSub">
+            <button class="tab-secondary active" data-sub="regex">正则测试</button>
+            <button class="tab-secondary" data-sub="diff">差异对比</button>
+            <button class="tab-secondary" data-sub="jwt">JWT解析</button>
+            <button class="tab-secondary" data-sub="filehash">文件哈希</button>
+            <button class="tab-secondary" data-sub="urltool">URL工具</button>
+            <button class="tab-secondary" data-sub="jsonpath">JSONPath</button>
+            <button class="tab-secondary" data-sub="yaml">YAML / JSON</button>
+            <button class="tab-secondary" data-sub="xml">XML格式化</button>
+            <button class="tab-secondary" data-sub="cron">Cron解析</button>
+            <button class="tab-secondary" data-sub="timezone">时区转换</button>
+            <button class="tab-secondary" data-sub="color">颜色转换</button>
+            <button class="tab-secondary" data-sub="hmac">HMAC</button>
+        </div>
+
+        <!-- Regex -->
+        <div class="panel active" id="sub-extras-regex">
+            <div class="section-label mb-sm">正则表达式</div>
+            <div class="tool-grid">
+                <div class="tool-field"><label for="regexPattern">表达式</label><input id="regexPattern" type="text" value="\b\w+\b" placeholder="例如：\b\w+\b"></div>
+                <div class="tool-field"><label for="regexFlags">标志（flags）</label><input id="regexFlags" type="text" value="gm" placeholder="g i m s u y d"></div>
+            </div>
+            <div class="section-label mt-md mb-sm">测试文本</div>
+            <textarea id="regexTestText" placeholder="输入要匹配的文本..."></textarea>
+            <div class="row mt-sm gap-sm">
+                <div class="flex-1"><input id="regexReplacement" type="text" placeholder="替换文本（可选，支持 $1 等捕获组）"></div>
+                <button class="btn primary" id="regexRun">测试匹配</button>
+                <button class="btn" id="regexReplace">替换预览</button>
+            </div>
+            <div class="section-label mt-md mb-sm">结果</div>
+            <div id="regexOutput" class="result-mono tool-output">输入表达式和文本后开始测试。</div>
+            <p class="note tool-note">正则将在可终止的 Worker 中执行；单次最多显示 500 个匹配项，超时会自动终止。请勿在不可信的正则表达式上关闭超时保护。</p>
+        </div>
+
+        <!-- Diff -->
+        <div class="panel" id="sub-extras-diff">
+            <div class="tool-grid">
+                <div class="tool-field"><label for="diffLeft">文本 A</label><textarea id="diffLeft" placeholder="粘贴第一份文本或 JSON..."></textarea></div>
+                <div class="tool-field"><label for="diffRight">文本 B</label><textarea id="diffRight" placeholder="粘贴第二份文本或 JSON..."></textarea></div>
+            </div>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="diffTextRun">文本对比</button>
+                <button class="btn" id="diffJsonRun">JSON对比</button>
+                <span class="note" id="diffFeedback">按行比较；大型输入会受到计算量限制。</span>
+            </div>
+            <div class="section-label mt-md mb-sm">差异结果</div>
+            <div id="diffOutput" class="result-mono tool-output">等待对比。</div>
+        </div>
+
+        <!-- JWT -->
+        <div class="panel" id="sub-extras-jwt">
+            <div class="section-label mb-sm">JWT令牌</div>
+            <textarea id="jwtInput" placeholder="粘贴 header.payload.signature 格式的 JWT..." style="min-height:100px;"></textarea>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="jwtDecode">解析 JWT</button><button class="btn" id="jwtClear">清空</button></div>
+            <p class="note tool-note">本工具只解码 Header 和 Payload，不验证签名，也不会证明令牌可信。请勿粘贴生产环境中的敏感令牌。</p>
+            <div class="section-label mt-md mb-sm">Header</div><pre id="jwtHeaderOutput" class="result-mono tool-output">—</pre>
+            <div class="section-label mt-md mb-sm">Payload</div><pre id="jwtPayloadOutput" class="result-mono tool-output">—</pre>
+            <div class="section-label mt-md mb-sm">常见声明</div><div id="jwtClaimsOutput" class="result-mono tool-output">—</div>
+        </div>
+
+        <!-- File hash -->
+        <div class="panel" id="sub-extras-filehash">
+            <div class="section-label mb-sm">选择文件（支持多选）</div>
+            <input id="fileHashInput" type="file" multiple style="font-family:var(--font-sans);font-size:12px;max-width:100%;">
+            <div class="row mt-sm gap-sm">
+                <select id="fileHashAlgo" style="max-width:180px"><option value="SHA-256">SHA-256</option><option value="SHA-384">SHA-384</option><option value="SHA-512">SHA-512</option></select>
+                <button class="btn primary" id="fileHashRun">计算哈希</button>
+                <button class="btn" id="fileHashClear">清空结果</button>
+            </div>
+            <div id="fileHashStatus" class="note tool-note">文件只在浏览器中读取；为避免内存占用，每个文件限制为 200 MiB。</div>
+            <div class="section-label mt-md mb-sm">文件摘要</div><div id="fileHashOutput" class="result-mono tool-output">尚未选择文件。</div>
+        </div>
+
+        <!-- URL -->
+        <div class="panel" id="sub-extras-urltool">
+            <div class="section-label mb-sm">URL解析</div>
+            <textarea id="urlParseInput" class="small-textarea" placeholder="https://example.com:8443/path?a=1&b=hello#section"></textarea>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="urlParseRun">解析 URL</button><button class="btn" id="urlParseClear">清空</button></div>
+            <div id="urlParseOutput" class="result-mono tool-output mt-sm">输入绝对 URL 后解析。</div>
+            <div class="section-label mt-md mb-sm">URL构造（查询参数每行一个 key=value）</div>
+            <input id="urlBuildBase" type="text" value="https://example.com/path" placeholder="基础 URL">
+            <textarea id="urlBuildParams" class="small-textarea mt-sm" placeholder="q=hello world&#10;page=2&#10;tag=a&#10;tag=b"></textarea>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="urlBuildRun">构造 URL</button><button class="btn small copy-btn" data-target="urlBuildOutput">复制</button></div>
+            <textarea id="urlBuildOutput" class="output-area mt-sm" readonly placeholder="生成的 URL..." style="min-height:76px;"></textarea>
+        </div>
+
+        <!-- JSONPath -->
+        <div class="panel" id="sub-extras-jsonpath">
+            <div class="section-label mb-sm">JSON数据</div>
+            <textarea id="jsonPathData" placeholder='输入 JSON，例如：{"users":[{"name":"Alice"},{"name":"Bob"}]}'></textarea>
+            <div class="row mt-sm gap-sm">
+                <div class="flex-1"><input id="jsonPathExpr" type="text" value="$.users[*].name" placeholder="例如：$.users[*].name"></div>
+                <button class="btn primary" id="jsonPathRun">查询</button>
+            </div>
+            <div class="section-label mt-md mb-sm">查询结果</div><div id="jsonPathOutput" class="result-mono tool-output">支持 $、点属性、数组下标、[*]、.*、..name 和 ['key'] 等常用语法。</div>
+            <p class="note tool-note">这是轻量 JSONPath 实现，支持常见路径与递归属性查询，不支持过滤表达式（如 [?(@.price&gt;10)]）、函数和脚本表达式。</p>
+        </div>
+
+        <!-- YAML -->
+        <div class="panel" id="sub-extras-yaml">
+            <div class="tool-grid">
+                <div class="tool-field"><label for="yamlInput">输入（YAML 或 JSON）</label><textarea id="yamlInput" placeholder="name: DevToolbox&#10;enabled: true&#10;items:&#10;  - alpha&#10;  - beta"></textarea></div>
+                <div class="tool-field"><label for="yamlOutput">输出</label><textarea id="yamlOutput" class="output-area" readonly placeholder="转换结果..."></textarea></div>
+            </div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="yamlToJson">YAML → JSON</button><button class="btn" id="jsonToYaml">JSON → YAML</button><button class="btn" id="yamlValidate">验证 YAML</button><button class="btn small copy-btn" data-target="yamlOutput">复制</button></div>
+            <p id="yamlFeedback" class="note tool-note">支持常见 YAML 映射、列表、标量、引号字符串、注释和 JSON 风格内联数组/对象；高级 YAML 标签、锚点/别名及部分复杂语法不支持。</p>
+        </div>
+
+        <!-- XML -->
+        <div class="panel" id="sub-extras-xml">
+            <div class="section-label mb-sm">XML输入</div><textarea id="xmlInput" placeholder="粘贴 XML 文档..." style="min-height:150px;"></textarea>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="xmlFormat">格式化</button><button class="btn" id="xmlMinify">压缩</button><button class="btn" id="xmlValidate">验证</button><button class="btn small copy-btn" data-target="xmlOutput">复制</button></div>
+            <div class="section-label mt-md mb-sm">输出</div><textarea id="xmlOutput" class="output-area" readonly placeholder="格式化后的 XML..." style="min-height:180px;"></textarea><p id="xmlFeedback" class="note tool-note"></p>
+        </div>
+
+        <!-- Cron -->
+        <div class="panel" id="sub-extras-cron">
+            <div class="section-label mb-sm">Cron表达式（5段）</div><input id="cronInput" type="text" value="*/5 * * * *" placeholder="分 时 日 月 周">
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="cronParse">解析并计算下次运行</button></div>
+            <p class="note tool-note">字段顺序：分钟 小时 日 月 星期。支持 *、数字、范围、逗号列表和步长；星期日可写 0 或 7。使用浏览器本地时区，未来时间最多搜索 366 天。</p>
+            <div class="section-label mt-md mb-sm">解释与下次运行时间</div><div id="cronOutput" class="result-mono tool-output">等待解析。</div>
+        </div>
+
+        <!-- Time zone -->
+        <div class="panel" id="sub-extras-timezone">
+            <div class="section-label mb-sm">时区转换</div>
+            <div class="tool-grid">
+                <div class="tool-field"><label for="tzDateTime">来源本地日期时间</label><input id="tzDateTime" type="text" placeholder="2026-10-13T15:30"></div>
+                <div class="tool-field"><label for="tzFrom">来源时区（IANA）</label><input id="tzFrom" type="text" value="Asia/Tokyo" list="tzSuggestions" placeholder="Asia/Tokyo"></div>
+                <div class="tool-field"><label for="tzTo">目标时区（IANA）</label><input id="tzTo" type="text" value="America/New_York" list="tzSuggestions" placeholder="America/New_York"></div>
+                <datalist id="tzSuggestions"><option value="UTC"><option value="Asia/Tokyo"><option value="Asia/Shanghai"><option value="Asia/Singapore"><option value="Europe/London"><option value="Europe/Paris"><option value="America/New_York"><option value="America/Los_Angeles"><option value="Australia/Sydney"></datalist>
+            </div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="tzConvert">转换时区</button><button class="btn" id="tzNow">填入当前时间</button></div>
+            <div class="section-label mt-md mb-sm">转换结果</div><div id="tzOutput" class="result-mono tool-output">输入来源时间与时区后转换。</div>
+            <p class="note tool-note">时区转换依赖浏览器 Intl 数据；遇到夏令时跳变或重复时刻时，结果可能需要人工确认。</p>
+        </div>
+
+        <!-- Color -->
+        <div class="panel" id="sub-extras-color">
+            <div class="section-label mb-sm">颜色格式转换</div>
+            <div class="row gap-sm"><div id="colorSwatch" class="color-swatch"></div><div class="flex-1"><input id="colorInput" type="text" value="#4f46e5" placeholder="#RRGGBB / rgb() / hsl()"><div class="note mt-sm">支持 HEX、RGB、HSL；HEX 可带 Alpha（#RGBA / #RRGGBBAA）。</div></div><button class="btn primary" id="colorConvert">转换</button></div>
+            <div class="section-label mt-md mb-sm">结果</div><div class="result-mono tool-output" id="colorOutput">#4f46e5</div>
+        </div>
+
+        <!-- HMAC -->
+        <div class="panel" id="sub-extras-hmac">
+            <div class="section-label mb-sm">HMAC 消息认证码</div>
+            <div class="tool-grid">
+                <div class="tool-field"><label for="hmacAlgo">哈希算法</label><select id="hmacAlgo"><option value="SHA-256">HMAC-SHA-256</option><option value="SHA-384">HMAC-SHA-384</option><option value="SHA-512">HMAC-SHA-512</option></select></div>
+                <div class="tool-field"><label for="hmacKey">密钥（文本）</label><input id="hmacKey" type="text" placeholder="输入 HMAC 密钥"></div>
+            </div>
+            <div class="section-label mt-md mb-sm">消息</div><textarea id="hmacMessage" placeholder="输入要认证的消息..."></textarea>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="hmacRun">计算 HMAC</button><button class="btn" id="hmacClear">清空</button></div>
+            <div class="section-label mt-md mb-sm">摘要（Hex / Base64）</div><div id="hmacOutput" class="result-mono tool-output">—</div>
+            <p class="note tool-note">HMAC 与普通哈希不同，需要共享密钥。请妥善保管密钥；不要将生产密钥输入不可信网页。</p>
+        </div>
+    </div>
+
+    <hr class="divider">
+    <p class="note" style="text-align:center;">本页没有实现数据上传接口，工具逻辑在浏览器端运行；哈希功能依赖外部 CryptoJS CDN 脚本。处理高度敏感数据前，建议自行托管依赖并配置完整性校验。</p>
+</div>
+
+<script>
+(function() {
+    // ============ 工具函数 ============
+    function getById(id) { return document.getElementById(id); }
+
+    function decodeHtmlEntities(input) {
+        var textarea = document.createElement('textarea');
+        // HTML 文本实体解码：先转义原始尖括号，避免输入被当作标签解析；实体解码后的内容只读 value，不插入活动 DOM。
+        textarea.innerHTML = String(input).replace(/</g, '&lt;');
+        return textarea.value;
+    }
+
+    function bytesToBase64(bytes) {
+        var chunkSize = 0x8000;
+        var binary = '';
+        for (var i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+        }
+        return btoa(binary);
+    }
+    function base64ToBytes(b64) {
+        var binary = atob(String(b64).replace(/\s+/g, ''));
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes;
+    }
+    function safeBtoa(str) {
+        try { return bytesToBase64(new TextEncoder().encode(str)); }
+        catch(e) { return ''; }
+    }
+    function safeAtob(b64) {
+        try { return new TextDecoder().decode(base64ToBytes(b64)); }
+        catch(e) { return ''; }
+    }
+    function hexEncode(str) {
+        var bytes = new TextEncoder().encode(str);
+        var hex = '';
+        for (var i = 0; i < bytes.length; i++) hex += bytes[i].toString(16).padStart(2, '0');
+        return hex;
+    }
+    function hexDecode(hex) {
+        try {
+            var bytes = new Uint8Array(hex.length / 2);
+            for (var i = 0; i < hex.length; i += 2) bytes[i/2] = parseInt(hex.substr(i,2), 16);
+            return new TextDecoder().decode(bytes);
+        } catch(e) { return ''; }
+    }
+    function copyText(text, btn) {
+        if (!text) { btn.textContent = '无内容'; setTimeout(function(){ btn.textContent = '复制'; }, 1000); return; }
+        function showCopied(ok) {
+            if (ok) {
+                btn.classList.add('copied'); btn.textContent = '✓已复制';
+                setTimeout(function(){ btn.classList.remove('copied'); btn.textContent = '复制'; }, 1600);
+            } else {
+                btn.textContent = '复制失败';
+                setTimeout(function(){ btn.textContent = '复制'; }, 1000);
+            }
+        }
+        function fallbackCopy() {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            ta.style.top = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            var copied = false;
+            try { copied = document.execCommand('copy'); } catch(e) { copied = false; }
+            document.body.removeChild(ta);
+            showCopied(copied);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function(){ showCopied(true); }).catch(fallbackCopy);
+        } else fallbackCopy();
+    }
+
+    // ============ Tab系统 ============
+    function setupTabs(containerId, panelPrefix) {
+        var container = getById(containerId);
+        if (!container) return;
+        container.addEventListener('click', function(e) {
+            var tab = e.target.closest('[data-tab]');
+            if (!tab) return;
+            var tabs = container.querySelectorAll('[data-tab]');
+            for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+            tab.classList.add('active');
+            var panelId = panelPrefix + tab.getAttribute('data-tab');
+            var target = getById(panelId);
+            if (target) {
+                var parentPanel = container.closest('.panel') || document;
+                var panels = parentPanel.querySelectorAll('[id^="' + panelPrefix + '"]');
+                for (var j = 0; j < panels.length; j++) panels[j].classList.remove('active');
+                target.classList.add('active');
+            }
+        });
+    }
+    function setupSubTabs(containerId, prefix) {
+        var container = getById(containerId);
+        if (!container) return;
+        container.addEventListener('click', function(e) {
+            var tab = e.target.closest('[data-sub]');
+            if (!tab) return;
+            var tabs = container.querySelectorAll('[data-sub]');
+            for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+            tab.classList.add('active');
+            var panelId = 'sub-' + prefix + '-' + tab.getAttribute('data-sub');
+            var scope = container.closest('.panel');
+            if (scope) {
+                var subPanels = scope.querySelectorAll('[id^="sub-' + prefix + '-"]');
+                for (var j = 0; j < subPanels.length; j++) subPanels[j].classList.remove('active');
+            }
+            var target = getById(panelId);
+            if (target) target.classList.add('active');
+            // 哈希切换时重新计算
+            if (prefix === 'hash') computeHash();
+        });
+    }
+
+    setupTabs('tabsPrimary', 'panel-');
+    setupSubTabs('tabsEncodeSub', 'encode');
+    setupSubTabs('tabsHashSub', 'hash');
+    setupSubTabs('tabsCipherSub', 'cipher');
+    setupSubTabs('tabsGenSub', 'gen');
+    setupSubTabs('tabsConvertSub', 'convert');
+    setupSubTabs('tabsExtrasSub', 'extras');
+
+    // ============ 复制按钮事件委托 ============
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.copy-btn');
+        if (!btn) return;
+        var targetId = btn.getAttribute('data-target');
+        var text = '';
+        if (targetId && targetId.endsWith('Text')) {
+            var el = getById(targetId.replace('Text', ''));
+            if (el) text = el.value || el.textContent || '';
+        } else if (targetId) {
+            var el = getById(targetId);
+            if (el) text = el.value || el.textContent || '';
+        }
+        copyText(text, btn);
+    });
+
+    // ============ 编解码功能 ============
+    getById('b64Enc').onclick = function() {
+        var v = getById('b64Input').value;
+        getById('b64Output').value = v ? safeBtoa(v) : '';
+    };
+    getById('b64Dec').onclick = function() {
+        var v = getById('b64Input').value.trim();
+        var decoded = safeAtob(v);
+        if (decoded) getById('b64Output').value = decoded;
+        else { getById('b64Output').value = ''; alert('无效的Base64字符串'); }
+    };
+    getById('b64urlEnc').onclick = function() {
+        var value = getById('b64urlInput').value;
+        try { getById('b64urlOutput').value = value ? safeBtoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '') : ''; }
+        catch(e) { getById('b64urlOutput').value = ''; alert('Base64URL 编码失败：' + e.message); }
+    };
+    getById('b64urlDec').onclick = function() {
+        var raw = getById('b64urlInput').value.trim();
+        try {
+            if (!raw || !/^[A-Za-z0-9_-]+={0,2}$/.test(raw) || /=/.test(raw.slice(0, -2))) throw new Error('格式无效');
+            var normalized = raw.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/g, '');
+            if (normalized.length % 4 === 1) throw new Error('长度无效');
+            normalized += '='.repeat((4 - normalized.length % 4) % 4);
+            var decoded = safeAtob(normalized);
+            if (decoded === '' && normalized !== '') throw new Error('无法解码');
+            getById('b64urlOutput').value = decoded;
+        } catch(e) { getById('b64urlOutput').value = ''; alert('Base64URL 解码失败：' + e.message); }
+    };
+
+    getById('urlEnc').onclick = function() {
+        getById('urlOutput').value = encodeURIComponent(getById('urlInput').value);
+    };
+    getById('urlDec').onclick = function() {
+        try {
+            getById('urlOutput').value = decodeURIComponent(getById('urlInput').value.trim());
+        } catch(e) { getById('urlOutput').value = ''; alert('无效的URL编码'); }
+    };
+    getById('htmlEntityEnc').onclick = function() {
+        var v = getById('htmlEntityInput').value;
+        var entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        var encoded = v.replace(/[&<>"']/g, function(c){ return entities[c]; });
+        encoded = Array.from(encoded).map(function(c){ var cp = c.codePointAt(0); return cp > 0x7F ? '&#' + cp + ';' : c; }).join('');
+        getById('htmlEntityOutput').value = encoded;
+    };
+    getById('htmlEntityDec').onclick = function() {
+        getById('htmlEntityOutput').value = decodeHtmlEntities(getById('htmlEntityInput').value);
+    };
+    getById('uniEnc').onclick = function() {
+        var input = getById('uniInput').value;
+        var result = '';
+        for (var i = 0; i < input.length; i++) {
+            var ch = input.charAt(i);
+            var cp = input.codePointAt(i);
+            if (cp > 0xFFFF) { result += '\\u{' + cp.toString(16) + '}'; i++; }
+            else if (cp > 0x7F) result += '\\u' + cp.toString(16).padStart(4, '0');
+            else result += ch;
+        }
+        getById('uniOutput').value = result;
+    };
+    getById('uniDec').onclick = function() {
+        var input = getById('uniInput').value;
+        try {
+            var decoded = input.replace(/\\u\{([0-9a-fA-F]+)\}/g, function(_, h){ return String.fromCodePoint(parseInt(h,16)); });
+            decoded = decoded.replace(/\\u([0-9a-fA-F]{4})/g, function(_, h){ return String.fromCharCode(parseInt(h,16)); });
+            getById('uniOutput').value = decoded;
+        } catch(e) { getById('uniOutput').value = ''; alert('解析失败'); }
+    };
+    getById('hexEnc').onclick = function() {
+        getById('hexOutput').value = hexEncode(getById('hexInput').value);
+    };
+    getById('hexDec').onclick = function() {
+        var h = getById('hexInput').value.replace(/\s+/g, '');
+        if (!/^[0-9a-fA-F]+$/.test(h) || h.length % 2 !== 0) { getById('hexOutput').value = ''; alert('无效的十六进制字符串'); return; }
+        var decoded = hexDecode(h);
+        if (decoded) getById('hexOutput').value = decoded;
+        else alert('Hex解码失败');
+    };
+
+    // ============ 哈希功能 ============
+    var hashFunctions = {
+        md5: function(v) { return CryptoJS.MD5(v).toString(); },
+        sha1: function(v) { return CryptoJS.SHA1(v).toString(); },
+        sha256: function(v) { return CryptoJS.SHA256(v).toString(); },
+        sha512: function(v) { return CryptoJS.SHA512(v).toString(); },
+        sha224: function(v) { return CryptoJS.SHA224 ? CryptoJS.SHA224(v).toString() : 'SHA-224不支持'; },
+        sha384: function(v) { return CryptoJS.SHA384 ? CryptoJS.SHA384(v).toString() : 'SHA-384不支持'; },
+        sha3: function(v) { return CryptoJS.SHA3 ? CryptoJS.SHA3(v, {outputLength:256}).toString() : 'Keccak-256 不支持'; },
+        sha3512: function(v) { return CryptoJS.SHA3 ? CryptoJS.SHA3(v, {outputLength:512}).toString() : 'Keccak-512 不支持'; },
+        ripemd160: function(v) { return CryptoJS.RIPEMD160 ? CryptoJS.RIPEMD160(v).toString() : 'RIPEMD-160不支持'; }
+    };
+    var algoNames = { md5:'MD5', sha1:'SHA-1', sha256:'SHA-256', sha512:'SHA-512', sha224:'SHA-224', sha384:'SHA-384', sha3:'Keccak-256 (非标准SHA-3)', sha3512:'Keccak-512 (非标准SHA-3)', ripemd160:'RIPEMD-160' };
+
+    function computeHash() {
+        var v = getById('hashInput').value;
+        if (getById('hashVerifyFeedback')) { getById('hashVerifyFeedback').textContent = ''; getById('hashVerifyFeedback').style.color = ''; }
+        if (typeof CryptoJS === 'undefined') {
+            getById('hashResult').textContent = '无法加载 CryptoJS';
+            getById('hashNote').textContent = '请检查网络、CDN 可用性或自行托管依赖';
+            return;
+        }
+        var active = document.querySelector('#tabsHashSub .tab-secondary.active');
+        var algo = active ? active.getAttribute('data-sub') : 'md5';
+        getById('hashAlgoLabel').textContent = algoNames[algo] || algo;
+        if (!v) {
+            getById('hashResult').textContent = '—';
+            getById('hashNote').textContent = '';
+            return;
+        }
+        var fn = hashFunctions[algo];
+        var result = fn ? fn(v) : '算法不可用';
+        var format = getById('hashOutputFormat') ? getById('hashOutputFormat').value : 'hex';
+        if (typeof result === 'string' && /^[0-9a-f]+$/i.test(result) && typeof CryptoJS !== 'undefined' && CryptoJS.enc) {
+            if (format === 'HEX') result = result.toUpperCase();
+            else if (format === 'base64') result = CryptoJS.enc.Hex.parse(result).toString(CryptoJS.enc.Base64);
+        }
+        getById('hashResult').textContent = result;
+        getById('hashNote').textContent = result === '—' ? '' : result.length + ' 字符';
+        if (getById('hashVerifyFeedback')) getById('hashVerifyFeedback').textContent = '';
+    }
+    getById('hashInput').addEventListener('input', computeHash);
+    getById('hashOutputFormat').addEventListener('change', computeHash);
+    getById('hashExpected').addEventListener('input', function(){ getById('hashVerifyFeedback').textContent = ''; });
+    getById('hashVerify').onclick = function() {
+        var expected = getById('hashExpected').value.trim();
+        var actual = getById('hashResult').textContent.trim();
+        var feedback = getById('hashVerifyFeedback');
+        if (!expected) { feedback.textContent = '请先填写预期摘要'; return; }
+        if (!actual || actual === '—' || actual.indexOf('不支持') >= 0 || actual.indexOf('无法加载') >= 0) { feedback.textContent = '请先输入文本并计算摘要'; return; }
+        var same = expected.toLowerCase() === actual.toLowerCase();
+        feedback.textContent = same ? '✓ 摘要匹配' : '✗ 摘要不匹配';
+        feedback.style.color = same ? '#237a38' : '#b42318';
+    };
+
+    // ============ AES (Web Crypto API) ============
+    // 新格式：DTP1 | mode(1=GCM) | keyBytes(16/24/32) | PBKDF2迭代次数(uint32 BE) | salt(16) | IV(12) | ciphertext+tag
+    var AES_MAGIC = [0x44, 0x54, 0x50, 0x31]; // "DTP1"
+    var AES_PBKDF2_ITERATIONS = 600000;
+
+    function getSecureRandomValues(buf) {
+        if (!window.crypto || typeof window.crypto.getRandomValues !== 'function') {
+            throw new Error('当前环境没有可用的安全随机数生成器；请使用现代浏览器，已拒绝降级到 Math.random()');
+        }
+        window.crypto.getRandomValues(buf);
+        return buf;
+    }
+    function concatBytes(parts) {
+        var total = 0;
+        for (var i = 0; i < parts.length; i++) total += parts[i].length;
+        var out = new Uint8Array(total), offset = 0;
+        for (var j = 0; j < parts.length; j++) { out.set(parts[j], offset); offset += parts[j].length; }
+        return out;
+    }
+    function hasAesMagic(data) {
+        return data.length >= AES_MAGIC.length && AES_MAGIC.every(function(v, i) { return data[i] === v; });
+    }
+    async function deriveAesKey(password, salt, iterations, keyLen, usages) {
+        if (!window.crypto || !window.crypto.subtle) throw new Error('当前环境不支持 Web Crypto API，请使用 HTTPS 或 localhost');
+        var pwKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+        return crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt: salt, iterations: iterations, hash: 'SHA-256' },
+            pwKey,
+            { name: 'AES-GCM', length: keyLen },
+            false,
+            usages
+        );
+    }
+    async function aesGcmEncrypt(plaintext, password, keyLen) {
+        if (!window.crypto || !window.crypto.subtle) throw new Error('当前环境不支持 Web Crypto API，请使用 HTTPS 或 localhost');
+        var salt = getSecureRandomValues(new Uint8Array(16));
+        var iv = getSecureRandomValues(new Uint8Array(12));
+        var header = new Uint8Array(10);
+        header.set(AES_MAGIC, 0);
+        header[4] = 1; // AES-GCM
+        header[5] = keyLen / 8; // key length in bytes
+        header[6] = (AES_PBKDF2_ITERATIONS >>> 24) & 255;
+        header[7] = (AES_PBKDF2_ITERATIONS >>> 16) & 255;
+        header[8] = (AES_PBKDF2_ITERATIONS >>> 8) & 255;
+        header[9] = AES_PBKDF2_ITERATIONS & 255;
+        var key = await deriveAesKey(password, salt, AES_PBKDF2_ITERATIONS, keyLen, ['encrypt']);
+        var encrypted = new Uint8Array(await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: iv, tagLength: 128, additionalData: header }, key, new TextEncoder().encode(plaintext)
+        ));
+        return bytesToBase64(concatBytes([header, salt, iv, encrypted]));
+    }
+    async function aesGcmDecrypt(cipherB64, password, keyLen) {
+        if (!window.crypto || !window.crypto.subtle) throw new Error('当前环境不支持 Web Crypto API');
+        var data = base64ToBytes(cipherB64);
+        var salt, iv, ct, actualKeyLen, iterations;
+        if (hasAesMagic(data)) {
+            if (data.length < 54) throw new Error('密文长度不足，格式无效');
+            if (data[4] !== 1) throw new Error('不支持的 AES 密文模式版本');
+            actualKeyLen = data[5] * 8;
+            if ([128, 192, 256].indexOf(actualKeyLen) === -1) throw new Error('密文中的密钥长度字段无效');
+            iterations = data[6] * 0x1000000 + data[7] * 0x10000 + data[8] * 0x100 + data[9];
+            // Do not allow untrusted ciphertext to request an arbitrarily expensive KDF.
+            if (iterations !== AES_PBKDF2_ITERATIONS) throw new Error('不支持的 KDF 参数；迭代次数与当前版本不符');
+            salt = data.slice(10, 26);
+            iv = data.slice(26, 38);
+            ct = data.slice(38);
+        } else {
+            // 兼容旧版格式：salt(16) + IV(12) + ciphertext/tag；旧版 PBKDF2 仅 100,000 次。
+            if (data.length < 44) throw new Error('密文长度不足，可能不是有效的旧版 GCM 密文');
+            actualKeyLen = keyLen;
+            iterations = 100000;
+            salt = data.slice(0, 16);
+            iv = data.slice(16, 28);
+            ct = data.slice(28);
+        }
+        var key = await deriveAesKey(password, salt, iterations, actualKeyLen, ['decrypt']);
+        var decryptParams = { name: 'AES-GCM', iv: iv, tagLength: 128 };
+        if (hasAesMagic(data)) decryptParams.additionalData = data.slice(0, 10);
+        var decrypted = await crypto.subtle.decrypt(decryptParams, key, ct);
+        return new TextDecoder('utf-8', { fatal: true }).decode(decrypted);
+    }
+    async function aesCbcDecrypt(cipherB64, password, keyLen) {
+        if (!window.crypto || !window.crypto.subtle) throw new Error('当前环境不支持 Web Crypto API');
+        var data = base64ToBytes(cipherB64);
+        if (data.length < 48 || ((data.length - 32) % 16) !== 0) throw new Error('旧版 CBC 密文长度无效');
+        var salt = data.slice(0, 16), iv = data.slice(16, 32), ct = data.slice(32);
+        var pwKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+        var derived = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: salt, iterations: 100000, hash: 'SHA-256' }, pwKey, keyLen);
+        var aesKey = await crypto.subtle.importKey('raw', derived, { name: 'AES-CBC' }, false, ['decrypt']);
+        var decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv }, aesKey, ct);
+        return new TextDecoder('utf-8', { fatal: true }).decode(decrypted);
+    }
+    async function aesCtrDecrypt(cipherB64, password, keyLen) {
+        if (!window.crypto || !window.crypto.subtle) throw new Error('当前环境不支持 Web Crypto API');
+        var data = base64ToBytes(cipherB64);
+        if (data.length < 16) throw new Error('旧版 CTR 密文长度不足');
+        var iv = data.slice(0, 16), ct = data.slice(16);
+        var pwKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+        // 旧版 CTR 使用固定全零 salt，因此保留该派生方式仅用于兼容旧密文。
+        var derived = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: new Uint8Array(16), iterations: 100000, hash: 'SHA-256' }, pwKey, keyLen);
+        var aesKey = await crypto.subtle.importKey('raw', derived, { name: 'AES-CTR', length: 64 }, false, ['decrypt']);
+        var decrypted = await crypto.subtle.decrypt({ name: 'AES-CTR', counter: iv, length: 64 }, aesKey, ct);
+        return new TextDecoder('utf-8', { fatal: true }).decode(decrypted);
+    }
+    async function handleAes(encrypt) {
+        var input = getById('aesInput').value;
+        var pwd = getById('aesPassword').value;
+        var mode = getById('aesMode').value;
+        var keyLen = parseInt(getById('aesKeyLen').value, 10);
+        var outputEl = getById('aesOutput');
+        if (!pwd || input === '') {
+            outputEl.value = '';
+            outputEl.placeholder = '请填写明文/密文和密码';
+            return;
+        }
+        try {
+            var result;
+            if (encrypt) {
+                if (mode !== 'GCM') throw new Error('为避免生成无认证密文，新加密仅支持 AES-GCM。');
+                result = await aesGcmEncrypt(input, pwd, keyLen);
+            } else {
+                var maybeBytes = base64ToBytes(input);
+                if (hasAesMagic(maybeBytes) || mode === 'GCM') result = await aesGcmDecrypt(input, pwd, keyLen);
+                else if (mode === 'CBC') result = await aesCbcDecrypt(input, pwd, keyLen);
+                else if (mode === 'CTR') result = await aesCtrDecrypt(input, pwd, keyLen);
+                else throw new Error('不支持的算法模式');
+            }
+            outputEl.value = result;
+            outputEl.placeholder = '结果将显示在此处...';
+        } catch(e) {
+            outputEl.value = '';
+            outputEl.placeholder = '操作失败: ' + (e && e.message ? e.message : '未知错误');
+        }
+    }
+    getById('aesEnc').onclick = function() { handleAes(true); };
+    getById('aesDec').onclick = function() { handleAes(false); };
+
+    // ============ RSA ============
+    async function pemToArrayBuffer(pem) {
+        var b64 = pem.replace(/-----[^-]+-----/g,'').replace(/\s/g,'');
+        var binary = atob(b64);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes.buffer;
+    }
+    async function arrayBufferToPem(buffer, type) {
+        var bytes = new Uint8Array(buffer);
+        var binary = String.fromCharCode.apply(null, bytes);
+        var b64 = btoa(binary);
+        var lines = b64.match(/.{1,64}/g).join('\n');
+        return '-----BEGIN ' + type + '-----\n' + lines + '\n-----END ' + type + '-----';
+    }
+    getById('rsaGenKey').onclick = async function() {
+        if (!window.crypto || !window.crypto.subtle) { alert('当前环境不支持Web Crypto API'); return; }
+        try {
+            var keyPair = await crypto.subtle.generateKey(
+                { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([0x01,0x00,0x01]), hash: 'SHA-256' },
+                true, ['encrypt','decrypt']
+            );
+            var pubBuffer = await crypto.subtle.exportKey('spki', keyPair.publicKey);
+            var privBuffer = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+            getById('rsaPublicKey').value = await arrayBufferToPem(pubBuffer, 'PUBLIC KEY');
+            getById('rsaPrivateKey').value = await arrayBufferToPem(privBuffer, 'PRIVATE KEY');
+        } catch(e) { alert('生成密钥失败: ' + e.message); }
+    };
+    getById('rsaEnc').onclick = async function() {
+        if (!window.crypto || !window.crypto.subtle) { alert('当前环境不支持Web Crypto API'); return; }
+        var pem = getById('rsaPublicKey').value.trim();
+        var plain = getById('rsaInput').value;
+        if (!pem) { getById('rsaOutput').value = ''; getById('rsaOutput').placeholder = '请填写 RSA 公钥'; return; }
+        try {
+            var key = await crypto.subtle.importKey('spki', await pemToArrayBuffer(pem), {name:'RSA-OAEP', hash:'SHA-256'}, false, ['encrypt']);
+            var enc = await crypto.subtle.encrypt({name:'RSA-OAEP'}, key, new TextEncoder().encode(plain));
+            getById('rsaOutput').value = btoa(String.fromCharCode.apply(null, new Uint8Array(enc)));
+        } catch(e) { getById('rsaOutput').value = ''; alert('加密失败: ' + e.message); }
+    };
+    getById('rsaDec').onclick = async function() {
+        if (!window.crypto || !window.crypto.subtle) { alert('当前环境不支持Web Crypto API'); return; }
+        var pem = getById('rsaPrivateKey').value.trim();
+        var cipherB64 = getById('rsaInput').value.trim();
+        if (!pem || !cipherB64) { getById('rsaOutput').value = ''; getById('rsaOutput').placeholder = '请填写 RSA 私钥和 Base64 密文'; return; }
+        try {
+            var key = await crypto.subtle.importKey('pkcs8', await pemToArrayBuffer(pem), {name:'RSA-OAEP', hash:'SHA-256'}, false, ['decrypt']);
+            var data = new Uint8Array(atob(cipherB64).split('').map(function(c){return c.charCodeAt(0);}));
+            var dec = await crypto.subtle.decrypt({name:'RSA-OAEP'}, key, data);
+            getById('rsaOutput').value = new TextDecoder().decode(dec);
+        } catch(e) { getById('rsaOutput').value = ''; alert('解密失败: ' + e.message); }
+    };
+
+    // ============ RSA 混合加密：RSA-OAEP 包装 AES-256 密钥，正文使用 AES-GCM ============
+    var HYBRID_FORMAT = 'DTP-RSA-HYBRID-1';
+    var HYBRID_AAD = new TextEncoder().encode(HYBRID_FORMAT);
+    getById('hybridEncrypt').onclick = async function() {
+        var out=getById('hybridOutput'); out.value='';
+        try {
+            if(!window.crypto||!crypto.subtle) throw new Error('需要 HTTPS 或 localhost 环境');
+            var pem=getById('rsaPublicKey').value.trim(); if(!pem)throw new Error('请先在 RSA 标签生成或粘贴公钥');
+            var publicKey=await crypto.subtle.importKey('spki',await pemToArrayBuffer(pem),{name:'RSA-OAEP',hash:'SHA-256'},false,['encrypt']);
+            var rawKey=getSecureRandomValues(new Uint8Array(32)); var iv=getSecureRandomValues(new Uint8Array(12));
+            var aesKey=await crypto.subtle.importKey('raw',rawKey,{name:'AES-GCM'},false,['encrypt']);
+            var wrapped=await crypto.subtle.encrypt({name:'RSA-OAEP'},publicKey,rawKey);
+            var plaintext=new TextEncoder().encode(getById('hybridInput').value);
+            var ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv,additionalData:HYBRID_AAD,tagLength:128},aesKey,plaintext);
+            out.value=JSON.stringify({format:HYBRID_FORMAT,wrappedKey:bytesToBase64(new Uint8Array(wrapped)),iv:bytesToBase64(iv),ciphertext:bytesToBase64(new Uint8Array(ciphertext))},null,2);
+        }catch(e){out.value='';alert('混合加密失败：'+e.message);}
+    };
+    getById('hybridDecrypt').onclick = async function() {
+        var out=getById('hybridOutput'); out.value='';
+        try {
+            if(!window.crypto||!crypto.subtle) throw new Error('需要 HTTPS 或 localhost 环境');
+            var pem=getById('rsaPrivateKey').value.trim(); if(!pem)throw new Error('请先在 RSA 标签粘贴私钥');
+            var obj=JSON.parse(getById('hybridInput').value);
+            if(!obj||obj.format!==HYBRID_FORMAT||!obj.wrappedKey||!obj.iv||!obj.ciphertext)throw new Error('混合密文格式不正确');
+            var privateKey=await crypto.subtle.importKey('pkcs8',await pemToArrayBuffer(pem),{name:'RSA-OAEP',hash:'SHA-256'},false,['decrypt']);
+            var rawKey=await crypto.subtle.decrypt({name:'RSA-OAEP'},privateKey,base64ToBytes(obj.wrappedKey));
+            if(rawKey.byteLength!==32)throw new Error('解出的 AES 密钥长度不正确');
+            var aesKey=await crypto.subtle.importKey('raw',rawKey,{name:'AES-GCM'},false,['decrypt']);
+            var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:base64ToBytes(obj.iv),additionalData:HYBRID_AAD,tagLength:128},aesKey,base64ToBytes(obj.ciphertext));
+            out.value=new TextDecoder('utf-8',{fatal:true}).decode(plain);
+        }catch(e){out.value='';alert('混合解密失败：密码学认证、密钥或密文格式检查未通过。'+(e.message?'\n'+e.message:''));}
+    };
+
+    // ============ 文件 AES-GCM：单文件加密，带格式头和认证数据 ============
+    var FILE_MAGIC=[68,84,80,70,49]; // DTPF1
+    var FILE_PBKDF2_ITERATIONS=600000;
+    async function deriveFileKey(password,salt,usages){
+        var material=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']);
+        return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:FILE_PBKDF2_ITERATIONS,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,usages);
+    }
+    function setFileCipherStatus(msg){getById('fileCipherStatus').textContent=msg;}
+    function downloadBytes(bytes,filename,type){var blob=new Blob([bytes],{type:type||'application/octet-stream'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=filename;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1500);}
+    getById('fileCipherEncrypt').onclick=async function(){
+        var file=getById('fileCipherInput').files[0],password=getById('fileCipherPassword').value;
+        try{
+            if(!file)throw new Error('请先选择文件');if(!password)throw new Error('请输入加密密码');if(file.size>50*1024*1024)throw new Error('单文件上限为 50 MiB');if(!crypto.subtle)throw new Error('需要 HTTPS 或 localhost 环境');
+            setFileCipherStatus('正在加密 '+file.name+' …');var input=new Uint8Array(await file.arrayBuffer());var salt=getSecureRandomValues(new Uint8Array(16));var iv=getSecureRandomValues(new Uint8Array(12));var header=new Uint8Array(9);header.set(FILE_MAGIC,0);header[5]=(FILE_PBKDF2_ITERATIONS>>>24)&255;header[6]=(FILE_PBKDF2_ITERATIONS>>>16)&255;header[7]=(FILE_PBKDF2_ITERATIONS>>>8)&255;header[8]=FILE_PBKDF2_ITERATIONS&255;
+            var key=await deriveFileKey(password,salt,['encrypt']);var ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:iv,additionalData:header,tagLength:128},key,input));var packed=concatBytes([header,salt,iv,ct]);
+            downloadBytes(packed,file.name+'.dtpf');setFileCipherStatus('加密完成：已下载 '+file.name+'.dtpf。请保留原文件和密码。');
+        }catch(e){setFileCipherStatus('加密失败：'+e.message);}
+    };
+    getById('fileCipherDecrypt').onclick=async function(){
+        var file=getById('fileCipherInput').files[0],password=getById('fileCipherPassword').value;
+        try{
+            if(!file)throw new Error('请选择 .dtpf 密文文件');if(!password)throw new Error('请输入解密密码');if(file.size>50*1024*1024+128)throw new Error('单文件上限为 50 MiB（另加少量格式头）');if(!crypto.subtle)throw new Error('需要 HTTPS 或 localhost 环境');
+            setFileCipherStatus('正在验证并解密 '+file.name+' …');var packed=new Uint8Array(await file.arrayBuffer());if(packed.length<9+16+12+16)throw new Error('文件太短，不是有效的 DTPF 文件');
+            for(var i=0;i<FILE_MAGIC.length;i++)if(packed[i]!==FILE_MAGIC[i])throw new Error('文件格式标识不匹配');var iterations=packed[5]*0x1000000+packed[6]*0x10000+packed[7]*0x100+packed[8];if(iterations!==FILE_PBKDF2_ITERATIONS)throw new Error('不支持的 KDF 参数');
+            var header=packed.slice(0,9),salt=packed.slice(9,25),iv=packed.slice(25,37),ct=packed.slice(37);var key=await deriveFileKey(password,salt,['decrypt']);var plain=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:iv,additionalData:header,tagLength:128},key,ct));
+            var filename=file.name.toLowerCase().endsWith('.dtpf')?file.name.slice(0,-5):file.name+'.decrypted';downloadBytes(plain,filename);setFileCipherStatus('解密成功：已下载 '+filename+'。');
+        }catch(e){setFileCipherStatus('解密失败：密码错误、文件损坏或格式不兼容。'+(e.message?' '+e.message:''));}
+    };
+
+    // ============ 生成器 ============
+    function uuidv4() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+        var bytes = getSecureRandomValues(new Uint8Array(16));
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        var h = Array.from(bytes, function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+        return h.slice(0,8) + '-' + h.slice(8,12) + '-' + h.slice(12,16) + '-' + h.slice(16,20) + '-' + h.slice(20);
+    }
+    getById('uuidGen').onclick = function() {
+        try { getById('uuidResult').textContent = uuidv4(); getById('uuidBatchList').textContent = ''; }
+        catch(e) { getById('uuidResult').textContent = '生成失败：' + e.message; }
+    };
+    getById('uuidBatch').onclick = function() {
+        try {
+            var list = [];
+            for (var i = 0; i < 10; i++) list.push(uuidv4());
+            getById('uuidBatchList').textContent = list.join('\n');
+        } catch(e) { getById('uuidBatchList').textContent = '生成失败：' + e.message; }
+    };
+
+    // 密码生成：使用安全随机源 + 拒绝采样，避免取模偏差。
+    function secureRandomInt(maxExclusive) {
+        if (!Number.isInteger(maxExclusive) || maxExclusive < 1 || maxExclusive > 0x100000000) throw new Error('随机范围无效');
+        var range = 0x100000000;
+        var limit = range - (range % maxExclusive);
+        var n;
+        do { n = getSecureRandomValues(new Uint32Array(1))[0]; } while (n >= limit);
+        return n % maxExclusive;
+    }
+    function secureShuffle(items) {
+        for (var i = items.length - 1; i > 0; i--) {
+            var j = secureRandomInt(i + 1), t = items[i];
+            items[i] = items[j]; items[j] = t;
+        }
+        return items;
+    }
+    getById('pwdLength').oninput = function() { getById('pwdLengthVal').textContent = getById('pwdLength').value; };
+    getById('pwdGen').onclick = function() {
+        var result = getById('pwdResult');
+        try {
+            var len = parseInt(getById('pwdLength').value, 10);
+            var pools = [];
+            var exclude = getById('pwdExclude').checked;
+            if (getById('pwdUpper').checked) pools.push(exclude ? 'ABCDEFGHJKLMNPQRSTUVWXYZ' : 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+            if (getById('pwdLower').checked) pools.push(exclude ? 'abcdefghjkmnpqrstuvwxyz' : 'abcdefghijklmnopqrstuvwxyz');
+            if (getById('pwdDigits').checked) pools.push(exclude ? '23456789' : '0123456789');
+            if (getById('pwdSymbols').checked) pools.push('!@#$%^&*()_+-=[]{}|;:,.<>?');
+            if (!pools.length) throw new Error('请至少选择一种字符类型');
+            if (len < pools.length) throw new Error('密码长度不足以覆盖所有选中的字符类型');
+            var charset = pools.join('');
+            var chars = pools.map(function(pool) { return pool[secureRandomInt(pool.length)]; });
+            while (chars.length < len) chars.push(charset[secureRandomInt(charset.length)]);
+            var pwd = secureShuffle(chars).join('');
+            result.textContent = pwd;
+            var bits = len * Math.log2(charset.length);
+            var info = bits < 40 ? {label:'弱',color:'#c0392b',w:'20%'} : bits < 60 ? {label:'一般',color:'#e67e22',w:'40%'} : bits < 80 ? {label:'较强',color:'#f1c40f',w:'60%'} : bits < 100 ? {label:'强',color:'#27ae60',w:'80%'} : {label:'很强',color:'#1e8449',w:'100%'};
+            getById('pwdStrengthBar').style.width = info.w;
+            getById('pwdStrengthBar').style.background = info.color;
+            getById('pwdStrengthLabel').textContent = '估算空间熵：' + bits.toFixed(1) + ' bit（' + info.label + '；仅为理论估计）';
+        } catch(e) {
+            result.textContent = '生成失败：' + e.message;
+            getById('pwdStrengthBar').style.width = '0%';
+            getById('pwdStrengthLabel').textContent = '';
+        }
+    };
+
+    // 随机字符串
+    getById('randStrLen').oninput = function() { getById('randStrLenVal').textContent = getById('randStrLen').value; };
+    getById('randHexOnly').onchange = function() {
+        if (this.checked) { getById('randAlpha').checked = false; getById('randDigits').checked = false; getById('randCustom').checked = false; }
+    };
+    getById('randCustom').onchange = function() {
+        getById('randCustomSet').style.display = this.checked ? '' : 'none';
+        if (this.checked) getById('randHexOnly').checked = false;
+    };
+    getById('randAlpha').onchange = getById('randDigits').onchange = function() {
+        if (this.checked) { getById('randHexOnly').checked = false; getById('randCustom').checked = false; getById('randCustomSet').style.display = 'none'; }
+    };
+    getById('randStrGen').onclick = function() {
+        var resultEl = getById('randStrResult');
+        try {
+            var len = parseInt(getById('randStrLen').value, 10);
+            var charset = '';
+            if (getById('randCustom').checked) {
+                var customChars = Array.from(new Set(Array.from(getById('randCustomSet').value)));
+                if (!customChars.length) throw new Error('请填写自定义字符集');
+                charset = customChars.join('');
+            } else if (getById('randHexOnly').checked) {
+                charset = '0123456789abcdef';
+            } else {
+                if (getById('randAlpha').checked) charset += 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+                if (getById('randDigits').checked) charset += '0123456789';
+                if (!charset) throw new Error('请至少选择一种字符类型');
+            }
+            var charList = Array.from(charset);
+            var chars = [];
+            for (var i = 0; i < len; i++) chars.push(charList[secureRandomInt(charList.length)]);
+            resultEl.textContent = chars.join('');
+        } catch(e) { resultEl.textContent = '生成失败：' + e.message; }
+    };
+
+    // ============ 安全令牌 / 任意范围随机整数 ============
+    getById('tokenGenerate').onclick=function(){try{var n=parseInt(getById('tokenBytes').value,10);var bytes=getSecureRandomValues(new Uint8Array(n));var format=getById('tokenFormat').value;var value=format==='hex'?Array.from(bytes,function(b){return b.toString(16).padStart(2,'0');}).join(''):bytesToBase64(bytes).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');getById('tokenResult').textContent=value;}catch(e){getById('tokenResult').textContent='生成失败：'+e.message;}};
+    function secureRandomBigIntBelow(maxExclusive){if(typeof maxExclusive!=='bigint'||maxExclusive<=0n)throw new Error('随机范围无效');var bits=maxExclusive.toString(2).length,byteLen=Math.ceil(bits/8),excess=byteLen*8-bits,buf,n;do{buf=getSecureRandomValues(new Uint8Array(byteLen));if(excess)buf[0]&=(0xff>>>excess);n=0n;for(var i=0;i<buf.length;i++)n=(n<<8n)|BigInt(buf[i]);}while(n>=maxExclusive);return n;}
+    getById('randIntGenerate').onclick=function(){try{var minRaw=getById('randIntMin').value,maxRaw=getById('randIntMax').value;if(minRaw===''||maxRaw==='')throw new Error('请填写最小值和最大值');var min=Number(minRaw),max=Number(maxRaw);if(!Number.isSafeInteger(min)||!Number.isSafeInteger(max))throw new Error('请使用安全整数范围（±9007199254740991）');if(max<min)throw new Error('最大值不能小于最小值');var span=BigInt(max)-BigInt(min)+1n;var val=BigInt(min)+secureRandomBigIntBelow(span);getById('randIntResult').textContent=val.toString();}catch(e){getById('randIntResult').textContent='生成失败：'+e.message;}};
+
+    // ============ 转换器 ============
+    setInterval(function() { getById('tsNow').textContent = Date.now(); }, 1000);
+    getById('tsToDate').onclick = function() {
+        var raw = getById('tsInput').value.trim();
+        var out = getById('tsDateResult');
+        if (!/^\d+$/.test(raw)) { out.textContent = '请输入非负整数时间戳'; return; }
+        var ts = Number(raw);
+        if (!Number.isSafeInteger(ts)) { out.textContent = '时间戳超出安全整数范围'; return; }
+        if (ts <= 9999999999) ts *= 1000;
+        var d = new Date(ts);
+        out.textContent = isNaN(d.getTime()) ? '无效时间戳或超出日期范围' : d.toISOString() + '\n本地: ' + d.toString();
+    };
+    getById('dateToTs').onclick = function() {
+        var d = new Date(getById('dateInput').value.trim());
+        if (isNaN(d.getTime())) { getById('dateTsResult').textContent = '无效日期'; return; }
+        getById('dateTsResult').textContent = '毫秒: ' + d.getTime() + '\n秒: ' + Math.floor(d.getTime() / 1000);
+    };
+    getById('jsonFormat').onclick = function() {
+        try {
+            var obj = JSON.parse(getById('jsonInput').value);
+            getById('jsonOutput').value = JSON.stringify(obj, null, 2);
+            getById('jsonFeedback').textContent = '✓ 有效';
+        } catch(e) { getById('jsonOutput').value = ''; getById('jsonFeedback').textContent = '✗ ' + e.message; }
+    };
+    getById('jsonCompact').onclick = function() {
+        try {
+            var obj = JSON.parse(getById('jsonInput').value);
+            getById('jsonOutput').value = JSON.stringify(obj);
+            getById('jsonFeedback').textContent = '✓ 已压缩';
+        } catch(e) { getById('jsonOutput').value = ''; getById('jsonFeedback').textContent = '✗ ' + e.message; }
+    };
+    getById('jsonValidate').onclick = function() {
+        try {
+            JSON.parse(getById('jsonInput').value);
+            getById('jsonFeedback').textContent = '✓ 有效JSON';
+        } catch(e) { getById('jsonFeedback').textContent = '✗ ' + e.message; }
+    };
+
+    var caseButtons = document.querySelectorAll('.case-btn');
+    function toTitleCase(s) { return s.replace(/\b\w/g, function(c){ return c.toUpperCase(); }); }
+    function toSentenceCase(s) { return s.replace(/(^\s*\w|[.!?]\s+\w)/g, function(c){ return c.toUpperCase(); }); }
+    function toCamelCase(s) { return s.replace(/[\s_\-]+(.)/g, function(_,c){ return c.toUpperCase(); }).replace(/^[A-Z]/, function(c){ return c.toLowerCase(); }); }
+    function toSnakeCase(s) { return s.replace(/[\s\-]+/g, '_').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase(); }
+    function toKebabCase(s) { return s.replace(/[\s_]+/g, '-').replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase(); }
+    for (var i = 0; i < caseButtons.length; i++) {
+        caseButtons[i].onclick = function() {
+            var v = getById('caseInput').value;
+            var action = this.getAttribute('data-action');
+            var map = {
+                upper: v.toUpperCase(),
+                lower: v.toLowerCase(),
+                title: toTitleCase(v),
+                sentence: toSentenceCase(v),
+                camel: toCamelCase(v),
+                snake: toSnakeCase(v),
+                kebab: toKebabCase(v)
+            };
+            getById('caseOutput').value = map[action] || v;
+        };
+    }
+
+    getById('numConvert').onclick = function() {
+        var input = getById('numInput').value.trim();
+        var from = parseInt(getById('numFromBase').value, 10);
+        var feedback = getById('numFeedback');
+        try {
+            if (!input) throw new Error('请输入数字');
+            if (![2, 8, 10, 16].includes(from)) throw new Error('不支持的进制');
+            var negative = input.charAt(0) === '-';
+            var unsigned = /^[+-]/.test(input) ? input.slice(1) : input;
+            var prefix = {2:/^0b/i, 8:/^0o/i, 16:/^0x/i};
+            if (prefix[from]) unsigned = unsigned.replace(prefix[from], '');
+            var patterns = {2:/^[01]+$/, 8:/^[0-7]+$/, 10:/^\d+$/, 16:/^[0-9a-f]+$/i};
+            if (!patterns[from].test(unsigned)) throw new Error('输入内容与所选进制不匹配');
+            var num = from === 10 ? BigInt(unsigned) : BigInt((from === 16 ? '0x' : from === 8 ? '0o' : '0b') + unsigned);
+            if (negative) num = -num;
+            var sign = num < 0n ? '-' : '';
+            var abs = num < 0n ? -num : num;
+            getById('numDec').textContent = sign + abs.toString(10);
+            getById('numHex').textContent = sign + '0x' + abs.toString(16);
+            getById('numOct').textContent = sign + '0o' + abs.toString(8);
+            getById('numBin').textContent = sign + '0b' + abs.toString(2);
+            feedback.textContent = '';
+        } catch(e) {
+            getById('numDec').textContent = getById('numHex').textContent = getById('numOct').textContent = getById('numBin').textContent = '—';
+            feedback.textContent = '错误: ' + e.message;
+        }
+    };
+
+    // ============ CSV / JSON 转换 ============
+    function parseCsv(text,delimiter){
+        if(delimiter.length!==1)throw new Error('分隔符必须是一个字符');
+        text=text.replace(/^\uFEFF/,'');
+        var rows=[],row=[],field='',quoted=false,afterQuote=false;
+        for(var i=0;i<text.length;i++){
+            var ch=text[i];
+            if(quoted){
+                if(ch==='"'){
+                    if(text[i+1]==='"'){field+='"';i++;}
+                    else{quoted=false;afterQuote=true;}
+                }else field+=ch;
+                continue;
+            }
+            if(afterQuote){
+                if(ch===delimiter){row.push(field);field='';afterQuote=false;continue;}
+                if(ch==='\r'&&text[i+1]==='\n')continue;
+                if(ch==='\n'){row.push(field);rows.push(row);row=[];field='';afterQuote=false;continue;}
+                throw new Error('带引号字段结束后只能跟分隔符或换行');
+            }
+            if(ch==='"'){
+                if(field!=='')throw new Error('引号必须出现在字段开头');
+                quoted=true;
+            }else if(ch===delimiter){row.push(field);field='';}
+            else if(ch==='\n'){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field='';}
+            else field+=ch;
+        }
+        if(quoted)throw new Error('CSV 中存在未闭合的双引号');
+        if(field!==''||row.length||text.endsWith(delimiter)||afterQuote){row.push(field.replace(/\r$/,''));rows.push(row);}
+        if(rows.length&&rows[rows.length-1].length===1&&rows[rows.length-1][0]===''&&/\r?\n$/.test(text))rows.pop();
+        return rows;
+    }
+    function csvField(v,delimiter){var s=v==null?'':typeof v==='object'?JSON.stringify(v):String(v);return (s.indexOf(delimiter)>=0||/["\r\n]/.test(s)||/^\s|\s$/.test(s))?'"'+s.replace(/"/g,'""')+'"':s;}
+    getById('csvToJson').onclick=function(){var out=getById('csvJsonOutput');try{var input=getById('csvJsonInput').value;if(!input.trim())throw new Error('请输入 CSV');var rows=parseCsv(input,getById('csvDelimiter').value);if(!rows.length)throw new Error('没有可转换的数据');var withHeader=getById('csvHasHeader').value==='yes';var headers,body;
+        if(withHeader){headers=rows.shift().map(function(h){return h.trim();});if(new Set(headers).size!==headers.length)throw new Error('CSV 字段名重复，请先处理重复列名');body=rows.map(function(r){var obj={};headers.forEach(function(h,i){obj[h]=r[i]===undefined?'':r[i];});if(r.length>headers.length)obj._extra=r.slice(headers.length);return obj;});}
+        else{var width=Math.max.apply(null,rows.map(function(r){return r.length;}));headers=Array.from({length:width},function(_,i){return 'column'+(i+1);});body=rows.map(function(r){var obj={};headers.forEach(function(h,i){obj[h]=r[i]===undefined?'':r[i];});return obj;});}out.value=JSON.stringify(body,null,2);
+        }catch(e){out.value='';alert('CSV → JSON 失败：'+e.message);}};
+    getById('jsonToCsv').onclick=function(){var out=getById('csvJsonOutput');try{var arr=JSON.parse(getById('csvJsonInput').value);if(!Array.isArray(arr)||!arr.every(function(v){return v&&typeof v==='object'&&!Array.isArray(v);}))throw new Error('请输入由对象组成的 JSON 数组');var delimiter=getById('csvDelimiter').value;var keys=[];arr.forEach(function(obj){Object.keys(obj).forEach(function(k){if(!keys.includes(k))keys.push(k);});});if(!keys.length)throw new Error('对象没有字段');var rows=[keys.map(function(k){return csvField(k,delimiter);}).join(delimiter)];arr.forEach(function(obj){rows.push(keys.map(function(k){return csvField(obj[k],delimiter);}).join(delimiter));});out.value=rows.join('\r\n');}catch(e){out.value='';alert('JSON → CSV 失败：'+e.message);}};
+
+    // ============ 文本批处理 ============
+    function transformTextLines(fn){var text=getById('textToolsInput').value;getById('textToolsOutput').value=fn(text.split(/\r?\n/),text);}
+    getById('textTrimLines').onclick=function(){transformTextLines(function(lines){return lines.map(function(x){return x.trim();}).join('\n');});};
+    getById('textRemoveBlank').onclick=function(){transformTextLines(function(lines){return lines.filter(function(x){return x.trim()!=='';}).join('\n');});};
+    getById('textDedupe').onclick=function(){transformTextLines(function(lines){var seen=new Set();return lines.filter(function(x){if(seen.has(x))return false;seen.add(x);return true;}).join('\n');});};
+    getById('textSort').onclick=function(){transformTextLines(function(lines){return lines.slice().sort(function(a,b){return a.localeCompare(b);}).join('\n');});};
+    getById('textReverse').onclick=function(){transformTextLines(function(lines){return lines.reverse().join('\n');});};
+    getById('textLineNumbers').onclick=function(){transformTextLines(function(lines){var width=String(lines.length).length;return lines.map(function(x,i){return String(i+1).padStart(width,'0')+'  '+x;}).join('\n');});};
+    getById('textToolsClear').onclick=function(){getById('textToolsInput').value='';getById('textToolsOutput').value='';};
+
+    // ============ 智能解码：多种候选 + 有界递归 ============
+    function isPrintable(str) {
+        if (!str) return false;
+        var printable = str.replace(/[\x20-\x7E\u4e00-\u9fff\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF\u3000-\u303F\uFF00-\uFFEF]/g, '');
+        return (printable.length / str.length) < 0.3;
+    }
+    function calculateConfidence(str, method) {
+        if (!str) return {score:0, level:'low'};
+        var score=0;
+        if (/^[\w\s.,!?;:'"()\-_=+@#$%^&*\[\]{}|\\<>/~`\u4e00-\u9fff]+$/.test(str)) score+=3; else if(isPrintable(str)) score+=2;
+        if(str.length>3&&str.trim().length>0)score+=1;
+        if(/^(base64|url|hex)/i.test(method)||method.indexOf('URL')>=0||method.indexOf('Hex')>=0)score+=1;
+        return {score:score,level:score>=4?'high':score>=2?'medium':'low'};
+    }
+    function decodeCandidates(value) {
+        var out=[], seen=new Set([value]);
+        function add(method,content){if(typeof content==='string'&&content!==value&&!seen.has(content)){seen.add(content);out.push({method:method,content:content,conf:calculateConfidence(content,method)});}}
+        // Base64 / Base64URL: accept only alphabet-shaped inputs; reject ambiguous single characters.
+        if(value.length>=4&&/^[A-Za-z0-9+/]+={0,2}$/.test(value)&&value.length%4!==1){try{var b=value.replace(/=+$/,'');b+='='.repeat((4-b.length%4)%4);var d=safeAtob(b);if(d&&d!==value)add('Base64',d);}catch(e){}}
+        if(value.length>=4&&/^[A-Za-z0-9_-]+={0,2}$/.test(value)&&value.length%4!==1){try{var u=value.replace(/-/g,'+').replace(/_/g,'/').replace(/=+$/,'');u+='='.repeat((4-u.length%4)%4);var du=safeAtob(u);if(du&&du!==value)add('Base64URL',du);}catch(e){}}
+        try{var url=decodeURIComponent(value);add('URL 解码',url);}catch(e){}
+        try{var html=decodeHtmlEntities(value);add('HTML 实体',html);}catch(e){}
+        try{var uni=value.replace(/\\u\{([0-9a-fA-F]{1,6})\}/g,function(_,h){var cp=parseInt(h,16);if(cp>0x10ffff||(cp>=0xd800&&cp<=0xdfff))throw new Error('Code point invalid');return String.fromCodePoint(cp);}).replace(/\\u([0-9a-fA-F]{4})/g,function(_,h){return String.fromCharCode(parseInt(h,16));}).replace(/\\x([0-9a-fA-F]{2})/g,function(_,h){return String.fromCharCode(parseInt(h,16));});add('Unicode / \\x 转义',uni);}catch(e){}
+        try{var hex=value.replace(/\s+/g,'');if(hex.length>=2&&hex.length%2===0&&/^[0-9a-fA-F]+$/.test(hex))add('Hex 解码',hexDecode(hex));}catch(e){}
+        // JSON quoted string escapes or pretty-print JSON objects/arrays.
+        try{var parsed=JSON.parse(value);if(typeof parsed==='string')add('JSON 字符串转义',parsed);else if(parsed&&typeof parsed==='object')add('JSON 格式化',JSON.stringify(parsed,null,2));}catch(e){}
+        // JWT: only decode the visible header/payload; this is not signature verification.
+        var parts=value.split('.');if(parts.length===3){try{var hjson=safeAtob(parts[0].replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-parts[0].length%4)%4));var pobj=safeAtob(parts[1].replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-parts[1].length%4)%4));var hj=JSON.parse(hjson),pj=JSON.parse(pobj);add('JWT Header（未验签）',JSON.stringify(hj,null,2));add('JWT Payload（未验签）',JSON.stringify(pj,null,2));}catch(e){}}
+        // Try Latin1 bytes interpreted as UTF-8, only for byte-valued code units.
+        try{if(Array.from(value).every(function(c){return c.charCodeAt(0)<=255;})){var bytes=new Uint8Array(value.length);for(var i=0;i<value.length;i++)bytes[i]=value.charCodeAt(i);var fixed=new TextDecoder('utf-8',{fatal:true}).decode(bytes);if(fixed!==value&&isPrintable(fixed))add('Latin1 → UTF-8 修复',fixed);}}catch(e){}
+        return out;
+    }
+    getById('smartDecode').onclick=function(){
+        var input=getById('smartInput').value.trim(),container=getById('smartResults'),feedback=getById('smartFeedback');container.textContent='';feedback.textContent='';
+        if(!input){var empty=document.createElement('div');empty.className='result-mono empty';empty.textContent='请输入内容';container.appendChild(empty);return;}
+        if(input.length>100000){var tooLarge=document.createElement('div');tooLarge.className='result-mono empty';tooLarge.textContent='输入过长（最多 100,000 字符），请先缩小数据范围。';container.appendChild(tooLarge);return;}
+        var recursive=getById('smartRecursive').checked,maxDepth=recursive?parseInt(getById('smartDepth').value,10):1,queue=[{content:input,depth:0,chain:[]}],seen=new Set([input]),results=[],maxResults=40;
+        while(queue.length&&results.length<maxResults){var node=queue.shift();if(node.depth>=maxDepth)continue;var candidates=decodeCandidates(node.content);for(var i=0;i<candidates.length&&results.length<maxResults;i++){var c=candidates[i];if(seen.has(c.content))continue;seen.add(c.content);var chain=node.chain.concat(c.method);var item={method:(node.depth?'第'+(node.depth+1)+'层 · ':'')+chain.join(' → '),content:c.content,conf:calculateConfidence(c.content,c.method),depth:node.depth+1};results.push(item);queue.push({content:c.content,depth:node.depth+1,chain:chain});}}
+        results.sort(function(a,b){return b.conf.score-a.conf.score||a.depth-b.depth;});
+        if(!results.length){var none=document.createElement('div');none.className='result-mono empty';none.textContent='未找到可用的解码结果';container.appendChild(none);return;}
+        feedback.textContent='找到 '+results.length+' 个候选结果'+(results.length>=maxResults?'（已达到显示上限）':'')+'；置信度仅供参考。';
+        for(var j=0;j<results.length;j++){var r=results[j],itemEl=document.createElement('div');itemEl.className='smart-result-item';var methodEl=document.createElement('span');methodEl.className='method';methodEl.textContent=r.method;var contentEl=document.createElement('span');contentEl.className='content';contentEl.textContent=r.content.length>20000?r.content.slice(0,20000)+'…（结果过长，已截断显示）':r.content;var conf=document.createElement('span');conf.className='confidence '+r.conf.level;conf.textContent=r.conf.level==='high'?'高':r.conf.level==='medium'?'中':'低';itemEl.appendChild(methodEl);itemEl.appendChild(contentEl);itemEl.appendChild(conf);var cp=document.createElement('button');cp.type='button';cp.className='btn small';cp.textContent='复制';cp.addEventListener('click',(function(text){return function(){copyText(text,this);};})(r.content));itemEl.appendChild(cp);container.appendChild(itemEl);}
+    };
+    getById('smartClear').onclick=function(){getById('smartInput').value='';getById('smartResults').textContent='';getById('smartFeedback').textContent='';var d=document.createElement('div');d.className='result-mono empty';d.textContent='点击“智能解码”开始分析';getById('smartResults').appendChild(d);};
+
+    // ============ 实用工具：正则测试、差异、JWT、文件哈希、URL、JSONPath、YAML、XML、Cron、时区、颜色、HMAC ============
+    function setToolText(id, text) { var el = getById(id); if (el) el.textContent = String(text); }
+
+    // 正则：在可终止 Worker 中运行，避免灾难性回溯永久阻塞主线程。
+    async function executeRegex(pattern, flags, text, replacement) {
+        if (pattern.length > 1000) throw new Error('正则表达式过长（最多 1000 字符）');
+        if (text.length > 1000000) throw new Error('测试文本过大（最多 1,000,000 字符）');
+        if (!/^[dgimsuvy]*$/.test(flags) || new Set(flags.split('')).size !== flags.length) throw new Error('正则标志无效或存在重复标志');
+        if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || !URL.createObjectURL) throw new Error('当前环境不支持 Worker，已拒绝在主线程执行正则以避免页面卡死');
+        var workerSource = `self.onmessage=function(e){var d=e.data;try{var f=d.flags;var gf=f.indexOf('g')>=0?f:f+'g';var re=new RegExp(d.pattern,gf);var ms=[];var m;while((m=re.exec(d.text))!==null){ms.push({value:m[0],index:m.index,groups:Array.prototype.slice.call(m,1)});if(ms.length>=500)break;if(m[0]===''){var at=re.lastIndex,cp=d.text.codePointAt(at);re.lastIndex+=((f.indexOf('u')>=0||f.indexOf('v')>=0)&&cp>65535)?2:1;if(re.lastIndex>d.text.length)break;}}var replacement;try{replacement=d.text.replace(new RegExp(d.pattern,f),d.replacement);}catch(err){replacement='替换失败：'+err.message;}self.postMessage({matches:ms,replacement:replacement,truncated:ms.length>=500});}catch(err){self.postMessage({error:err.message});}};`;
+        var blobUrl = URL.createObjectURL(new Blob([workerSource], {type:'text/javascript'}));
+        return await new Promise(function(resolve, reject) {
+            var worker;
+            var settled = false;
+            function finish(fn, value) { if (settled) return; settled = true; clearTimeout(timer); if (worker) worker.terminate(); URL.revokeObjectURL(blobUrl); fn(value); }
+            var timer = setTimeout(function(){ finish(reject, new Error('正则运行超过 800 毫秒，已终止（可能存在灾难性回溯）')); }, 800);
+            try { worker = new Worker(blobUrl); } catch (e) { finish(reject, new Error('无法启动正则 Worker：' + e.message)); return; }
+            worker.onmessage = function(ev) { if (ev.data.error) finish(reject, new Error(ev.data.error)); else finish(resolve, ev.data); };
+            worker.onerror = function(ev) { finish(reject, new Error('正则 Worker 执行失败：' + (ev.message || '未知错误'))); };
+            worker.postMessage({pattern:pattern,flags:flags,text:text,replacement:replacement});
+        });
+    }
+    async function runRegex(mode) {
+        var out = getById('regexOutput');
+        out.textContent = '正在测试…';
+        try {
+            var result = await executeRegex(getById('regexPattern').value, getById('regexFlags').value.trim(), getById('regexTestText').value, getById('regexReplacement').value);
+            if (mode === 'replace') { out.textContent = result.replacement; return; }
+            var lines = ['匹配数量：' + result.matches.length + (result.truncated ? '（已达到 500 项上限）' : '')];
+            result.matches.forEach(function(m, i) { lines.push('[' + (i + 1) + '] 位置 ' + m.index + '：' + JSON.stringify(m.value) + (m.groups.length ? '\n    捕获组：' + JSON.stringify(m.groups) : '')); });
+            if (!result.matches.length) lines.push('没有匹配项。');
+            lines.push('', '替换预览：', result.replacement);
+            out.textContent = lines.join('\n');
+        } catch (e) { out.textContent = '错误：' + e.message; }
+    }
+    getById('regexRun').onclick = function(){ runRegex('match'); };
+    getById('regexReplace').onclick = function(){ runRegex('replace'); };
+
+    // 文本 / JSON 差异比较（LCS；限制矩阵规模防止超大输入耗尽内存）。
+    function makeLineDiff(left, right) {
+        if (left.length + right.length > 1000000) throw new Error('两份文本总长度不能超过 1,000,000 字符');
+        var a = left.split(/\r?\n/), b = right.split(/\r?\n/);
+        if (a.length * b.length > 1500000) throw new Error('行数过多，比较矩阵超过限制（每份文本建议不超过约 1200 行）');
+        var dp = new Array(a.length + 1);
+        for (var i = 0; i <= a.length; i++) dp[i] = new Uint32Array(b.length + 1);
+        for (var ai = a.length - 1; ai >= 0; ai--) for (var bi = b.length - 1; bi >= 0; bi--) dp[ai][bi] = a[ai] === b[bi] ? dp[ai + 1][bi + 1] + 1 : Math.max(dp[ai + 1][bi], dp[ai][bi + 1]);
+        var result = [], x = 0, y = 0;
+        while (x < a.length && y < b.length) {
+            if (a[x] === b[y]) { result.push({type:'context', text:'  ' + a[x]}); x++; y++; }
+            else if (dp[x + 1][y] >= dp[x][y + 1]) { result.push({type:'removed', text:'- ' + a[x]}); x++; }
+            else { result.push({type:'added', text:'+ ' + b[y]}); y++; }
+        }
+        while (x < a.length) result.push({type:'removed', text:'- ' + a[x++]});
+        while (y < b.length) result.push({type:'added', text:'+ ' + b[y++]});
+        return result;
+    }
+    function stableJsonValue(value) {
+        if (Array.isArray(value)) return value.map(stableJsonValue);
+        if (value && typeof value === 'object') { var out = Object.create(null); Object.keys(value).sort().forEach(function(k){out[k]=stableJsonValue(value[k]);}); return out; }
+        return value;
+    }
+    function renderDiff(jsonMode) {
+        var out = getById('diffOutput'); out.textContent = '';
+        try {
+            var a = getById('diffLeft').value, b = getById('diffRight').value;
+            if (jsonMode) { a = JSON.stringify(stableJsonValue(JSON.parse(a)), null, 2); b = JSON.stringify(stableJsonValue(JSON.parse(b)), null, 2); }
+            var rows = makeLineDiff(a, b);
+            if (rows.length > 8000) throw new Error('差异结果过多，最多显示 8000 行');
+            rows.forEach(function(row) { var div = document.createElement('div'); div.className = 'diff-line ' + row.type; div.textContent = row.text; out.appendChild(div); });
+            setToolText('diffFeedback', '共 ' + rows.length + ' 行；绿色为新增，红色为删除，灰色为相同。');
+        } catch (e) { out.textContent = '对比失败：' + e.message; setToolText('diffFeedback', '请检查输入。'); }
+    }
+    getById('diffTextRun').onclick = function(){ renderDiff(false); };
+    getById('diffJsonRun').onclick = function(){ renderDiff(true); };
+
+    // JWT：只解码，不验证签名。
+    function decodeBase64UrlUtf8(value) {
+        if (!/^[A-Za-z0-9_-]*$/.test(value)) throw new Error('Base64URL 字符无效');
+        var normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+        while (normalized.length % 4) normalized += '=';
+        var binary = atob(normalized), bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new TextDecoder('utf-8', {fatal:true}).decode(bytes);
+    }
+    getById('jwtDecode').onclick = function() {
+        ['jwtHeaderOutput','jwtPayloadOutput','jwtClaimsOutput'].forEach(function(id){setToolText(id,'—');});
+        try {
+            var token = getById('jwtInput').value.trim();
+            if (!token || token.length > 200000) throw new Error('请输入 JWT，且长度不得超过 200,000 字符');
+            var parts = token.split('.'); if (parts.length !== 3) throw new Error('JWT 必须由三段以点号分隔的内容组成');
+            var header = JSON.parse(decodeBase64UrlUtf8(parts[0]));
+            var payload = JSON.parse(decodeBase64UrlUtf8(parts[1]));
+            setToolText('jwtHeaderOutput', JSON.stringify(header, null, 2));
+            setToolText('jwtPayloadOutput', JSON.stringify(payload, null, 2));
+            var claims = [];
+            ['iss','sub','aud','jti'].forEach(function(k){ if (payload[k] !== undefined) claims.push(k + ': ' + (typeof payload[k] === 'string' ? payload[k] : JSON.stringify(payload[k]))); });
+            ['iat','nbf','exp'].forEach(function(k){ if (payload[k] !== undefined) { var d = new Date(Number(payload[k]) * 1000); claims.push(k + ': ' + (Number.isFinite(Number(payload[k])) && !isNaN(d.getTime()) ? d.toISOString() : '无效时间戳') + '（原值 ' + payload[k] + '）'); } });
+            claims.push('签名段字符数：' + parts[2].length, '签名状态：未验证');
+            setToolText('jwtClaimsOutput', claims.join('\n') || '没有常见声明字段。');
+        } catch(e) { setToolText('jwtClaimsOutput', '解析失败：' + e.message); }
+    };
+    getById('jwtClear').onclick = function(){ ['jwtInput','jwtHeaderOutput','jwtPayloadOutput','jwtClaimsOutput'].forEach(function(id){ if(getById(id).tagName === 'TEXTAREA') getById(id).value=''; else setToolText(id,'—'); }); };
+
+    // 文件哈希：一次读取一个文件并限制单文件大小。
+    function bytesToHex(buffer) { return Array.from(new Uint8Array(buffer), function(b){return b.toString(16).padStart(2,'0');}).join(''); }
+    getById('fileHashRun').onclick = async function() {
+        var files = Array.from(getById('fileHashInput').files || []), output = getById('fileHashOutput'), status = getById('fileHashStatus');
+        output.textContent = '';
+        if (!files.length) { output.textContent = '请先选择文件。'; return; }
+        if (!window.crypto || !crypto.subtle) { output.textContent = '当前环境不支持 Web Crypto；请使用 HTTPS 或 localhost。'; return; }
+        var algorithm = getById('fileHashAlgo').value, maxSize = 200 * 1024 * 1024, lines = [];
+        for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            setToolText('fileHashStatus', '正在处理 ' + (i + 1) + '/' + files.length + '：' + file.name);
+            if (file.size > maxSize) { lines.push(file.name + '\n错误：文件超过 200 MiB 限制（' + file.size + ' 字节）'); continue; }
+            try {
+                var digest = await crypto.subtle.digest(algorithm, await file.arrayBuffer());
+                lines.push(file.name + '\n大小：' + file.size + ' 字节\n算法：' + algorithm + '\n' + bytesToHex(digest));
+            } catch(e) { lines.push(file.name + '\n计算失败：' + e.message); }
+        }
+        output.textContent = lines.join('\n\n'); setToolText('fileHashStatus', '处理完成：' + files.length + ' 个文件。数据在浏览器本地处理。');
+    };
+    getById('fileHashClear').onclick = function(){ getById('fileHashInput').value=''; setToolText('fileHashOutput','尚未选择文件。'); setToolText('fileHashStatus','文件只在浏览器中读取；为避免内存占用，每个文件限制为 200 MiB。'); };
+
+    // URL parse/build
+    getById('urlParseRun').onclick = function() {
+        var out = getById('urlParseOutput'); out.textContent='';
+        try {
+            var u = new URL(getById('urlParseInput').value.trim());
+            var items = [['协议',u.protocol],['主机',u.host],['主机名',u.hostname],['端口',u.port || '（默认）'],['路径',u.pathname],['查询字符串',u.search],['Fragment',u.hash],['Origin',u.origin],['用户名凭据',(u.username || u.password) ? '存在（内容已隐藏）' : '无'],['参数个数',String(Array.from(u.searchParams).length)]];
+            items.forEach(function(it){ var row=document.createElement('div'); row.textContent=it[0]+'：'+it[1]; out.appendChild(row); });
+            var params = document.createElement('div'); params.style.marginTop='8px'; params.textContent='查询参数：'; out.appendChild(params);
+            if (!u.searchParams.size) { var empty=document.createElement('div'); empty.textContent='（无）'; out.appendChild(empty); }
+            u.searchParams.forEach(function(v,k){var row=document.createElement('div'); row.textContent=k+' = '+v; row.style.paddingLeft='12px'; out.appendChild(row);});
+        } catch(e) { out.textContent='解析失败：请输入合法的绝对 URL。' + (e.message ? '\n' + e.message : ''); }
+    };
+    getById('urlParseClear').onclick = function(){ getById('urlParseInput').value=''; setToolText('urlParseOutput',''); };
+    getById('urlBuildRun').onclick = function() {
+        var out = getById('urlBuildOutput');
+        try {
+            var u = new URL(getById('urlBuildBase').value.trim());
+            var lines = getById('urlBuildParams').value.split(/\r?\n/);
+            lines.forEach(function(line){ if (!line.trim()) return; var idx=line.indexOf('='); var key=(idx<0?line:line.slice(0,idx)).trim(); var val=idx<0?'':line.slice(idx+1).trim(); if (!key) throw new Error('参数名不能为空'); u.searchParams.append(key,val); });
+            out.value = u.toString();
+        } catch(e) { out.value = '构造失败：' + e.message; }
+    };
+
+    // JSONPath common subset: properties, indexes, wildcards and recursive property.
+    function tokenizeJsonPath(path) {
+        if (!path || path[0] !== '$') throw new Error('路径必须以 $ 开头');
+        var tokens=[], i=1;
+        while (i<path.length) {
+            if (path.slice(i,i+2)==='..') {
+                i+=2; if (path[i]==='*') { tokens.push({type:'recursiveAll'}); i++; continue; }
+                if (path[i]==='[') { var endR=path.indexOf(']',i); if(endR<0) throw new Error('递归属性缺少 ]'); var rawR=path.slice(i+1,endR).trim(); tokens.push({type:'recursive',key:unquoteJsonPathKey(rawR)}); i=endR+1; continue; }
+                var mr=path.slice(i).match(/^[A-Za-z_$][\w$-]*/); if(!mr) throw new Error('递归属性语法无效'); tokens.push({type:'recursive',key:mr[0]}); i+=mr[0].length; continue;
+            }
+            if (path[i]==='.') { i++; if(path[i]==='*'){tokens.push({type:'wildcard'});i++;continue;} var m=path.slice(i).match(/^[A-Za-z_$][\w$-]*/); if(!m) throw new Error('点属性语法无效'); tokens.push({type:'prop',key:m[0]}); i+=m[0].length; continue; }
+            if (path[i]==='[') { var end=path.indexOf(']',i); if(end<0) throw new Error('缺少 ]'); var raw=path.slice(i+1,end).trim(); if(raw==='*') tokens.push({type:'wildcard'}); else if(/^\d+$/.test(raw)) tokens.push({type:'index',index:Number(raw)}); else tokens.push({type:'prop',key:unquoteJsonPathKey(raw)}); i=end+1; continue; }
+            throw new Error('路径语法错误，位置 ' + i);
+        }
+        return tokens;
+    }
+    function unquoteJsonPathKey(raw) { if ((raw[0]==='"'&&raw[raw.length-1]==='"')) return JSON.parse(raw); if (raw[0]==="'"&&raw[raw.length-1]==="'") return raw.slice(1,-1).replace(/\\'/g,"'").replace(/\\\\/g,'\\'); if(!/^[A-Za-z_$][\w$-]*$/.test(raw)) throw new Error('属性名请使用 .name 或 [\'name\'] 形式'); return raw; }
+    function queryJsonPath(root, tokens) {
+        var current=[{value:root,path:'$'}];
+        function children(v,p) { var arr=[]; if(Array.isArray(v)) v.forEach(function(x,i){arr.push({value:x,path:p+'['+i+']',key:String(i)});}); else if(v && typeof v==='object') Object.keys(v).forEach(function(k){arr.push({value:v[k],path:p+'['+JSON.stringify(k)+']',key:k});}); return arr; }
+        tokens.forEach(function(t){ var next=[]; current.forEach(function(item){ var v=item.value;
+            if(t.type==='prop') { if(v!==null && typeof v==='object' && Object.prototype.hasOwnProperty.call(v,t.key)) next.push({value:v[t.key],path:item.path+'['+JSON.stringify(t.key)+']'}); }
+            else if(t.type==='index') { if(Array.isArray(v) && t.index<v.length) next.push({value:v[t.index],path:item.path+'['+t.index+']'}); else if(v && typeof v==='object' && Object.prototype.hasOwnProperty.call(v,String(t.index))) next.push({value:v[String(t.index)],path:item.path+'['+JSON.stringify(String(t.index))+']'}); }
+            else if(t.type==='wildcard') next=next.concat(children(v,item.path));
+            else { var stack=children(v,item.path), visits=0; while(stack.length && visits<100000) { var child=stack.pop(); visits++; if(t.type==='recursiveAll' || child.key===t.key) next.push({value:child.value,path:child.path}); stack=stack.concat(children(child.value,child.path)); if(next.length>2000) throw new Error('匹配结果超过 2000 项'); } if(stack.length) throw new Error('递归遍历节点超过 100,000 项上限'); }
+        }); if(next.length>2000) throw new Error('匹配结果超过 2000 项'); current=next; });
+        return current;
+    }
+    getById('jsonPathRun').onclick = function() {
+        var out=getById('jsonPathOutput');
+        try { var root=JSON.parse(getById('jsonPathData').value); var tokens=tokenizeJsonPath(getById('jsonPathExpr').value.trim()); var result=queryJsonPath(root,tokens); out.textContent=result.length ? result.map(function(x,i){return '['+(i+1)+'] '+x.path+'\n'+JSON.stringify(x.value,null,2);}).join('\n\n') : '查询成功，但没有匹配项。'; }
+        catch(e) { out.textContent='查询失败：'+e.message; }
+    };
+
+    // YAML simple subset parser / serializer. No eval, no custom tags or aliases.
+    function yamlStripComment(line) { var quote=null, escaped=false; for(var i=0;i<line.length;i++){var c=line[i];if(quote==='"'){if(escaped){escaped=false;continue;}if(c==='\\'){escaped=true;continue;}if(c==='"')quote=null;}else if(quote==="'"){if(c==="'"&&line[i+1]==="'"){i++;continue;}if(c==="'")quote=null;}else{if(c==='"'||c==="'")quote=c;else if(c==='#'&&(i===0||/\s/.test(line[i-1])))return line.slice(0,i).trimEnd();}} return line.trimEnd(); }
+    function yamlColonIndex(text) { var quote=null, escape=false, depth=0; for(var i=0;i<text.length;i++){var c=text[i];if(quote==='"'){if(escape){escape=false;continue;}if(c==='\\'){escape=true;continue;}if(c==='"')quote=null;continue;}if(quote==="'"){if(c==="'"&&text[i+1]==="'"){i++;continue;}if(c==="'")quote=null;continue;}if(c==='"'||c==="'"){quote=c;continue;}if(c==='['||c==='{')depth++; if(c===']'||c==='}')depth--; if(c===':'&&depth===0&&(i===text.length-1||/\s/.test(text[i+1])))return i;} return -1; }
+    function yamlScalar(raw) {
+        var s=raw.trim(); if(!s) return null;
+        if(s[0]==='"') { try{return JSON.parse(s);}catch(e){throw new Error('双引号字符串格式错误：'+s);} }
+        if(s[0]==="'") { if(s[s.length-1]!=="'") throw new Error('单引号字符串未闭合'); return s.slice(1,-1).replace(/''/g,"'"); }
+        if((s[0]==='['&&s[s.length-1]===']')||(s[0]==='{'&&s[s.length-1]==='}')) {
+            try{return JSON.parse(s);}catch(e){ /* parse YAML-style inline below */ }
+            if(s[0]==='[') return splitYamlInline(s.slice(1,-1)).filter(function(x){return x.trim()!=='';}).map(yamlScalar);
+            var obj=Object.create(null); splitYamlInline(s.slice(1,-1)).forEach(function(pair){var idx=yamlColonIndex(pair);if(idx<0)throw new Error('内联映射语法错误');obj[String(yamlScalar(pair.slice(0,idx)))]=yamlScalar(pair.slice(idx+1));}); return obj;
+        }
+        if(/^(?:null|Null|NULL|~)$/.test(s))return null;
+        if(/^(?:true|True|TRUE)$/.test(s))return true;
+        if(/^(?:false|False|FALSE)$/.test(s))return false;
+        if(/^[+-]?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(s)) { var n=Number(s); if(Number.isFinite(n))return n; }
+        if(s==='| '||s==='>' ) return '';
+        return s;
+    }
+    function splitYamlInline(s) { var parts=[],start=0,quote=null,escape=false,depth=0;for(var i=0;i<s.length;i++){var c=s[i];if(quote==='"'){if(escape){escape=false;continue;}if(c==='\\'){escape=true;continue;}if(c==='"')quote=null;continue;}if(quote==="'"){if(c==="'"&&s[i+1]==="'"){i++;continue;}if(c==="'")quote=null;continue;}if(c==='"'||c==="'"){quote=c;continue;}if(c==='['||c==='{')depth++;else if(c===']'||c==='}')depth--;else if(c===','&&depth===0){parts.push(s.slice(start,i));start=i+1;}}parts.push(s.slice(start));return parts; }
+    function yamlParse(source) {
+        if(source.length>1000000) throw new Error('输入过大（最多 1,000,000 字符）');
+        var raw=source.replace(/^\uFEFF/,'').split(/\r?\n/), lines=[];
+        raw.forEach(function(line,idx){if(/\t/.test((line.match(/^\s*/) || [''])[0]))throw new Error('第 '+(idx+1)+' 行缩进不能使用 Tab');var cleaned=yamlStripComment(line);if(!cleaned.trim()||/^\s*(---|\.\.\.)\s*$/.test(cleaned))return;var indent=cleaned.match(/^ */)[0].length;lines.push({indent:indent,text:cleaned.slice(indent),line:idx+1});});
+        if(!lines.length) return null;
+        if(lines.length===1 && !/^-(?:\s|$)/.test(lines[0].text) && yamlColonIndex(lines[0].text)<0) return yamlScalar(lines[0].text);
+        function parseBlock(start, indent) {
+            if(start>=lines.length||lines[start].indent<indent) return {value:null,index:start};
+            if(lines[start].indent!==indent) throw new Error('第 '+lines[start].line+' 行缩进层级错误');
+            var sequence=/^-(?:\s|$)/.test(lines[start].text), container=sequence?[]:Object.create(null), i=start;
+            while(i<lines.length && lines[i].indent===indent) {
+                var line=lines[i];
+                if(sequence) {
+                    if(!/^-(?:\s|$)/.test(line.text)) throw new Error('第 '+line.line+' 行：列表与映射结构混用');
+                    var rest=line.text.slice(1).trim(); i++;
+                    if(!rest) { if(i<lines.length&&lines[i].indent>indent){var child=parseBlock(i,lines[i].indent);container.push(child.value);i=child.index;}else container.push(null); continue; }
+                    var ci=yamlColonIndex(rest);
+                    if(ci>=0) {
+                        var obj=Object.create(null), keyRaw=rest.slice(0,ci).trim(), valRaw=rest.slice(ci+1).trim(), key=String(yamlScalar(keyRaw));
+                        if(!key) throw new Error('第 '+line.line+' 行键名不能为空');
+                        if(valRaw) obj[key]=yamlScalar(valRaw);
+                        else if(i<lines.length && lines[i].indent>indent+2){var nested=parseBlock(i,lines[i].indent);obj[key]=nested.value;i=nested.index;}
+                        else obj[key]=null;
+                        if(i<lines.length && lines[i].indent>indent) {
+                            var continuation=parseBlock(i,lines[i].indent);
+                            if(continuation.value && !Array.isArray(continuation.value) && typeof continuation.value==='object') Object.keys(continuation.value).forEach(function(k){if(Object.prototype.hasOwnProperty.call(obj,k))throw new Error('重复键：'+k);obj[k]=continuation.value[k];});
+                            else throw new Error('第 '+lines[i].line+' 行：此处需要映射项');
+                            i=continuation.index;
+                        }
+                        container.push(obj);
+                    } else {
+                        container.push(yamlScalar(rest));
+                        if(i<lines.length&&lines[i].indent>indent) throw new Error('第 '+lines[i].line+' 行：简单列表项后不能直接跟随嵌套内容');
+                    }
+                } else {
+                    if(/^-(?:\s|$)/.test(line.text)) throw new Error('第 '+line.line+' 行：映射与列表结构混用');
+                    var idx=yamlColonIndex(line.text); if(idx<0) throw new Error('第 '+line.line+' 行：映射项必须是 key: value');
+                    var kraw=line.text.slice(0,idx).trim(), vraw=line.text.slice(idx+1).trim(), k=String(yamlScalar(kraw));
+                    if(!k) throw new Error('第 '+line.line+' 行键名不能为空');
+                    if(Object.prototype.hasOwnProperty.call(container,k)) throw new Error('第 '+line.line+' 行存在重复键：'+k);
+                    i++;
+                    if(vraw==='|'||vraw==='>'||vraw==='|-'||vraw==='>-') {
+                        var blockLines=[]; var minIndent=Infinity; while(i<lines.length&&lines[i].indent>indent){minIndent=Math.min(minIndent,lines[i].indent);blockLines.push(lines[i]);i++;}
+                        var body=blockLines.map(function(x){return ' '.repeat(Math.max(0,x.indent-minIndent))+x.text;});container[k]=vraw[0]==='>'?body.join(' ').trim():body.join('\n')+(vraw==='|-'?'':'\n');
+                    } else if(vraw) container[k]=yamlScalar(vraw);
+                    else if(i<lines.length&&lines[i].indent>indent){var nestedValue=parseBlock(i,lines[i].indent);container[k]=nestedValue.value;i=nestedValue.index;}
+                    else container[k]=null;
+                }
+            }
+            return {value:container,index:i};
+        }
+        var parsed=parseBlock(0,lines[0].indent);
+        if(parsed.index!==lines.length) throw new Error('第 '+lines[parsed.index].line+' 行无法解析');
+        return parsed.value;
+    }
+    function yamlQuoteKey(k) { return /^[A-Za-z_][\w.-]*$/.test(k) && !/^(?:true|false|null|yes|no|on|off)$/i.test(k) ? k : JSON.stringify(k); }
+    function yamlScalarOut(v) {
+        if(v===null)return 'null'; if(typeof v==='boolean'||typeof v==='number')return String(v);
+        if(typeof v!=='string')return JSON.stringify(v);
+        if(v===''||/^(?:null|~|true|false|yes|no|on|off)$/i.test(v)||/^[+-]?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(v)||/^\s|\s$/.test(v)||/[\r\n:#,[\]{}&*!|>'"%@`]/.test(v)) return JSON.stringify(v);
+        return v;
+    }
+    function yamlStringify(value, indent) {
+        var pad=' '.repeat(indent), lines=[];
+        if(Array.isArray(value)) {
+            if(!value.length)return pad+'[]';
+            value.forEach(function(item){ if(item!==null && typeof item==='object') lines.push(pad+'-\n'+yamlStringify(item,indent+2)); else lines.push(pad+'- '+yamlScalarOut(item)); });
+            return lines.join('\n');
+        }
+        if(value && typeof value==='object') {
+            var keys=Object.keys(value); if(!keys.length)return pad+'{}';
+            keys.forEach(function(k){var v=value[k], head=pad+yamlQuoteKey(k)+':'; if(v!==null&&typeof v==='object'&&((Array.isArray(v)&&v.length)||(!Array.isArray(v)&&Object.keys(v).length))) lines.push(head+'\n'+yamlStringify(v,indent+2)); else if(Array.isArray(v)&&!v.length) lines.push(head+' []'); else if(v&&typeof v==='object') lines.push(head+' {}'); else lines.push(head+' '+yamlScalarOut(v));});
+            return lines.join('\n');
+        }
+        return pad+yamlScalarOut(value);
+    }
+    getById('yamlToJson').onclick = function() { try { var val=yamlParse(getById('yamlInput').value); getById('yamlOutput').value=JSON.stringify(val,null,2); setToolText('yamlFeedback','✓ 已转换为 JSON（使用受支持的 YAML 子集解析器）。'); } catch(e) {getById('yamlOutput').value='';setToolText('yamlFeedback','YAML 解析失败：'+e.message);} };
+    getById('yamlValidate').onclick = function() { try {yamlParse(getById('yamlInput').value);setToolText('yamlFeedback','✓ YAML 结构有效（在本工具支持的语法范围内）。');}catch(e){setToolText('yamlFeedback','验证失败：'+e.message);} };
+    getById('jsonToYaml').onclick = function() { try {var val=JSON.parse(getById('yamlInput').value);getById('yamlOutput').value=yamlStringify(val,0);setToolText('yamlFeedback','✓ 已转换为 YAML。');}catch(e){getById('yamlOutput').value='';setToolText('yamlFeedback','JSON 解析失败：'+e.message);} };
+
+    // XML format/minify/validate using DOMParser; all output is assigned as text/value.
+    function parseXmlInput() { var src=getById('xmlInput').value; if(!src.trim())throw new Error('请输入 XML'); var doc=new DOMParser().parseFromString(src,'application/xml'); if(doc.getElementsByTagName('parsererror').length)throw new Error(doc.getElementsByTagName('parsererror')[0].textContent); if(doc.doctype)throw new Error('为避免丢失 DTD/DOCTYPE 声明，本工具暂不处理包含 DOCTYPE 的 XML'); return doc; }
+    function xmlEscapeText(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function xmlEscapeAttr(s) { return xmlEscapeText(s).replace(/"/g,'&quot;'); }
+    function formatXmlNode(node, depth, pretty) {
+        var pad=pretty?'  '.repeat(depth):'';
+        if(node.nodeType===Node.DOCUMENT_NODE) return Array.from(node.childNodes).map(function(n){return formatXmlNode(n,depth,pretty);}).filter(Boolean).join(pretty?'\n':'');
+        if(node.nodeType===Node.DOCUMENT_TYPE_NODE) return '<!DOCTYPE '+node.name+'>';
+        if(node.nodeType===Node.COMMENT_NODE) return pad+'<!--'+node.nodeValue+'-->';
+        if(node.nodeType===Node.PROCESSING_INSTRUCTION_NODE) return pad+'<?'+node.target+(node.data?' '+node.data:'')+'?>';
+        if(node.nodeType===Node.TEXT_NODE) return node.nodeValue.trim()?pad+xmlEscapeText(node.nodeValue):'';
+        if(node.nodeType===Node.CDATA_SECTION_NODE) return pad+'<![CDATA['+node.nodeValue+']]>';
+        if(node.nodeType!==Node.ELEMENT_NODE) return '';
+        var attrs=Array.from(node.attributes).map(function(a){return ' '+a.name+'="'+xmlEscapeAttr(a.value)+'"';}).join('');
+        var allChildren=Array.from(node.childNodes);
+        var children=allChildren.filter(function(n){return n.nodeType!==Node.TEXT_NODE||n.nodeValue.trim();});
+        var open='<'+node.tagName+attrs;
+        if(!children.length) return pad+open+'/>';
+        var hasElement=children.some(function(n){return n.nodeType===Node.ELEMENT_NODE;});
+        var hasNonWhitespaceText=allChildren.some(function(n){return n.nodeType===Node.TEXT_NODE&&n.nodeValue.trim();});
+        if(hasElement&&hasNonWhitespaceText) {
+            var mixed=allChildren.map(function(n){if(n.nodeType===Node.TEXT_NODE)return xmlEscapeText(n.nodeValue);if(n.nodeType===Node.CDATA_SECTION_NODE)return '<![CDATA['+n.nodeValue+']]>';return formatXmlNode(n,0,false);}).join('');
+            return pad+open+'>'+mixed+'</'+node.tagName+'>';
+        }
+        if(children.every(function(n){return n.nodeType===Node.TEXT_NODE||n.nodeType===Node.CDATA_SECTION_NODE;})) return pad+open+'>'+children.map(function(n){return n.nodeType===Node.CDATA_SECTION_NODE?'<![CDATA['+n.nodeValue+']]>':xmlEscapeText(n.nodeValue);}).join('')+'</'+node.tagName+'>';
+        var inner=children.map(function(n){return formatXmlNode(n,depth+1,pretty);}).filter(Boolean).join(pretty?'\n':'');
+        if(!pretty) return open+'>'+inner+'</'+node.tagName+'>';
+        return pad+open+'>\n'+inner+'\n'+pad+'</'+node.tagName+'>';
+    }
+    function runXml(mode) { var out=getById('xmlOutput');try{var doc=parseXmlInput();if(mode==='validate'){out.value='';setToolText('xmlFeedback','✓ XML 结构有效。');return;}var pretty=mode==='format';out.value=formatXmlNode(doc,0,pretty);setToolText('xmlFeedback',pretty?'✓ 已格式化。':'✓ 已压缩空白与标签之间的换行。');}catch(e){out.value='';setToolText('xmlFeedback','XML 处理失败：'+e.message);} }
+    getById('xmlFormat').onclick=function(){runXml('format');}; getById('xmlMinify').onclick=function(){runXml('minify');}; getById('xmlValidate').onclick=function(){runXml('validate');};
+
+    // Cron: common 5-field syntax. Day-of-month and day-of-week follow conventional OR semantics if both restricted.
+    function parseCronField(text,min,max,name) {
+        var values=new Set(), wildcard=text==='*';
+        text.split(',').forEach(function(part){if(!part)throw new Error(name+' 字段存在空项');var bits=part.split('/');if(bits.length>2)throw new Error(name+' 字段步长格式错误');var step=bits.length===2?Number(bits[1]):1;if(!Number.isInteger(step)||step<1||step>max-min+1)throw new Error(name+' 字段步长无效');var base=bits[0],start,end;
+            if(!base || base[0]==='-' || base[base.length-1]==='-') throw new Error(name+' 字段范围格式错误');
+            if(base==='*'){start=min;end=max;}else if(base.includes('-')){var range=base.split('-');if(range.length!==2||range[0]===''||range[1]==='')throw new Error(name+' 字段范围错误');start=Number(range[0]);end=Number(range[1]);if(!Number.isInteger(start)||!Number.isInteger(end)||start<min||end>max||start>end)throw new Error(name+' 字段范围超出 '+min+'–'+max);}else{start=Number(base);end=bits.length===2?max:start;if(!Number.isInteger(start)||start<min||start>max)throw new Error(name+' 字段值超出 '+min+'–'+max);}
+            for(var n=start;n<=end;n+=step)values.add(n);
+        });
+        if(!values.size)throw new Error(name+' 字段没有有效值');
+        if(name==='星期'&&values.has(7)){values.delete(7);values.add(0);}
+        return {values:values,wildcard:wildcard};
+    }
+    function parseCron(expr) {
+        var fields=expr.trim().split(/\s+/); if(fields.length!==5)throw new Error('请提供 5 个字段：分 时 日 月 周');
+        var defs=[ [0,59,'分钟'],[0,23,'小时'],[1,31,'日期'],[1,12,'月份'],[0,7,'星期'] ];
+        var f=fields.map(function(x,i){return parseCronField(x,defs[i][0],defs[i][1],defs[i][2]);});
+        function describe(field,def){if(field==='*')return '每'+def;if(field.startsWith('*/'))return '每 '+field.slice(2)+' '+def;return field+'（'+def+'）';}
+        var explanation='分钟：'+describe(fields[0],'分钟')+'；小时：'+describe(fields[1],'小时')+'；日期：'+describe(fields[2],'日')+'；月份：'+describe(fields[3],'月')+'；星期：'+describe(fields[4],'星期');
+        var bothDomDow=!f[2].wildcard&&!f[4].wildcard;
+        var matches=[]; var d=new Date(); d.setSeconds(0,0); d.setMinutes(d.getMinutes()+1);
+        var end=d.getTime()+366*24*60*60*1000;
+        while(d.getTime()<=end&&matches.length<5) {
+            var minute=f[0].values.has(d.getMinutes()), hour=f[1].values.has(d.getHours()), day=f[2].values.has(d.getDate()), month=f[3].values.has(d.getMonth()+1), dow=f[4].values.has(d.getDay());
+            var dayMatch=bothDomDow?(day||dow):(f[2].wildcard?dow:f[4].wildcard?day:(day&&dow));
+            if(minute&&hour&&month&&dayMatch)matches.push(new Date(d.getTime()));
+            d.setMinutes(d.getMinutes()+1);
+        }
+        if(!matches.length)throw new Error('未来 366 天内没有找到运行时间');
+        return explanation+'\n\n本机时区：'+Intl.DateTimeFormat().resolvedOptions().timeZone+'\n\n下次运行时间：\n'+matches.map(function(x){return x.toLocaleString()+'（'+x.toISOString()+'）';}).join('\n');
+    }
+    getById('cronParse').onclick=function(){try{setToolText('cronOutput',parseCron(getById('cronInput').value));}catch(e){setToolText('cronOutput','Cron 解析失败：'+e.message);}};
+
+    // Time zone conversion. Interpret the input as wall-clock time in sourceZone and iteratively derive UTC.
+    function datePartsInZone(date, zone) { var parts=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(date);var o={};parts.forEach(function(p){if(p.type!=='literal')o[p.type]=p.value;});return {year:Number(o.year),month:Number(o.month),day:Number(o.day),hour:Number(o.hour),minute:Number(o.minute),second:Number(o.second)}; }
+    function zonedWallTimeToUtc(value, zone) {
+        var m=value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/); if(!m)throw new Error('日期时间格式请使用 YYYY-MM-DDTHH:mm[:ss]');
+        var target={year:+m[1],month:+m[2],day:+m[3],hour:+m[4],minute:+m[5],second:+(m[6]||0)};
+        var check=new Date(Date.UTC(target.year,target.month-1,target.day,target.hour,target.minute,target.second));if(check.getUTCFullYear()!==target.year||check.getUTCMonth()+1!==target.month||check.getUTCDate()!==target.day||target.hour>23||target.minute>59||target.second>59)throw new Error('日期时间无效');
+        var guess=check.getTime();
+        for(var i=0;i<5;i++){var got=datePartsInZone(new Date(guess),zone);var represented=Date.UTC(got.year,got.month-1,got.day,got.hour,got.minute,got.second);var desired=Date.UTC(target.year,target.month-1,target.day,target.hour,target.minute,target.second);var delta=desired-represented;guess+=delta;if(delta===0)break;}
+        var final=datePartsInZone(new Date(guess),zone); if(final.year!==target.year||final.month!==target.month||final.day!==target.day||final.hour!==target.hour||final.minute!==target.minute||final.second!==target.second)throw new Error('该时间在来源时区中不存在或处于夏令时跳变，请换一个时间');
+        return new Date(guess);
+    }
+    function convertTimeZone() {
+        try { var wall=getById('tzDateTime').value.trim(), from=getById('tzFrom').value.trim(), to=getById('tzTo').value.trim();if(!wall||!from||!to)throw new Error('请填写日期时间和两个时区');
+            var utc=zonedWallTimeToUtc(wall,from);var target=new Intl.DateTimeFormat('zh-CN',{timeZone:to,dateStyle:'full',timeStyle:'long'}).format(utc);var source=new Intl.DateTimeFormat('zh-CN',{timeZone:from,dateStyle:'full',timeStyle:'long'}).format(utc);var utcText=utc.toISOString();setToolText('tzOutput','来源时间：'+source+'\nUTC：'+utcText+'\n目标时间：'+target+'\n目标时区：'+to);
+        }catch(e){setToolText('tzOutput','转换失败：'+e.message);}
+    }
+    getById('tzConvert').onclick=convertTimeZone;
+    getById('tzNow').onclick=function(){try{var now=new Date(), p=datePartsInZone(now,getById('tzFrom').value.trim()||Intl.DateTimeFormat().resolvedOptions().timeZone);getById('tzDateTime').value=String(p.year).padStart(4,'0')+'-'+String(p.month).padStart(2,'0')+'-'+String(p.day).padStart(2,'0')+'T'+String(p.hour).padStart(2,'0')+':'+String(p.minute).padStart(2,'0')+':'+String(p.second).padStart(2,'0');}catch(e){setToolText('tzOutput','无法填入当前时间：'+e.message);}};
+    (function(){var now=new Date();var p=datePartsInZone(now,'Asia/Tokyo');getById('tzDateTime').value=p.year+'-'+String(p.month).padStart(2,'0')+'-'+String(p.day).padStart(2,'0')+'T'+String(p.hour).padStart(2,'0')+':'+String(p.minute).padStart(2,'0');})();
+
+    // Color conversions
+    function hslToRgb(h,s,l){h=((h%360)+360)%360/360;s/=100;l/=100;if(s===0){var g=Math.round(l*255);return [g,g,g];}var q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;function hue(t){if(t<0)t++;if(t>1)t--;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}return [Math.round(hue(h+1/3)*255),Math.round(hue(h)*255),Math.round(hue(h-1/3)*255)];}
+    function rgbToHsl(r,g,b){r/=255;g/=255;b/=255;var max=Math.max(r,g,b),min=Math.min(r,g,b),h=0,s=0,l=(max+min)/2;if(max!==min){var d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4;}h*=60;}return [Math.round(h),Math.round(s*100),Math.round(l*100)];}
+    function parseColor(raw) {
+        var s=raw.trim(), m, rgba;
+        if ((m=s.match(/^#([\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/i))) {
+            var hex=m[1];
+            if(hex.length===3||hex.length===4) hex=hex.split('').map(function(c){return c+c;}).join('');
+            rgba=[parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16),hex.length===8?parseInt(hex.slice(6,8),16)/255:1];
+        } else if ((m=s.match(/^rgba?\(\s*([\d.]+)(%)?\s*,\s*([\d.]+)(%)?\s*,\s*([\d.]+)(%)?(?:\s*[,/]\s*([\d.]+)(%)?)?\s*\)$/i))) {
+            var units=[m[2]||'',m[4]||'',m[6]||''];
+            if(units.some(function(u){return u!==units[0];})) throw new Error('RGB 三个通道必须统一使用百分比或 0–255 数值');
+            var isPercent=units[0]==='%';
+            var rawChannels=[Number(m[1]),Number(m[3]),Number(m[5])];
+            if(rawChannels.some(function(v){return !Number.isFinite(v)||v<0||v>(isPercent?100:255);})) throw new Error('RGB 通道超出范围');
+            rgba=rawChannels.map(function(v){return Math.round(v*(isPercent?2.55:1));});
+            var alpha=1;
+            if(m[7]!==undefined){alpha=Number(m[7])/(m[8]==='%'?100:1);if(!Number.isFinite(alpha)||alpha<0||alpha>1)throw new Error('Alpha 必须在 0–1 或 0%–100% 范围内');}
+            rgba.push(alpha);
+        } else if ((m=s.match(/^hsla?\(\s*([+-]?[\d.]+)(?:deg)?\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%(?:\s*[,/]\s*([\d.]+)(%)?)?\s*\)$/i))) {
+            var hue=Number(m[1]), sat=Number(m[2]), light=Number(m[3]);
+            if(!Number.isFinite(hue)||!Number.isFinite(sat)||!Number.isFinite(light)||sat<0||sat>100||light<0||light>100) throw new Error('HSL 颜色值超出范围');
+            var hAlpha=m[4]===undefined?1:Number(m[4])/(m[5]==='%'?100:1);
+            if(!Number.isFinite(hAlpha)||hAlpha<0||hAlpha>1) throw new Error('Alpha 必须在 0–1 或 0%–100% 范围内');
+            rgba=hslToRgb(hue,sat,light).concat(hAlpha);
+        } else throw new Error('格式无法识别，请使用 HEX、rgb(r,g,b) 或 hsl(h,s%,l%)');
+        return rgba;
+    }
+    function convertColor(){try{var c=parseColor(getById('colorInput').value),r=c[0],g=c[1],b=c[2],a=c[3],hsl=rgbToHsl(r,g,b),hex='#'+[r,g,b].map(function(x){return x.toString(16).padStart(2,'0');}).join('')+(a<1?Math.round(a*255).toString(16).padStart(2,'0'):'');var rgb='rgb('+r+', '+g+', '+b+')',hslText='hsl('+hsl[0]+', '+hsl[1]+'%, '+hsl[2]+'%)';if(a<1){rgb='rgba('+r+', '+g+', '+b+', '+Number(a.toFixed(3))+')';hslText='hsla('+hsl[0]+', '+hsl[1]+'%, '+hsl[2]+'%, '+Number(a.toFixed(3))+')';}setToolText('colorOutput','HEX：'+hex+'\nRGB：'+rgb+'\nHSL：'+hslText+'\nAlpha：'+Number(a.toFixed(4)));getById('colorSwatch').style.backgroundColor='rgba('+r+','+g+','+b+','+a+')';}catch(e){setToolText('colorOutput','转换失败：'+e.message);getById('colorSwatch').style.background='transparent';}}
+    getById('colorConvert').onclick=convertColor;getById('colorInput').addEventListener('keydown',function(e){if(e.key==='Enter')convertColor();});
+
+    // HMAC using Web Crypto
+    getById('hmacRun').onclick=async function(){var out=getById('hmacOutput');out.textContent='正在计算…';try{if(!window.crypto||!crypto.subtle)throw new Error('当前环境不支持 Web Crypto，请使用 HTTPS 或 localhost');var keyText=getById('hmacKey').value,message=getById('hmacMessage').value;if(!keyText)throw new Error('请输入密钥');var algo=getById('hmacAlgo').value;var key=await crypto.subtle.importKey('raw',new TextEncoder().encode(keyText),{name:'HMAC',hash:algo},false,['sign']);var sig=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));var bytes=new Uint8Array(sig);var binary='';for(var i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);out.textContent='算法：HMAC-'+algo+'\nHex：'+bytesToHex(sig)+'\nBase64：'+btoa(binary);}catch(e){out.textContent='计算失败：'+e.message;}};
+    getById('hmacClear').onclick=function(){getById('hmacKey').value='';getById('hmacMessage').value='';setToolText('hmacOutput','—');};
+
+
+    // ============ 初始化 ============
+    try {
+        getById('uuidResult').textContent = uuidv4();
+        getById('pwdGen').click();
+        getById('randStrGen').click();
+        computeHash();
+    } catch(e) {
+        console.warn('初始化部分功能失败 (可能因浏览器限制): ' + e.message);
+    }
+})();
+</script>
+</body>
+</html>
