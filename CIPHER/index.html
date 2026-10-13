@@ -468,11 +468,16 @@
             background: var(--success-bg);
         }
 
+        /* ══════════════ 信息框（横跨整宽） ══════════════ */
+        /* 布局：作为 .main-content 的直接子项，桌面双栏下 grid-column: 1/-1，
+           占据输入/结果两栏下方的整行，获得最大横向空间。
+           chips 用 flex-wrap：单条永不换行/截断，空间不足时整条折到下一行，
+           因此「文本完整显示」与「自动折行」两者兼得。 */
         .stats-panel {
             display: flex;
             flex-direction: column;
             gap: 10px;
-            margin-top: 10px;
+            margin-top: 14px;
             padding: 12px 14px;
             background: var(--surface-elevated);
             border: 1px solid var(--border);
@@ -481,6 +486,8 @@
             font-size: 11px;
             color: var(--text-secondary);
             transition: all var(--transition-normal);
+            grid-column: 1 / -1; /* 桌面双栏下横跨两列；窄屏 block 布局自动忽略 */
+            min-width: 0;
         }
         .stats-panel .stat-label {
             color: var(--text-tertiary);
@@ -493,26 +500,21 @@
             font-weight: 500;
             transition: color var(--transition-normal);
         }
-        /* ── 字节布局表：把真实头部/密文结构逐段摊开 ── */
-        /* 三态同构：idle / 处理中 / 完成 的 chips 与布局行数一致。
-           chips 用固定 4 列网格，条数变化只填充格子不触发换行 → 行数恒定 → 整框高度恒定 */
+        /* chips 容器：横向铺排，装不下就整条折行，绝不压缩单条内容 */
         .stats-panel .stat-chips {
-            display: grid;
-            grid-template-columns: repeat(var(--chip-cols, 4), minmax(0, 1fr));
+            display: flex;
+            flex-wrap: wrap;
             align-items: baseline;
-            gap: 6px 14px;
-            /* 行数由 JS 按最大条目数锁定（见 lockStatsHeight），此处不预设高度 */
+            gap: 6px 24px;
+            min-width: 0;
         }
         .stats-panel .stat-item {
             display: flex;
             align-items: baseline;
             gap: 6px;
+            flex: 0 0 auto;      /* 不拉伸、不收缩，宽度由内容决定 */
+            white-space: nowrap; /* 单条内部绝不换行 */
             min-width: 0;
-        }
-        .stats-panel .stat-item .stat-value {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
         }
         .stats-panel .stat-block {
             border-top: 1px dashed var(--border);
@@ -627,6 +629,10 @@
             .meta div {
                 gap: 24px;
             }
+            /* 桌面双栏下，信息框独占一整行，间距交由 grid gap 处理 */
+            .stats-panel {
+                margin-top: 0;
+            }
         }
 
         @media (min-width: 1100px) {
@@ -667,8 +673,7 @@
                 font-size: 10px;
             }
             .stats-panel .stat-chips {
-                --chip-cols: 2;
-                gap: 4px 10px;
+                gap: 4px 14px;
             }
             .stats-panel .stat-item {
                 font-size: 10px;
@@ -806,9 +811,11 @@
                         <textarea id="output" placeholder="结果将显示在此..." spellcheck="false" readonly></textarea>
                         <button class="copy-btn" id="copyBtn" type="button">复制</button>
                     </div>
-                    <div class="stats-panel" id="statsPanel"></div>
                 </div>
             </div>
+
+            <!-- 信息框：位于两栏下方，横跨整宽（grid-column: 1 / -1） -->
+            <div class="stats-panel" id="statsPanel"></div>
         </div>
 
         <div class="meta">
@@ -1240,36 +1247,33 @@
                 statusEl.className='status show '+type; statusEl.textContent=text;
             }
             function clearStatus() { setStatus('',''); }
-            // ════════════════════ 信息框（三态同构，避免跳动） ════════════════════
-// 设计约束：idle / 处理中 / 完成 三种状态的 chips 条数与布局段行数完全一致，
-// 只替换单元格内的取值。这样整框高度恒定，加解密过程中不会推挤页面。
-// 取值缺失时显示占位符 —，绝不增删行。
 
-// 布局段骨架：HEADER 恒 6 行（v1 无 magic/ver 时补空行占位），PAYLOAD 恒 1 行
-function layoutSkeleton(isV2, plainLen) {
-    const headerLen = isV2 ? HEADER_LEN : LEGACY_HEADER_LEN;
-    const blank = '<span class="seg-idx">—</span>';
-    const segs = [];
-    let off = 0;
-    if (isV2) {
-        segs.push({ name:'magic', len:'[4]', hex:offPad(off)+'<span class="seg-idx">"CIPH" 43495048</span>' });
-        off = 4;
-        segs.push({ name:'ver', len:'[1]', hex:offPad(off)+'<span class="seg-idx">'+(currentKdf()==='argon2id'?'0x03':'0x02')+' · '+(currentKdf()==='argon2id'?'Argon2id':'PBKDF2')+'</span>' });
-        off = 5;
-    } else {
-        segs.push({ name:'magic', len:'[4]', hex:blank });
-        segs.push({ name:'ver', len:'[1]', hex:blank });
-    }
-    segs.push({ name:'salt', len:'['+SALT_LEN+']', hex:offPad(off)+blank });
-    off += SALT_LEN;
-    segs.push({ name:'aes_iv', len:'['+AES_IV_LEN+']', hex:offPad(off)+blank });
-    off += AES_IV_LEN;
-    segs.push({ name:'xnonce', len:'['+XNONCE_LEN+']', hex:offPad(off)+blank });
-    off += XNONCE_LEN;
-    segs.push({ name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:offPad(off)+blank });
-    return { headerLen, segs, plainLen: plainLen||0 };
-}
-// 把真实取值填回骨架；info 为 null 时保持占位符
+            // ════════════════════ 信息框（横向铺满整宽） ════════════════════
+            // 布局段骨架：HEADER 恒 6 行（v1 无 magic/ver 时补空行占位），PAYLOAD 恒 1 行
+            function layoutSkeleton(isV2, plainLen) {
+                const headerLen = isV2 ? HEADER_LEN : LEGACY_HEADER_LEN;
+                const blank = '<span class="seg-idx">—</span>';
+                const segs = [];
+                let off = 0;
+                if (isV2) {
+                    segs.push({ name:'magic', len:'[4]', hex:offPad(off)+'<span class="seg-idx">"CIPH" 43495048</span>' });
+                    off = 4;
+                    segs.push({ name:'ver', len:'[1]', hex:offPad(off)+'<span class="seg-idx">'+(currentKdf()==='argon2id'?'0x03':'0x02')+' · '+(currentKdf()==='argon2id'?'Argon2id':'PBKDF2')+'</span>' });
+                    off = 5;
+                } else {
+                    segs.push({ name:'magic', len:'[4]', hex:blank });
+                    segs.push({ name:'ver', len:'[1]', hex:blank });
+                }
+                segs.push({ name:'salt', len:'['+SALT_LEN+']', hex:offPad(off)+blank });
+                off += SALT_LEN;
+                segs.push({ name:'aes_iv', len:'['+AES_IV_LEN+']', hex:offPad(off)+blank });
+                off += AES_IV_LEN;
+                segs.push({ name:'xnonce', len:'['+XNONCE_LEN+']', hex:offPad(off)+blank });
+                off += XNONCE_LEN;
+                segs.push({ name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:offPad(off)+blank });
+                return { headerLen, segs, plainLen: plainLen||0 };
+            }
+            // 把真实取值填回骨架；info 为 null 时保持占位符
             // 按段名定位而非按下标递推：v1 无 magic/ver，下标递推会错位并越界
             function fillSkeleton(sk, info) {
                 const segs = sk.segs.map(s=>({ name:s.name, len:s.len, hex:s.hex }));
@@ -1289,59 +1293,50 @@ function layoutSkeleton(isV2, plainLen) {
                 put('key_check', offPad(base+SALT_LEN+AES_IV_LEN+XNONCE_LEN)+escapeHtml(bytesToHex(info.keyCheck)));
                 return segs;
             }
-function renderStats(sk, info, chips) {
-    const blocks = [{ title:'HEADER · 头部 '+sk.headerLen+' B', segments: fillSkeleton(sk, info) }];
-    // PAYLOAD 恒存在：解密/加密完成后填真实 poly1305_tag，其余时间占位
-    const payLen = info ? info.cipherLen - sk.headerLen : 0;
-    blocks.push({
-        title:'PAYLOAD · 载荷 '+(info ? payLen : '—')+' B',
-        segments:[{
-            name:'poly1305_tag', len:'[16]',
-            hex: info && info.polyTag && info.polyTag.length
-                ? offPad(info.cipherLen-16)+escapeHtml(bytesToHex(info.polyTag))
-                : '<span class="seg-idx">—</span>'
-        }]
-    });
-    showStats(chips, blocks);
-}
-// 信息框默认常驻：无结果时展示就绪态参数，加解密前后不消失
-function showIdleStats() {
-    const fmtLabel = formatSelect.options[formatSelect.selectedIndex].text;
-    const kdf = currentKdf();
-    renderStats(layoutSkeleton(true), null, [
-        { label:'状态', value:'就绪' },
-        { label:'算法', value:'AES-256-GCM × XChaCha20-Poly1305' },
-        { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
-        { label:'编码', value:fmtLabel },
-    ]);
-}
-function clearStats() { showIdleStats(); }
-// 处理中：沿用同一骨架，仅 chips 换为进行态文案。行数与完成态一致 → 高度不跳
-function showBusyStats(mode, kdf) {
-    const isEnc = mode === 'encrypt';
-    renderStats(layoutSkeleton(true), null, [
-        { label:'状态', value:isEnc ? '加密中…' : '解密中…' },
-        { label:'算法', value:'AES-256-GCM × XChaCha20-Poly1305' },
-        { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
-        { label:isEnc ? '明文' : '密文', value:'计算中' },
-    ]);
-}
-// chips: 顶部固定列网格；blocks: 下方逐段摊开的字节布局（真实取值）
-// 列数由 CSS 变量 --chip-cols 决定（桌面 4 / 窄屏 2）。不足整数倍时补空位，
-// 避免最后一行出现半排条目导致行数变化 → 整框高度恒定
-function chipCols() {
-    const v = getComputedStyle(statsPanel).getPropertyValue('--chip-cols');
-    const n = parseInt(v, 10);
-    return (n === 2 || n === 4) ? n : 4;
-}
-function showStats(chips, blocks) {
+            function renderStats(sk, info, chips) {
+                const blocks = [{ title:'HEADER · 头部 '+sk.headerLen+' B', segments: fillSkeleton(sk, info) }];
+                // PAYLOAD 恒存在：解密/加密完成后填真实 poly1305_tag，其余时间占位
+                const payLen = info ? info.cipherLen - sk.headerLen : 0;
+                blocks.push({
+                    title:'PAYLOAD · 载荷 '+(info ? payLen : '—')+' B',
+                    segments:[{
+                        name:'poly1305_tag', len:'[16]',
+                        hex: info && info.polyTag && info.polyTag.length
+                            ? offPad(info.cipherLen-16)+escapeHtml(bytesToHex(info.polyTag))
+                            : '<span class="seg-idx">—</span>'
+                    }]
+                });
+                showStats(chips, blocks);
+            }
+            // 信息框默认常驻：无结果时展示就绪态参数，加解密前后不消失
+            function showIdleStats() {
+                const fmtLabel = formatSelect.options[formatSelect.selectedIndex].text;
+                const kdf = currentKdf();
+                renderStats(layoutSkeleton(true), null, [
+                    { label:'状态', value:'就绪' },
+                    { label:'算法', value:'AES-256-GCM × XChaCha20-Poly1305' },
+                    { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
+                    { label:'编码', value:fmtLabel },
+                ]);
+            }
+            function clearStats() { showIdleStats(); }
+            // 处理中：沿用同一骨架，仅 chips 换为进行态文案
+            function showBusyStats(mode, kdf) {
+                const isEnc = mode === 'encrypt';
+                renderStats(layoutSkeleton(true), null, [
+                    { label:'状态', value:isEnc ? '加密中…' : '解密中…' },
+                    { label:'算法', value:'AES-256-GCM × XChaCha20-Poly1305' },
+                    { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
+                    { label:isEnc ? '明文' : '密文', value:'计算中' },
+                ]);
+            }
+            // chips：flex 横向铺排，单条 nowrap 不截断，装不下时整条折行；
+            // blocks：下方逐段摊开的字节布局（真实取值）
+            function showStats(chips, blocks) {
                 const list = chips||[];
-                let chipsHtml = list.map(item=>
+                const chipsHtml = list.map(item=>
                     '<span class="stat-item"><span class="stat-label">'+escapeHtml(item.label)+'</span><span class="stat-value">'+escapeHtml(item.value)+'</span></span>'
                 ).join('');
-                const cols = chipCols();
-                const pad = (cols - list.length % cols) % cols;
-                if (pad) chipsHtml += new Array(pad+1).join('<span class="stat-item" aria-hidden="true"></span>');
                 const blocksHtml = (blocks||[]).map(blk=>{
                     const head = '<div class="stat-block-head"><span class="blk-title">'+escapeHtml(blk.title)+'</span></div>';
                     const segs = blk.segments.map(s=>
@@ -1353,24 +1348,8 @@ function showStats(chips, blocks) {
                 }).join('');
                 statsPanel.innerHTML = '<div class="stat-chips">'+chipsHtml+'</div>'+blocksHtml;
                 statsPanel.className='stats-panel show';
-                lockStatsHeight(cols);
             }
-// 锁定信息框高度：按当前列数下「最多条目数」对应的行数预留空间，
-            // 使 idle(4条) / 处理中(4条) / 完成(最多8条) 三态高度完全一致。
-            const MAX_CHIPS = 8;
-            function lockStatsHeight(cols) {
-    const rows = Math.ceil(MAX_CHIPS / cols);
-    const probe = statsPanel.querySelector('.stat-chips');
-    if (!probe) return;
-    // 先清空再测量，否则会量到上一轮写入的 min-height
-    probe.style.minHeight = '0px';
-    const cell = probe.querySelector('.stat-item');
-    if (!cell) return;
-    const lineH = cell.getBoundingClientRect().height;
-    const gap = parseFloat(getComputedStyle(probe).rowGap) || 0;
-    if (!lineH) { probe.style.minHeight = ''; return; }
-    probe.style.minHeight = (rows * lineH + (rows - 1) * gap) + 'px';
-}
+
             function escapeHtml(str) {
                 const div=document.createElement('div'); div.textContent=str; return div.innerHTML;
             }
@@ -1696,12 +1675,7 @@ function showStats(chips, blocks) {
                     outputArea.style.height = Math.max(120, Math.round(outputArea.offsetHeight + delta)) + 'px';
                 }
             }
-            window.addEventListener('resize', ()=>{
-                syncOutputHeight();
-                // 断点切换会改变 chips 列数，需按新列数重算锁定高度
-                const probe = statsPanel.querySelector('.stat-chips');
-                if (probe) lockStatsHeight(chipCols());
-            });
+            window.addEventListener('resize', syncOutputHeight);
             window.addEventListener('load', syncOutputHeight);
             setTimeout(syncOutputHeight, 250); // 字体加载与布局稳定后二次校准
             if (window.ResizeObserver) new ResizeObserver(syncOutputHeight).observe(inputArea); // 用户拖拽【输入】高度时跟随
