@@ -211,7 +211,12 @@
             transition: color var(--transition-normal);
             text-align: right;
             max-width: 55%;
-            word-break: break-word;
+            /* 单行省略：换行会撑高 .label，把下方控件整体推移造成视觉割裂 */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 1;
+            min-width: 0;
         }
 
         input,
@@ -239,6 +244,10 @@
         #output {
             /* 高度由脚本动态对齐【输入】框底部，禁止手动拖动破坏对齐 */
             resize: none;
+        }
+        /* 右侧为 absolute 定位的显示/隐藏按钮预留空间，否则长密钥会压到按钮下方 */
+        #key {
+            padding-right: 62px;
         }
         input:focus,
         textarea:focus,
@@ -269,7 +278,7 @@
             right: 6px;
             top: 50%;
             transform: translateY(-50%);
-            background: transparent;
+            background: var(--surface);
             border: none;
             color: var(--text-tertiary);
             cursor: pointer;
@@ -280,6 +289,11 @@
             transition: color var(--transition-fast);
             -webkit-tap-highlight-color: transparent;
             z-index: 2;
+        }
+        /* 固定按钮宽度：显示/隐藏两字切换时布局不抖动 */
+        .toggle-visibility {
+            min-width: 52px;
+            text-align: center;
         }
         .toggle-visibility:hover {
             color: var(--text);
@@ -470,18 +484,6 @@
             color: var(--text-secondary);
             transition: all var(--transition-normal);
         }
-        .stats-panel .stat-chips {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 6px 18px;
-        }
-        .stats-panel .stat-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            white-space: nowrap;
-        }
         .stats-panel .stat-label {
             color: var(--text-tertiary);
             font-size: 10px;
@@ -493,12 +495,27 @@
             font-weight: 500;
             transition: color var(--transition-normal);
         }
-        .stats-panel .stat-sep {
-            color: var(--border-strong);
-            margin: 0 2px;
-            user-select: none;
-        }
         /* ── 字节布局表：把真实头部/密文结构逐段摊开 ── */
+        /* 三态同构：idle / 处理中 / 完成 的 chips 与布局行数一致。
+           chips 用固定 4 列网格，条数变化只填充格子不触发换行 → 行数恒定 → 整框高度恒定 */
+        .stats-panel .stat-chips {
+            display: grid;
+            grid-template-columns: repeat(var(--chip-cols, 4), minmax(0, 1fr));
+            align-items: baseline;
+            gap: 6px 14px;
+            /* 行数由 JS 按最大条目数锁定（见 lockStatsHeight），此处不预设高度 */
+        }
+        .stats-panel .stat-item {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            min-width: 0;
+        }
+        .stats-panel .stat-item .stat-value {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .stats-panel .stat-block {
             border-top: 1px dashed var(--border);
             padding-top: 9px;
@@ -652,6 +669,7 @@
                 font-size: 10px;
             }
             .stats-panel .stat-chips {
+                --chip-cols: 2;
                 gap: 4px 10px;
             }
             .stats-panel .stat-item {
@@ -694,9 +712,6 @@
             .stats-panel .stat-item {
                 font-size: 9px;
                 gap: 3px;
-            }
-            .stats-panel .stat-sep {
-                display: none;
             }
         }
     </style>
@@ -1227,36 +1242,108 @@
                 statusEl.className='status show '+type; statusEl.textContent=text;
             }
             function clearStatus() { setStatus('',''); }
-            // 信息框默认常驻：无结果时展示就绪态参数，加解密前后不消失
-            function showIdleStats() {
-                const fmtLabel = formatSelect.options[formatSelect.selectedIndex].text;
-                const kdf = currentKdf();
-                showStats([
-                    { label:'状态', value:'就绪' },
-                    { label:'算法', value:'AES-256-GCM × XChaCha20-Poly1305' },
-                    { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
-                    { label:'编码', value:fmtLabel },
-                ], [
-                    {
-                        title:'HEADER · 头部 '+HEADER_LEN+' B',
-                        segments:[
-                            { name:'magic', len:'[4]', hex:offPad(0)+'<span class="seg-idx">"CIPH" 43495048</span>' },
-                            { name:'ver', len:'[1]', hex:offPad(4)+'<span class="seg-idx">'+(kdf==='argon2id'?'0x03':'0x02')+' · '+(kdf==='argon2id'?'Argon2id':'PBKDF2')+'</span>' },
-                            { name:'salt', len:'['+SALT_LEN+']', hex:offPad(5)+'<span class="seg-idx">—</span>' },
-                            { name:'aes_iv', len:'['+AES_IV_LEN+']', hex:offPad(5+SALT_LEN)+'<span class="seg-idx">—</span>' },
-                            { name:'xnonce', len:'['+XNONCE_LEN+']', hex:offPad(5+SALT_LEN+AES_IV_LEN)+'<span class="seg-idx">—</span>' },
-                            { name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:offPad(5+SALT_LEN+AES_IV_LEN+XNONCE_LEN)+'<span class="seg-idx">—</span>' },
-                        ]
-                    }
-                ]);
+            // ════════════════════ 信息框（三态同构，避免跳动） ════════════════════
+// 设计约束：idle / 处理中 / 完成 三种状态的 chips 条数与布局段行数完全一致，
+// 只替换单元格内的取值。这样整框高度恒定，加解密过程中不会推挤页面。
+// 取值缺失时显示占位符 —，绝不增删行。
+
+// 布局段骨架：HEADER 恒 6 行（v1 无 magic/ver 时补空行占位），PAYLOAD 恒 1 行
+function layoutSkeleton(isV2, plainLen) {
+    const headerLen = isV2 ? HEADER_LEN : LEGACY_HEADER_LEN;
+    const blank = '<span class="seg-idx">—</span>';
+    const segs = [];
+    let off = 0;
+    if (isV2) {
+        segs.push({ name:'magic', len:'[4]', hex:offPad(off)+'<span class="seg-idx">"CIPH" 43495048</span>' });
+        off = 4;
+        segs.push({ name:'ver', len:'[1]', hex:offPad(off)+'<span class="seg-idx">'+(currentKdf()==='argon2id'?'0x03':'0x02')+' · '+(currentKdf()==='argon2id'?'Argon2id':'PBKDF2')+'</span>' });
+        off = 5;
+    } else {
+        segs.push({ name:'magic', len:'[4]', hex:blank });
+        segs.push({ name:'ver', len:'[1]', hex:blank });
+    }
+    segs.push({ name:'salt', len:'['+SALT_LEN+']', hex:offPad(off)+blank });
+    off += SALT_LEN;
+    segs.push({ name:'aes_iv', len:'['+AES_IV_LEN+']', hex:offPad(off)+blank });
+    off += AES_IV_LEN;
+    segs.push({ name:'xnonce', len:'['+XNONCE_LEN+']', hex:offPad(off)+blank });
+    off += XNONCE_LEN;
+    segs.push({ name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:offPad(off)+blank });
+    return { headerLen, segs, plainLen: plainLen||0 };
+}
+// 把真实取值填回骨架；info 为 null 时保持占位符
+            // 按段名定位而非按下标递推：v1 无 magic/ver，下标递推会错位并越界
+            function fillSkeleton(sk, info) {
+                const segs = sk.segs.map(s=>({ name:s.name, len:s.len, hex:s.hex }));
+                if (!info) return segs;
+                const base = info.isV2 ? 5 : 0;
+                const put = (name, hex) => {
+                    const t = segs.find(x=>x.name===name);
+                    if (t) t.hex = hex; // 找不到就跳过，绝不新增行
+                };
+                if (info.isV2) {
+                    put('magic', offPad(0)+'<span class="seg-idx">"CIPH"</span> '+escapeHtml(bytesToHex(info.magic)));
+                    put('ver', offPad(4)+escapeHtml((info.kdf==='argon2id'?'0x03':'0x02')+' · '+(info.kdf==='argon2id'?'Argon2id':'PBKDF2')));
+                }
+                put('salt', offPad(base)+escapeHtml(bytesToHex(info.salt)));
+                put('aes_iv', offPad(base+SALT_LEN)+escapeHtml(bytesToHex(info.aesIv)));
+                put('xnonce', offPad(base+SALT_LEN+AES_IV_LEN)+escapeHtml(bytesToHex(info.xnonce)));
+                put('key_check', offPad(base+SALT_LEN+AES_IV_LEN+XNONCE_LEN)+escapeHtml(bytesToHex(info.keyCheck)));
+                return segs;
             }
-            function clearStats() { showIdleStats(); }
-            // chips: 顶部一行摘要；blocks: 下方逐段摊开的字节布局（真实取值）
-            function showStats(chips, blocks) {
-                const chipsHtml = (chips||[]).map((item,i)=>{
-                    const sep = i<chips.length-1 ? '<span class="stat-sep" aria-hidden="true">·</span>' : '';
-                    return '<span class="stat-item"><span class="stat-label">'+escapeHtml(item.label)+'</span><span class="stat-value">'+escapeHtml(item.value)+'</span></span>'+sep;
-                }).join('');
+function renderStats(sk, info, chips) {
+    const blocks = [{ title:'HEADER · 头部 '+sk.headerLen+' B', segments: fillSkeleton(sk, info) }];
+    // PAYLOAD 恒存在：解密/加密完成后填真实 poly1305_tag，其余时间占位
+    const payLen = info ? info.cipherLen - sk.headerLen : 0;
+    blocks.push({
+        title:'PAYLOAD · 载荷 '+(info ? payLen : '—')+' B',
+        segments:[{
+            name:'poly1305_tag', len:'[16]',
+            hex: info && info.polyTag && info.polyTag.length
+                ? offPad(info.cipherLen-16)+escapeHtml(bytesToHex(info.polyTag))
+                : '<span class="seg-idx">—</span>'
+        }]
+    });
+    showStats(chips, blocks);
+}
+// 信息框默认常驻：无结果时展示就绪态参数，加解密前后不消失
+function showIdleStats() {
+    const fmtLabel = formatSelect.options[formatSelect.selectedIndex].text;
+    const kdf = currentKdf();
+    renderStats(layoutSkeleton(true), null, [
+        { label:'状态', value:'就绪' },
+        { label:'算法', value:'AES-256-GCM × XChaCha20-Poly1305' },
+        { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
+        { label:'编码', value:fmtLabel },
+    ]);
+}
+function clearStats() { showIdleStats(); }
+// 处理中：沿用同一骨架，仅 chips 换为进行态文案。行数与完成态一致 → 高度不跳
+function showBusyStats(mode, kdf) {
+    const isEnc = mode === 'encrypt';
+    renderStats(layoutSkeleton(true), null, [
+        { label:'状态', value:isEnc ? '加密中…' : '解密中…' },
+        { label:'算法', value:'AES-256-GCM × XChaCha20-Poly1305' },
+        { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
+        { label:isEnc ? '明文' : '密文', value:'计算中' },
+    ]);
+}
+// chips: 顶部固定列网格；blocks: 下方逐段摊开的字节布局（真实取值）
+// 列数由 CSS 变量 --chip-cols 决定（桌面 4 / 窄屏 2）。不足整数倍时补空位，
+// 避免最后一行出现半排条目导致行数变化 → 整框高度恒定
+function chipCols() {
+    const v = getComputedStyle(statsPanel).getPropertyValue('--chip-cols');
+    const n = parseInt(v, 10);
+    return (n === 2 || n === 4) ? n : 4;
+}
+function showStats(chips, blocks) {
+                const list = chips||[];
+                let chipsHtml = list.map(item=>
+                    '<span class="stat-item"><span class="stat-label">'+escapeHtml(item.label)+'</span><span class="stat-value">'+escapeHtml(item.value)+'</span></span>'
+                ).join('');
+                const cols = chipCols();
+                const pad = (cols - list.length % cols) % cols;
+                if (pad) chipsHtml += new Array(pad+1).join('<span class="stat-item" aria-hidden="true"></span>');
                 const blocksHtml = (blocks||[]).map(blk=>{
                     const head = '<div class="stat-block-head"><span class="blk-title">'+escapeHtml(blk.title)+'</span></div>';
                     const segs = blk.segments.map(s=>
@@ -1268,7 +1355,24 @@
                 }).join('');
                 statsPanel.innerHTML = '<div class="stat-chips">'+chipsHtml+'</div>'+blocksHtml;
                 statsPanel.className='stats-panel show';
+                lockStatsHeight(cols);
             }
+// 锁定信息框高度：按当前列数下「最多条目数」对应的行数预留空间，
+            // 使 idle(4条) / 处理中(4条) / 完成(最多8条) 三态高度完全一致。
+            const MAX_CHIPS = 8;
+            function lockStatsHeight(cols) {
+    const rows = Math.ceil(MAX_CHIPS / cols);
+    const probe = statsPanel.querySelector('.stat-chips');
+    if (!probe) return;
+    // 先清空再测量，否则会量到上一轮写入的 min-height
+    probe.style.minHeight = '0px';
+    const cell = probe.querySelector('.stat-item');
+    if (!cell) return;
+    const lineH = cell.getBoundingClientRect().height;
+    const gap = parseFloat(getComputedStyle(probe).rowGap) || 0;
+    if (!lineH) { probe.style.minHeight = ''; return; }
+    probe.style.minHeight = (rows * lineH + (rows - 1) * gap) + 'px';
+}
             function escapeHtml(str) {
                 const div=document.createElement('div'); div.textContent=str; return div.innerHTML;
             }
@@ -1276,35 +1380,6 @@
                 let out = '';
                 for (let i=0;i<bytes.length;i++) out += bytes[i].toString(16).padStart(2,'0');
                 return out;
-            }
-            // 把本次真实使用的头部/密文逐段渲染成可核对的信息框（只给实际取值，不写解释性文案）
-            function buildLayoutBlocks(info) {
-                const blocks = [];
-                const headerLen = info.isV2 ? HEADER_LEN : LEGACY_HEADER_LEN;
-                const segs = [];
-                let off = 0;
-                if (info.isV2) {
-                    segs.push({ name:'magic', len:'[4]', hex:offPad(off)+'<span class="seg-idx">"CIPH"</span> '+escapeHtml(bytesToHex(info.magic)) });
-                    off = 4;
-                    segs.push({ name:'ver', len:'[1]', hex:offPad(off)+escapeHtml((info.kdf==='argon2id'?'0x03':'0x02')+' · '+(info.kdf==='argon2id'?'Argon2id':'PBKDF2')) });
-                    off = 5;
-                }
-                segs.push({ name:'salt', len:'['+SALT_LEN+']', hex:offPad(off)+escapeHtml(bytesToHex(info.salt)) });
-                off += SALT_LEN;
-                segs.push({ name:'aes_iv', len:'['+AES_IV_LEN+']', hex:offPad(off)+escapeHtml(bytesToHex(info.aesIv)) });
-                off += AES_IV_LEN;
-                segs.push({ name:'xnonce', len:'['+XNONCE_LEN+']', hex:offPad(off)+escapeHtml(bytesToHex(info.xnonce)) });
-                off += XNONCE_LEN;
-                segs.push({ name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:offPad(off)+escapeHtml(bytesToHex(info.keyCheck)) });
-                blocks.push({ title:'HEADER · 头部 '+headerLen+' B', segments: segs });
-                // ── 载荷：外层认证标签是密文中仅存的明文字节，可直接核对 ──
-                if (info.polyTag && info.polyTag.length) {
-                    blocks.push({
-                        title:'PAYLOAD · 载荷 '+(info.cipherLen-headerLen)+' B',
-                        segments:[{ name:'poly1305_tag', len:'[16]', hex:offPad(info.cipherLen-16)+escapeHtml(bytesToHex(info.polyTag)) }]
-                    });
-                }
-                return blocks;
             }
             function offPad(off) { return '<span class="seg-idx">@'+off+'</span> '; }
             function formatBytes(bytes) {
@@ -1516,9 +1591,11 @@
             // ════════════════════ KDF 选择 (PBKDF2 / Argon2id) ════════════════════
             const KDF_KEY = 'cipher_kdf_v1';
             function currentKdf() { return kdfArgon2.checked ? 'argon2id' : 'pbkdf2'; }
+            // hint 单行省略显示，全文放进 title 供悬浮查看
+            function setHint(el, text) { el.textContent = text; el.title = text; }
             function refreshKdfHint() {
                 const info = KDF_INFO[currentKdf()];
-                kdfHint.textContent = info.name + ' · ' + info.desc;
+                setHint(kdfHint, info.name + ' · ' + info.desc);
             }
             try {
                 if (localStorage.getItem(KDF_KEY) === 'argon2id' && argon2Available()) kdfArgon2.checked = true;
@@ -1529,7 +1606,7 @@
                 kdfArgon2.disabled = true;
                 kdfOption.classList.add('disabled');
                 kdfOption.title = 'Argon2 库加载失败（需联网），当前仅可用 PBKDF2';
-                kdfHint.textContent = 'PBKDF2-SHA512 · 600,000 轮（Argon2 库未加载）';
+                setHint(kdfHint, 'PBKDF2-SHA512 · 600,000 轮（Argon2 库未加载）');
             } else {
                 refreshKdfHint();
             }
@@ -1621,7 +1698,12 @@
                     outputArea.style.height = Math.max(120, Math.round(outputArea.offsetHeight + delta)) + 'px';
                 }
             }
-            window.addEventListener('resize', syncOutputHeight);
+            window.addEventListener('resize', ()=>{
+                syncOutputHeight();
+                // 断点切换会改变 chips 列数，需按新列数重算锁定高度
+                const probe = statsPanel.querySelector('.stat-chips');
+                if (probe) lockStatsHeight(chipCols());
+            });
             window.addEventListener('load', syncOutputHeight);
             setTimeout(syncOutputHeight, 250); // 字体加载与布局稳定后二次校准
             if (window.ResizeObserver) new ResizeObserver(syncOutputHeight).observe(inputArea); // 用户拖拽【输入】高度时跟随
@@ -1637,8 +1719,8 @@
                 inputArea.value = '';
                 outputArea.value = '';
                 clearStatus(); clearStats();
-                resultHint.textContent = '就绪';
-                formatHint.textContent = '解密时须与加密输出格式一致';
+                setHint(resultHint, '就绪');
+                setHint(formatHint, '解密时须与加密输出格式一致');
                 updateStrength();
                 keyInput.focus();
             });
@@ -1652,7 +1734,8 @@
                 const kdf = currentKdf();
                 setBusy(true);
                 setStatus('加密中… ('+KDF_INFO[kdf].name+' '+KDF_INFO[kdf].desc+' + 双层加密)','info');
-                resultHint.textContent = '加密中…';
+                setHint(resultHint, '加密中…');
+                showBusyStats('encrypt', kdf);
                 await new Promise(r=>setTimeout(r,20));
                 const t0 = performance.now();
                 try {
@@ -1665,7 +1748,7 @@
                     const overheadBytes = cipherBytes.length - plainLen;
                     const ratio = plainLen>0 ? cipherBytes.length/plainLen : 0;
                     const overheadPct = plainLen>0 ? (overheadBytes/plainLen)*100 : 0;
-                    showStats([
+                    renderStats(layoutSkeleton(true), header, [
                         { label:'耗时', value:formatMs(elapsed) },
                         { label:'吞吐', value:formatThroughput(plainLen, elapsed) },
                         { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
@@ -1673,14 +1756,14 @@
                         { label:'密文', value:formatBytes(cipherBytes.length)+' · '+cipherBytes.length+' 字节' },
                         { label:'编码输出', value:encoded.length+' 字符 · '+fmt },
                         { label:'膨胀率', value:formatRatio(ratio)+' (+'+formatPercent(overheadPct)+')' },
-                    ], buildLayoutBlocks(header));
+                    ]);
                     setStatus('加密成功 · '+KDF_INFO[kdf].name+' · '+cipherBytes.length+' 字节密文 · '+encoded.length+' 字符（'+fmt+'）','success');
-                    resultHint.textContent = '加密完成 · '+formatBytes(cipherBytes.length);
+                    setHint(resultHint, '加密完成 · '+formatBytes(cipherBytes.length));
                 } catch(e) {
                     setStatus('加密失败：'+(e.message||e),'error');
                     outputArea.value = '';
                     clearStats();
-                    resultHint.textContent = '就绪';
+                    setHint(resultHint, '就绪');
                 } finally { setBusy(false); }
             });
 
@@ -1698,7 +1781,8 @@
 
                 setBusy(true);
                 setStatus('解密中… (按密文版本自动选择 KDF + 双层解密)','info');
-                resultHint.textContent = '解密中…';
+                setHint(resultHint, '解密中…');
+                showBusyStats('decrypt', currentKdf());
                 await new Promise(r=>setTimeout(r,20));
                 const t0 = performance.now();
                 const tried = [];
@@ -1723,7 +1807,7 @@
                     const fmtNote = ' · 格式: ' + usedFmt + (usedFmt !== userFmt ? '（按自动识别）' : '');
                     const compressionRatio = cipherLen>0 ? plainLen/cipherLen : 0;
                     const verLabel = !header.isV2 ? 'v1 · 旧版 (PBKDF2)' : (kdf==='argon2id' ? 'v3 · Argon2id' : 'v2 · PBKDF2');
-                    showStats([
+                    renderStats(layoutSkeleton(header.isV2), header, [
                         { label:'耗时', value:formatMs(elapsed) },
                         { label:'吞吐', value:formatThroughput(plainLen, elapsed) },
                         { label:'KDF', value:KDF_INFO[kdf].name+' · '+KDF_INFO[kdf].desc },
@@ -1732,14 +1816,14 @@
                         { label:'识别格式', value:usedFmt+(usedFmt!==userFmt ? '（自动识别）' : '') },
                         { label:'明文', value:plaintext.length+' 字符 · '+plainLen+' 字节' },
                         { label:'压缩比', value:formatRatio(compressionRatio) },
-                    ], buildLayoutBlocks(header));
+                    ]);
                     setStatus('解密成功 · '+plaintext.length+' 字符明文'+fmtNote,'success');
-                    resultHint.textContent = '解密完成 · '+formatBytes(plainLen)+' 明文';
+                    setHint(resultHint, '解密完成 · '+formatBytes(plainLen)+' 明文');
                 } catch(e) {
                     setStatus('解密失败：'+(e.message||e)+'（已尝试格式: '+tried.join('、')+'）','error');
                     outputArea.value = '';
                     clearStats();
-                    resultHint.textContent = '就绪';
+                    setHint(resultHint, '就绪');
                 } finally { setBusy(false); }
             });
 
@@ -1748,9 +1832,9 @@
                 if (!val || busy) return;
                 const detected = detectFormat(val);
                 if (detected) {
-                    formatHint.textContent = '已识别格式: ' + detected + ' · 解密时自动使用（下拉框不变）';
+                    setHint(formatHint, '已识别格式: ' + detected + ' · 解密时自动使用（下拉框不变）');
                 } else {
-                    formatHint.textContent = '解密时须与加密输出格式一致';
+                    setHint(formatHint, '解密时须与加密输出格式一致');
                 }
             });
 
@@ -1778,7 +1862,7 @@
                 }
             });
 
-            resultHint.textContent = '就绪';
+            setHint(resultHint, '就绪');
             clearStats();
             updateStrength();
             syncOutputHeight();
