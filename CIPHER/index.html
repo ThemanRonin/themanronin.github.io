@@ -4,9 +4,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
     <title>CIPHER</title>
-    <script src="./js/argon2/argon2-bundled.min.js"></script>
+    <!--
+      部署方须知（静态单文件页面无法自行下发响应头，建议在服务端同时返回）：
+        Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'
+        X-Content-Type-Options: nosniff
+        Referrer-Policy: no-referrer
+        Cross-Origin-Opener-Policy: same-origin
+        Strict-Transport-Security: max-age=31536000; includeSubDomains
+      把行内 <script> 抽成外部文件后，即可去掉 CSP 中的 'unsafe-inline'（本页为单文件分发故保留）。
+    -->
+    <!-- ⚠ SRI（子资源完整性）：强烈建议为 argon2-bundled.min.js 补上 integrity。
+         生成： openssl dgst -sha384 -binary js/argon2/argon2-bundled.min.js | openssl base64 -A
+         把输出填入下方 integrity="" 即可；届时浏览器会拒绝被篡改/替换过的脚本。
+         （未填 integrity 前请勿去掉 crossorigin，否则无法启用 SRI。） -->
+    <script src="./js/argon2/argon2-bundled.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         *,
         *::before,
@@ -835,7 +849,7 @@
                             <span class="hint">KDF → 96B → 拆分为三把子密钥</span>
                         </div>
                         <div class="input-row">
-                            <input type="password" id="key" placeholder="输入任意密钥（口令）" autocomplete="off" spellcheck="false">
+                            <input type="password" id="key" placeholder="输入任意密钥（口令）" autocomplete="new-password" spellcheck="false" autocapitalize="off">
                             <button class="toggle-visibility" id="toggleVis" type="button">显示</button>
                         </div>
                         <div class="strength" id="strength">
@@ -921,6 +935,7 @@
                 <div><strong>Layout</strong><span>magic[4] ‖ ver[1] ‖ salt[32] ‖ aes_iv[12] ‖ xnonce[24] ‖ key_check[16] ‖ ct</span></div>
                 <div><strong>Auth</strong><span>双层 128-bit Poly1305 / GCM tag + HMAC 密钥确认 + 头部 AAD 绑定</span></div>
                 <div><strong>Security</strong><span>XChaCha20-Poly1305 与 ML-KEM/X448 含自实现 JavaScript 代码，非恒定时间且未经独立审计；不建议保护高价值机密</span></div>
+                <div><strong>SelfTest</strong><span class="selftest-line">启动时运行 Keccak / ChaCha20 / XChaCha20 / X448 / ML-KEM-1024 已知答案测试…</span></div>
             </div>
         </section>
 
@@ -1010,6 +1025,7 @@
                 <div><strong>Key trust</strong><span>加密前须通过可信独立渠道核验公钥指纹；本工具不提供发送者身份认证</span></div>
                 <div><strong>Security</strong><span>此版本含自实现 JavaScript/BigInt 密码学代码，非恒定时间且未经独立审计；不建议用于高价值机密</span></div>
                 <div><strong>Privacy</strong><span>本页未主动上传密钥或明文；网页被篡改、浏览器扩展或本机恶意软件仍可能读取输入</span></div>
+                <div><strong>SelfTest</strong><span class="selftest-line">启动时运行 Keccak / ChaCha20 / XChaCha20 / X448 / ML-KEM-1024 已知答案测试…</span></div>
             </div>
         </section>
     </div>
@@ -1031,11 +1047,20 @@
             const HEADER_LEN = 4 + 1 + SALT_LEN + AES_IV_LEN + XNONCE_LEN + KEY_CHECK_LEN;
             const LEGACY_HEADER_LEN = SALT_LEN + AES_IV_LEN + XNONCE_LEN + KEY_CHECK_LEN;
             const AE_OVERHEAD = 32;
-            const SYM_MAX_PLAINTEXT_BYTES = 64 * 1024 * 1024;
+            // ── DoS 加固 ──
+            // 原上限 64 MiB 在本实现的纯 JS 路径下（BigInt Poly1305 + 每 64 B 一次 chacha20Block，
+            // 实测约 8 MB/s）需要数十秒且主线程完全冻结，textarea 也无法承载该量级文本。
+            // 故将对称明文上限压到 8 MiB（约 1 秒，含 PBKDF2）；Base-N 编码（BigInt 逐块）另限 1 MiB。
+            const SYM_MAX_PLAINTEXT_BYTES = 8 * 1024 * 1024;
             const SYM_MAX_CIPHERTEXT_BYTES = HEADER_LEN + SYM_MAX_PLAINTEXT_BYTES + AE_OVERHEAD;
             // 编码文本可能比原始数据更长；用较宽松的界限在解码/派生 KDF 前阻止超大输入。
             const MAX_SYM_INPUT_CHARS = SYM_MAX_CIPHERTEXT_BYTES * 2 + 64;
-            const BASN_MAX_BYTES = SYM_MAX_CIPHERTEXT_BYTES;
+            const BASN_MAX_BYTES = 1024 * 1024;
+            // legacy(v1) 编码最多承载 65535 字节载荷；据此反推各字符表的字符数上限，
+            // 在调用 O(n²) 的 legacy 解码之前直接拒绝超大输入（实测 64 KiB 非法输入即可冻结 2 秒）。
+            const LEGACY_MAX_PAYLOAD_BYTES = 65535 + 3;
+            // 结果框格式自动识别的最大文本长度（超出则跳过识别，避免每次按键扫描整段大文本）
+            const AUTODETECT_MAX_CHARS = 200000;
 
             // ════════════════════ 通用工具 ════════════════════
             function concatBytes() {
@@ -1321,7 +1346,7 @@
             function baseNEncode(bytes, alphabet) {
                 if (!bytes) bytes = new Uint8Array(0);
                 if (bytes.length > BASN_MAX_BYTES) {
-                    throw new Error('输入过大：该编码格式只支持本工具 64 MiB 明文上限对应的密文大小，大文件请改用 Base64 / Hex');
+                    throw new Error('输入过大：该编码格式上限为 1 MiB 明文对应的密文大小，大文件请改用 Base64 / Hex');
                 }
                 const { K, D } = blockParams(alphabet);
                 const A = BigInt(alphabet.length);
@@ -1357,6 +1382,12 @@
                 if (chars.length === 0) return new Uint8Array(0);
                 let v2err;
                 try { return baseNDecodeV2(chars, alphabet); } catch (e) { v2err = e; }
+                // legacy(v1) 解码把整段输入当作一个大整数逐字符累加（value = value*n + idx），
+                // 是 O(n²) 的 BigInt 运算：1 MB 垃圾输入即可冻结主线程数分钟（DoS）。
+                // legacy 格式最多承载 65538 字节，超过该长度的数据必然无解，
+                // 因此先按字符表信息密度反推字符数上限，超限直接拒绝，不做任何计算。
+                const legacyMaxChars = Math.ceil(LEGACY_MAX_PAYLOAD_BYTES * 8 / Math.log2(alphabet.length)) + 8;
+                if (chars.length > legacyMaxChars) throw v2err;
                 try { return baseNDecodeLegacy(chars, alphabet); } catch (e) {}
                 throw v2err;
             }
@@ -1408,8 +1439,12 @@
 
             // ════════════════════ 格式检测 ════════════════════
             function detectFormat(str) {
-                const s = str.trim().replace(/\s+/g, '');
-                if (!s) return null;
+                const full = str.trim().replace(/\s+/g, '');
+                if (!full) return null;
+                // 每次 input 事件都会调用本函数；对整段文本做 trim/replace 与多次 [...s] 展开，
+                // 在 10 MB 文本上会瞬时分配数 GB 级临时数组（DoS）。只对前 16 KiB 采样判定，
+                // 字符集与结构识别已足够可靠；长度类规则仍使用完整长度。
+                const s = full.length > 16384 ? full.slice(0, 16384) : full;
 
                 const hasHighCodepoint = [...s].some(c => {
                     const cp = c.codePointAt(0);
@@ -1455,6 +1490,7 @@
 
             // ════════════════════ DOM 元素 ════════════════════
             let busy = false;
+            let selfTestOk = false; // 启动自检未通过时禁用全部密码学功能
             const $ = (id) => document.getElementById(id);
             const statusEl = $('status'), keyInput = $('key'), inputArea = $('input');
             const outputArea = $('output'), formatSelect = $('format');
@@ -1483,15 +1519,11 @@
             }
             function clearStatus() { setStatus('',''); }
 
-            function escapeHtml(str) {
-                const div=document.createElement('div'); div.textContent=str; return div.innerHTML;
-            }
             function bytesToHex(bytes) {
                 let out = '';
                 for (let i=0;i<bytes.length;i++) out += bytes[i].toString(16).padStart(2,'0');
                 return out;
             }
-            function offPad(off) { return '<span class="seg-idx">@'+off+'</span> '; }
             function formatBytes(bytes) {
                 if (bytes<1000) return bytes+' B';
                 if (bytes<1000000) return (bytes/1000).toFixed(1)+' KB';
@@ -1516,67 +1548,73 @@
             }
             function setBusy(state) {
                 busy = state;
-                encryptBtn.disabled = state;
-                decryptBtn.disabled = state;
-                genKeyBtn.disabled = state;
-                asymEncryptBtn.disabled = state;
-                asymDecryptBtn.disabled = state;
+                const d = state || !selfTestOk; // 自检失败时按钮保持禁用
+                encryptBtn.disabled = d;
+                decryptBtn.disabled = d;
+                genKeyBtn.disabled = d;
+                asymEncryptBtn.disabled = d;
+                asymDecryptBtn.disabled = d;
             }
             function setHint(el, text) { el.textContent = text; el.title = text; }
+
+            // 内部异常（atob 原生报错、KDF 内部错误、库异常等）不应暴露实现细节，
+            // 也不应让"格式不对 / 口令不对 / 密文被篡改"可被区分——统一成同一句话。
+            // 仅放行对用户有明确行动指引的提示（体积过大、Argon2 未加载等）。
+            const SAFE_ERROR_HINTS = ['过大', '上限', 'Argon2', '未加载', 'Base64', 'JSON', '字段', '长度'];
+            function userFacingError(e, fallback) {
+                const msg = (e && e.message) ? String(e.message) : String(e || '');
+                if (msg && SAFE_ERROR_HINTS.some(k => msg.indexOf(k) >= 0)) return msg;
+                return fallback;
+            }
 
             // ════════════════════ 信息框（对称） ════════════════════
             function layoutSkeleton(isV2, plainLen) {
                 const headerLen = isV2 ? HEADER_LEN : LEGACY_HEADER_LEN;
-                const blank = '<span class="seg-idx">—</span>';
                 const segs = [];
                 let off = 0;
                 if (isV2) {
-                    segs.push({ name:'magic', len:'[4]', hex:offPad(off)+'<span class="seg-idx">"CIPH" 43495048</span>' });
+                    segs.push({ name:'magic', len:'[4]', idx:0, hex:'"CIPH" 43495048' });
                     off = 4;
-                    segs.push({ name:'ver', len:'[1]', hex:offPad(off)+'<span class="seg-idx">'+(currentKdf()==='argon2id'?'0x03':'0x02')+' · '+(currentKdf()==='argon2id'?'Argon2id':'PBKDF2')+'</span>' });
+                    segs.push({ name:'ver', len:'[1]', idx:4,
+                        hex:(currentKdf()==='argon2id' ? '0x03 · Argon2id' : '0x02 · PBKDF2') });
                     off = 5;
                 } else {
-                    segs.push({ name:'magic', len:'[4]', hex:blank });
-                    segs.push({ name:'ver', len:'[1]', hex:blank });
+                    segs.push({ name:'magic', len:'[4]', idx:null, hex:null });
+                    segs.push({ name:'ver', len:'[1]', idx:null, hex:null });
                 }
-                segs.push({ name:'salt', len:'['+SALT_LEN+']', hex:offPad(off)+blank });
-                off += SALT_LEN;
-                segs.push({ name:'aes_iv', len:'['+AES_IV_LEN+']', hex:offPad(off)+blank });
-                off += AES_IV_LEN;
-                segs.push({ name:'xnonce', len:'['+XNONCE_LEN+']', hex:offPad(off)+blank });
-                off += XNONCE_LEN;
-                segs.push({ name:'key_check', len:'['+KEY_CHECK_LEN+']', hex:offPad(off)+blank });
+                segs.push({ name:'salt', len:'['+SALT_LEN+']', idx:off, hex:null }); off += SALT_LEN;
+                segs.push({ name:'aes_iv', len:'['+AES_IV_LEN+']', idx:off, hex:null }); off += AES_IV_LEN;
+                segs.push({ name:'xnonce', len:'['+XNONCE_LEN+']', idx:off, hex:null }); off += XNONCE_LEN;
+                segs.push({ name:'key_check', len:'['+KEY_CHECK_LEN+']', idx:off, hex:null });
                 return { headerLen, segs, plainLen: plainLen||0 };
             }
             function fillSkeleton(sk, info) {
-                const segs = sk.segs.map(s=>({ name:s.name, len:s.len, hex:s.hex }));
+                const segs = sk.segs.map(x=>({ name:x.name, len:x.len, idx:x.idx, hex:x.hex }));
                 if (!info) return segs;
                 const base = info.isV2 ? 5 : 0;
-                const put = (name, hex) => {
+                const put = (name, idx, hex) => {
                     const t = segs.find(x=>x.name===name);
-                    if (t) t.hex = hex;
+                    if (t) { t.idx = idx; t.hex = hex; }
                 };
                 if (info.isV2) {
-                    put('magic', offPad(0)+'<span class="seg-idx">"CIPH"</span> '+escapeHtml(bytesToHex(info.magic)));
-                    put('ver', offPad(4)+escapeHtml((info.kdf==='argon2id'?'0x03':'0x02')+' · '+(info.kdf==='argon2id'?'Argon2id':'PBKDF2')));
+                    put('magic', 0, '"CIPH" ' + bytesToHex(info.magic));
+                    put('ver', 4, (info.kdf==='argon2id' ? '0x03 · Argon2id' : '0x02 · PBKDF2'));
                 }
-                put('salt', offPad(base)+escapeHtml(bytesToHex(info.salt)));
-                put('aes_iv', offPad(base+SALT_LEN)+escapeHtml(bytesToHex(info.aesIv)));
-                put('xnonce', offPad(base+SALT_LEN+AES_IV_LEN)+escapeHtml(bytesToHex(info.xnonce)));
-                put('key_check', offPad(base+SALT_LEN+AES_IV_LEN+XNONCE_LEN)+escapeHtml(bytesToHex(info.keyCheck)));
+                put('salt', base, bytesToHex(info.salt));
+                put('aes_iv', base + SALT_LEN, bytesToHex(info.aesIv));
+                put('xnonce', base + SALT_LEN + AES_IV_LEN, bytesToHex(info.xnonce));
+                put('key_check', base + SALT_LEN + AES_IV_LEN + XNONCE_LEN, bytesToHex(info.keyCheck));
                 return segs;
             }
             function renderStats(sk, info, chips) {
                 const blocks = [{ title:'HEADER · 头部 '+sk.headerLen+' B', segments: fillSkeleton(sk, info) }];
                 const payLen = info ? info.cipherLen - sk.headerLen : 0;
+                const hasTag = !!(info && info.polyTag && info.polyTag.length);
                 blocks.push({
                     title:'PAYLOAD · 载荷 '+(info ? payLen : '—')+' B',
-                    segments:[{
-                        name:'poly1305_tag', len:'[16]',
-                        hex: info && info.polyTag && info.polyTag.length
-                            ? offPad(info.cipherLen-16)+escapeHtml(bytesToHex(info.polyTag))
-                            : '<span class="seg-idx">—</span>'
-                    }]
+                    segments:[{ name:'poly1305_tag', len:'[16]',
+                        idx: hasTag ? info.cipherLen-16 : null,
+                        hex: hasTag ? bytesToHex(info.polyTag) : null }]
                 });
                 showStats(chips, blocks, statsPanel);
             }
@@ -1600,30 +1638,49 @@
                     { label:isEnc ? '明文' : '密文', value:'计算中' },
                 ]);
             }
+            // 全部使用 textContent + createElement 构建，杜绝 innerHTML 拼接带来的注入面
+            function buildChips(items) {
+                const wrap = document.createElement('div');
+                wrap.className = 'stat-chips';
+                (items||[]).forEach(item=>{
+                    const w = document.createElement('span'); w.className = 'stat-item';
+                    const l = document.createElement('span'); l.className = 'stat-label'; l.textContent = item.label;
+                    const v = document.createElement('span'); v.className = 'stat-value'; v.textContent = item.value;
+                    w.appendChild(l); w.appendChild(v); wrap.appendChild(w);
+                });
+                return wrap;
+            }
             function showStats(chips, blocks, panel) {
                 panel = panel || statsPanel;
-                const list = chips||[];
-                const chipsHtml = list.map(item=>
-                    '<span class="stat-item"><span class="stat-label">'+escapeHtml(item.label)+'</span><span class="stat-value">'+escapeHtml(item.value)+'</span></span>'
-                ).join('');
-                const blocksHtml = (blocks||[]).map(blk=>{
-                    const head = '<div class="stat-block-head"><span class="blk-title">'+escapeHtml(blk.title)+'</span></div>';
-                    const segs = blk.segments.map(s=>
-                        '<span class="seg"><span class="seg-name">'+escapeHtml(s.name)+'</span>'+
-                        '<span class="seg-len">'+escapeHtml(s.len)+'</span>'+
-                        '<span class="seg-hex">'+s.hex+'</span></span>'
-                    ).join('');
-                    return '<div class="stat-block">'+head+'<div class="stat-grid">'+segs+'</div></div>';
-                }).join('');
-                panel.innerHTML = '<div class="stat-chips">'+chipsHtml+'</div>'+blocksHtml;
+                const frag = document.createDocumentFragment();
+                frag.appendChild(buildChips(chips));
+                (blocks||[]).forEach(blk=>{
+                    const b = document.createElement('div'); b.className = 'stat-block';
+                    const h = document.createElement('div'); h.className = 'stat-block-head';
+                    const t = document.createElement('span'); t.className = 'blk-title'; t.textContent = blk.title;
+                    h.appendChild(t);
+                    const g = document.createElement('div'); g.className = 'stat-grid';
+                    (blk.segments||[]).forEach(seg=>{
+                        const row = document.createElement('span'); row.className = 'seg';
+                        const n = document.createElement('span'); n.className = 'seg-name'; n.textContent = seg.name;
+                        const l2 = document.createElement('span'); l2.className = 'seg-len'; l2.textContent = seg.len;
+                        const x = document.createElement('span'); x.className = 'seg-hex';
+                        if (seg.idx !== null && seg.idx !== undefined) {
+                            const i = document.createElement('span'); i.className = 'seg-idx'; i.textContent = '@'+seg.idx;
+                            x.appendChild(i); x.appendChild(document.createTextNode(' '));
+                        }
+                        x.appendChild(document.createTextNode(seg.hex || '—'));
+                        row.appendChild(n); row.appendChild(l2); row.appendChild(x); g.appendChild(row);
+                    });
+                    b.appendChild(h); b.appendChild(g); frag.appendChild(b);
+                });
+                panel.textContent = '';
+                panel.appendChild(frag);
             }
             function showAsymStats(items) {
-                const chipsHtml = items.map(item=>
-                    '<span class="stat-item"><span class="stat-label">'+escapeHtml(item.label)+'</span><span class="stat-value">'+escapeHtml(item.value)+'</span></span>'
-                ).join('');
-                asymStatsPanel.innerHTML = '<div class="stat-chips">'+chipsHtml+'</div>';
+                asymStatsPanel.textContent = '';
+                asymStatsPanel.appendChild(buildChips(items));
             }
-
             // ════════════════════ 编解码调度 ════════════════════
             function encodeBytes(bytes, format) {
                 switch(format) {
@@ -1672,12 +1729,12 @@
             // ════════════════════ 对称：加密 / 解密 核心 ════════════════════
             async function encrypt(plaintextStr, password, kdf) {
                 if (utf8ByteLengthAtMost(plaintextStr, SYM_MAX_PLAINTEXT_BYTES) < 0) {
-                    throw new Error('明文过大：对称模式上限为 64 MiB（按 UTF-8 字节计）');
+                    throw new Error('明文过大：对称模式上限为 8 MiB（按 UTF-8 字节计）');
                 }
                 const ptBytes = new TextEncoder().encode(plaintextStr);
                 if (ptBytes.length > SYM_MAX_PLAINTEXT_BYTES) {
                     ptBytes.fill(0);
-                    throw new Error('明文过大：对称模式上限为 64 MiB（按 UTF-8 字节计）');
+                    throw new Error('明文过大：对称模式上限为 8 MiB（按 UTF-8 字节计）');
                 }
                 const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
                 const aesIv = crypto.getRandomValues(new Uint8Array(AES_IV_LEN));
@@ -1752,21 +1809,24 @@
                     throw new Error('认证失败：密钥错误或数据损坏');
                 }
                 if (cipherBytes.length > SYM_MAX_CIPHERTEXT_BYTES) {
-                    throw new Error('密文过大：对称模式上限为 64 MiB 明文');
+                    throw new Error('密文过大：对称模式上限为 8 MiB 明文');
                 }
                 const parts = parseCipher(cipherBytes);
                 if (cipherBytes.length < parts.headerLen + AE_OVERHEAD) {
                     throw new Error('认证失败：密钥错误或数据损坏');
                 }
                 const keys = await deriveKeys(password, parts.salt, parts.kdf);
+                let aesCt = null;
                 try {
+                    // 不在密钥确认失败时提前返回：即便确认码不匹配也照常跑完两层解密，
+                    // 否则"验证一次口令猜测"只需 KDF+HMAC（比完整解密便宜数倍），
+                    // 等于给离线爆破一个低成本 oracle，并在时序上区分了"口令错"与"密文损坏"。
                     const expectedKeyCheck = await computeKeyCheck(keys.checkKey, parts.salt);
-                    if (!constantTimeEqual(parts.keyCheck, expectedKeyCheck)) {
-                        throw new Error('认证失败：密钥错误或数据损坏');
-                    }
-                    let aesCt;
-                    try { aesCt = xchacha20Poly1305Decrypt(keys.xKey, parts.xnonce, parts.xCt, parts.aad); }
-                    catch(e) { throw new Error('认证失败：密钥错误或数据损坏'); }
+                    const checkOk = constantTimeEqual(parts.keyCheck, expectedKeyCheck);
+                    let innerOk = false;
+                    try { aesCt = xchacha20Poly1305Decrypt(keys.xKey, parts.xnonce, parts.xCt, parts.aad); innerOk = true; }
+                    catch(e) { /* 内层的具体原因不区分，统一在下方失败 */ }
+                    if (!checkOk || !innerOk) throw new Error('认证失败：密钥错误或数据损坏');
                     try {
                         const aesKeyObj = await crypto.subtle.importKey('raw', keys.aesKey, {name:'AES-GCM'}, false, ['decrypt']);
                         const ptBuffer = await crypto.subtle.decrypt({name:'AES-GCM', iv:parts.aesIv, tagLength:128}, aesKeyObj, aesCt);
@@ -1793,6 +1853,7 @@
                     }
                 } finally {
                     keys.zero();
+                    if (aesCt) aesCt.fill(0);
                 }
             }
 
@@ -2545,7 +2606,7 @@
                 }
                 if (typeof plaintextStr !== 'string' || plaintextStr.length > ASYM_MAX_PLAINTEXT_BYTES ||
                     utf8ByteLengthAtMost(plaintextStr, ASYM_MAX_PLAINTEXT_BYTES) < 0) {
-                    throw new Error('明文过大：本工具非对称模式上限为 64 MiB（按 UTF-8 字节计）');
+                    throw new Error('明文过大：本工具非对称模式上限为 8 MiB（按 UTF-8 字节计）');
                 }
                 const xPk = publicKeyBytes.subarray(0, X448_KEY_LEN);
                 const ek = publicKeyBytes.subarray(X448_KEY_LEN, X448_KEY_LEN + MLKEM_EK_LEN);
@@ -2556,7 +2617,7 @@
                     // 字节数已预检；先编码明文，再执行较昂贵的 KEM 运算。
                     ptBytes = new TextEncoder().encode(plaintextStr);
                     if (ptBytes.length > ASYM_MAX_PLAINTEXT_BYTES) {
-                        throw new Error('UTF-8 编码后的明文超过 64 MiB 限制');
+                        throw new Error('UTF-8 编码后的明文超过 8 MiB 限制');
                     }
                     enc = mlkemEncaps(ek);
                     ephSk = crypto.getRandomValues(new Uint8Array(56));
@@ -2596,7 +2657,7 @@
                     throw new Error('解密失败：密文长度不足或已损坏');
                 }
                 if (cipherBytes.length > ASYM_MAX_CIPHERTEXT_BYTES) {
-                    throw new Error('密文过大：本工具非对称模式上限为 64 MiB 明文');
+                    throw new Error('密文过大：本工具非对称模式上限为 8 MiB 明文');
                 }
                 for (let i = 0; i < 4; i++) {
                     if (cipherBytes[i] !== ASYM_MAGIC[i]) throw new Error('解密失败：密文魔数不匹配（非本工具密文）');
@@ -2664,7 +2725,7 @@
             }
             function applyTheme(theme) {
                 document.documentElement.setAttribute('data-theme', theme);
-                themeToggle.innerHTML = theme === 'light' ? '🌙 深色模式' : '☀ 浅色模式';
+                themeToggle.textContent = theme === 'light' ? '🌙 深色模式' : '☀ 浅色模式';
                 try { localStorage.setItem(THEME_KEY, theme); } catch(e) {}
             }
             function toggleTheme() {
@@ -2720,8 +2781,10 @@
             const SAVED_FMT_KEY = 'cipher_fmt_v2';
             try {
                 const savedFmt = localStorage.getItem(SAVED_FMT_KEY);
-                if (savedFmt && formatSelect.querySelector('option[value="'+savedFmt+'"]'))
+                // 不把 localStorage 的值拼进查询选择器（选择器注入），改为遍历白名单比较
+                if (savedFmt && Array.prototype.some.call(formatSelect.options, o => o.value === savedFmt)) {
                     formatSelect.value = savedFmt;
+                }
             } catch(e) {}
             formatSelect.addEventListener('change', () => {
                 if (!outputArea.value) showIdleStats();
@@ -2733,6 +2796,15 @@
             const strengthLevel = $('strengthLevel'), strengthEntropy = $('strengthEntropy');
             const STRENGTH_SAMPLE_MAX = 4096;
 
+            // 常见弱口令片段：命中即大幅下调估算
+            const WEAK_FRAGMENTS = ['password','passwd','123456','12345678','123456789','qwerty','abc123',
+                '111111','123123','000000','admin','letmein','welcome','iloveyou','iloveu','monkey','dragon',
+                'sunshine','princess','football','qazwsx','123qwe','mima','woaini','5201314','test','secret',
+                'cipher','chuan','taobao','wang','zhang','love','login','root','user','hello','china'];
+            const KEYBOARD_RUNS = ['qwertyuiop','asdfghjkl','zxcvbnm','1234567890'];
+
+            // 估算仅用于提醒用户，不能等同于真实抗爆破强度：KDF 只能提高单次猜测成本，
+            // 无法弥补口令本身的可预测性。这里对常见弱模式施加保守惩罚，避免给出虚高的强度评级。
             function analyzePassword(pw) {
                 const chars = Array.from(pw.length > STRENGTH_SAMPLE_MAX ? pw.slice(0, STRENGTH_SAMPLE_MAX) : pw);
                 const n = chars.length;
@@ -2756,16 +2828,40 @@
                 let h = 0;
                 for (const c of freq.values()) { const p = c / n; h -= p * Math.log2(p); }
                 const shannonBits = h * n;
-                return { bits: Math.min(poolBits, shannonBits), poolBits, shannonBits, pool, n };
-            }
 
+                let bits = Math.min(poolBits, shannonBits);
+                const notes = [];
+                const lower = pw.toLowerCase();
+
+                if (WEAK_FRAGMENTS.some(w => lower.indexOf(w) >= 0)) {
+                    bits = Math.min(bits, 24); notes.push('含常见弱口令词');
+                }
+                let maxRun = 1, run = 1;
+                for (let i = 1; i < lower.length; i++) {
+                    const d = lower.charCodeAt(i) - lower.charCodeAt(i - 1);
+                    if (d === 1 || d === -1) { run++; if (run > maxRun) maxRun = run; } else run = 1;
+                }
+                if (KEYBOARD_RUNS.some(k => lower.indexOf(k) >= 0)) maxRun = Math.max(maxRun, 6);
+                if (maxRun >= 4) { bits -= Math.min(20, (maxRun - 3) * 4); notes.push('连续序列 ' + maxRun + ' 位'); }
+
+                const classes = (hasLower?1:0) + (hasUpper?1:0) + (hasDigit?1:0) + (hasSymbol?1:0) + (hasOther?1:0);
+                if (classes <= 1) {
+                    bits = Math.min(bits, n * (hasDigit ? 3.32 : 4.7));
+                    notes.push('仅单一字符类别');
+                }
+                if (/(19|20)\d{2}/.test(pw)) { bits -= 8; notes.push('含年份'); }
+                if (n < 8) { bits = Math.min(bits, 20); notes.push('长度不足 8 位'); }
+
+                bits = Math.max(0, Math.min(bits, 128));
+                return { bits, poolBits, shannonBits, pool, n, notes };
+            }
             function updateStrength() {
                 const pw = keyInput.value;
                 if (!pw) {
                     strengthEl.className = 'strength';
                     strengthFill.style.width = '0%';
                     strengthLevel.textContent = '强度 —';
-                    strengthEntropy.textContent = '熵值 —';
+                    strengthEntropy.textContent = '估算熵 —';
                     strengthEntropy.title = '';
                     return;
                 }
@@ -2779,8 +2875,10 @@
                 strengthEl.className = 'strength level-' + ['weak','fair','strong','excellent'][idx];
                 strengthFill.style.width = Math.max(4, (idx + frac) * 25) + '%';
                 strengthLevel.textContent = '强度 ' + ['弱','中','强','极强'][idx];
-                strengthEntropy.textContent = '熵值 ≈ ' + a.bits.toFixed(1) + ' bits';
-                strengthEntropy.title = '字符池 ' + a.pool + ' 类 ≈ ' + a.poolBits.toFixed(1) + ' bits · 香农熵 ' + a.shannonBits.toFixed(1) + ' bits · 取保守较小值';
+                strengthEntropy.textContent = '估算熵 ≈ ' + a.bits.toFixed(1) + ' bits';
+                strengthEntropy.title = '估算值（非真实抗爆破强度）：字符池 ' + a.pool + ' 类 ≈ ' + a.poolBits.toFixed(1) +
+                    ' bits · 香农熵 ' + a.shannonBits.toFixed(1) + ' bits · 取保守较小值' +
+                    (a.notes && a.notes.length ? ' · 已扣除：' + a.notes.join('、') : '');
             }
             keyInput.addEventListener('input', updateStrength);
 
@@ -2818,6 +2916,7 @@
 
             encryptBtn.addEventListener('click', async ()=>{
                 if (busy) return;
+                if (!selfTestOk) { setStatus('密码学自检未通过，功能已停用','error'); return; }
                 clearStatus(); clearStats();
                 const password = keyInput.value, plaintext = inputArea.value;
                 if (!password) { setStatus('请输入密钥','error'); keyInput.focus(); return; }
@@ -2851,7 +2950,7 @@
                     setStatus('加密成功 · '+KDF_INFO[kdf].name+' · '+cipherBytes.length+' 字节密文 · '+encoded.length+' 字符（'+fmt+'）','success');
                     setHint(resultHint, '加密完成 · '+formatBytes(cipherBytes.length));
                 } catch(e) {
-                    setStatus('加密失败：'+(e.message||e),'error');
+                    setStatus('加密失败：'+userFacingError(e,'加密过程出错，请重试'),'error');
                     outputArea.value = '';
                     clearStats();
                     setHint(resultHint, '就绪');
@@ -2860,12 +2959,13 @@
 
             decryptBtn.addEventListener('click', async ()=>{
                 if (busy) return;
+                if (!selfTestOk) { setStatus('密码学自检未通过，功能已停用','error'); return; }
                 clearStatus(); clearStats();
                 const password = keyInput.value, cipherStr = inputArea.value;
                 if (!password) { setStatus('请输入密钥','error'); keyInput.focus(); return; }
                 if (!cipherStr) { setStatus('请输入需要解密的密文','error'); inputArea.focus(); return; }
                 if (cipherStr.length > MAX_SYM_INPUT_CHARS) {
-                    setStatus('输入过大：对称模式最多处理 64 MiB 明文对应的密文','error'); return;
+                    setStatus('输入过大：对称模式最多处理 8 MiB 明文对应的密文','error'); return;
                 }
 
                 const detected = detectFormat(cipherStr);
@@ -2912,7 +3012,7 @@
                     setStatus('解密成功 · '+plaintext.length+' 字符明文'+fmtNote,'success');
                     setHint(resultHint, '解密完成 · '+formatBytes(plainLen)+' 明文');
                 } catch(e) {
-                    setStatus('解密失败：'+(e.message||e)+'（已尝试格式: '+tried.join('、')+'）','error');
+                    setStatus('解密失败：'+userFacingError(lastErr,'密钥错误、密文损坏或格式不匹配')+'（已尝试格式: '+tried.join('、')+'）','error');
                     outputArea.value = '';
                     clearStats();
                     setHint(resultHint, '就绪');
@@ -2922,6 +3022,10 @@
             inputArea.addEventListener('input', ()=>{
                 const val = inputArea.value;
                 if (!val || busy) return;
+                if (val.length > AUTODETECT_MAX_CHARS) {
+                    setHint(formatHint, '输入过长，已跳过自动识别（请手动选择正确格式）');
+                    return;
+                }
                 const detected = detectFormat(val);
                 if (detected) {
                     setHint(formatHint, '已识别格式: ' + detected + ' · 解密时自动使用（下拉框不变）');
@@ -2986,6 +3090,7 @@
 
             genKeyBtn.addEventListener('click', async ()=>{
                 if (busy) return;
+                if (!selfTestOk) { setStatus('密码学自检未通过，功能已停用','error'); return; }
                 clearStatus();
                 setBusy(true);
                 setStatus('正在生成 X448 + ML-KEM-1024 密钥对…','info');
@@ -3025,7 +3130,7 @@
                         { label:'自检', value:'ML-KEM 封装/解封装 通过' },
                     ]);
                 } catch(e) {
-                    setStatus('密钥生成失败：'+(e.message||e),'error');
+                    setStatus('密钥生成失败：'+userFacingError(e,'密钥生成过程出错，请重试'),'error');
                     showAsymStats([{ label:'状态', value:'生成失败' }]);
                 } finally { setBusy(false); }
             });
@@ -3065,6 +3170,7 @@
 
             asymEncryptBtn.addEventListener('click', async ()=>{
                 if (busy) return;
+                if (!selfTestOk) { setStatus('密码学自检未通过，功能已停用','error'); return; }
                 clearStatus();
                 const plaintext = asymInput.value;
                 const pkStr = pubKey.value.trim();
@@ -3104,7 +3210,7 @@
                         { label:'膨胀', value:'+'+(cipherBytes.length - plainLen)+' 字节' },
                     ]);
                 } catch(e) {
-                    setStatus('加密失败：'+(e.message||e),'error');
+                    setStatus('加密失败：'+userFacingError(e,'加密过程出错（公钥可能无效）'),'error');
                     asymOutput.value = '';
                     refreshAsymStatsIdle();
                     setHint(asymResultHint, '就绪');
@@ -3113,6 +3219,7 @@
 
             asymDecryptBtn.addEventListener('click', async ()=>{
                 if (busy) return;
+                if (!selfTestOk) { setStatus('密码学自检未通过，功能已停用','error'); return; }
                 clearStatus();
                 const cipherStr = asymInput.value;
                 const skStr = privKey.value.trim();
@@ -3125,7 +3232,7 @@
 
                 let ctBytes;
                 if (cipherStr.length > Math.ceil(ASYM_MAX_CIPHERTEXT_BYTES * 4 / 3) + 16) {
-                    setStatus('密文文本过大：本工具非对称模式上限为 64 MiB 明文','error'); return;
+                    setStatus('密文文本过大：本工具非对称模式上限为 8 MiB 明文','error'); return;
                 }
                 try { ctBytes = b64decodeStrict(cipherStr, '密文'); }
                 catch(e) { setStatus('密文不是有效的规范 Base64 字符串：' + (e.message || e),'error'); return; }
@@ -3155,7 +3262,7 @@
                         { label:'明文', value:plaintext.length+' 字符 · '+plainLen+' 字节' },
                     ]);
                 } catch(e) {
-                    setStatus('解密失败：'+(e.message||e),'error');
+                    setStatus('解密失败：'+userFacingError(e,'私钥不匹配、密文损坏或已被篡改'),'error');
                     asymOutput.value = '';
                     refreshAsymStatsIdle();
                     setHint(asymResultHint, '就绪');
@@ -3180,14 +3287,67 @@
             });
 
             // 密钥框内容变化时刷新统计（提示密钥是否有效）
+            // 解析/校验一个 ML-KEM 私钥要跑 SHA3-256 与全量系数检查，逐字符触发过重，做 300ms 去抖
+            let asymStatsTimer = 0;
+            function scheduleAsymStats() {
+                if (asymStatsTimer) clearTimeout(asymStatsTimer);
+                asymStatsTimer = setTimeout(()=>{
+                    asymStatsTimer = 0;
+                    if (!asymOutput.value) refreshAsymStatsIdle();
+                }, 300);
+            }
             pubKey.addEventListener('input', ()=>{
                 if (panelAsym.hidden) return;
-                if (!asymOutput.value) refreshAsymStatsIdle();
+                scheduleAsymStats();
             });
             privKey.addEventListener('input', ()=>{
                 if (panelAsym.hidden) return;
-                if (!asymOutput.value) refreshAsymStatsIdle();
+                scheduleAsymStats();
             });
+
+            // ════════════════════ 启动自检（已知答案测试 KAT） ════════════════════
+            // 向量来源：SHA3/SHAKE 取自 NIST 标准并与 CPython hashlib 交叉验证；
+            // ChaCha20-Poly1305 为 RFC 8439 §2.8.2；XChaCha20-Poly1305 为 draft-irtf-cfrg-xchacha A.3.1；
+            // X448 为 RFC 7748 §6.2；ML-KEM-1024 的 (dk, ct, K) 由 OpenSSL（cryptography 50）独立实现生成，
+            // 且本实现的封装结果已被 OpenSSL 成功解封（双向验证）。
+            const KAT = {
+                sha3_256:  { in: 'abc', out: '3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532' },
+                sha3_512:  { in: 'abc', out: 'b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0' },
+                shake256:  { in: 'CIPHER', out: 'b061d9884b0473d23f7e75efaaffbf0952501791832e8915274885956c9d6b7099f6a33e5e068ce270c4d8a20fdbcf7e1fe030d8e2a5fdcf25c93f8a5ae22979' },
+                chacha20:  { key: '808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f', nonce: '070000004041424344454647', aad: '50515253c0c1c2c3c4c5c6c7', pt: '4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e', out: 'd31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d63dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b61161ae10b594f09e26a7e902ecbd0600691' },
+                xchacha20: { key: '808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f', nonce: '404142434445464748494a4b4c4d4e4f5051525354555657', aad: '50515253c0c1c2c3c4c5c6c7', pt: '4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e', out: 'bd6d179d3e83d43b9576579493c0e939572a1700252bfaccbed2902c21396cbb731c7f1b0b4aa6440bf3a82f4eda7e39ae64c6708c54c216cb96b72e1213b4522f8c9ba40db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c97637da9768812f615c68b13b52ec0875924c1c7987947deafd8780acf49' },
+                x448:      { a: '9a8f4925d1519f5775cf46b04b5800d4ee9ee8bae8bc5565d498c28dd9c9baf574a9419744897391006382a6f127ab1d9ac2d8c0a598726b', b: '3eb7a829b0cd20f5bcfc0b599b6feccf6da4627107bdb0d4f345b43027d8b972fc3e34fb4232a13ca706dcb57aec3dae07bdc1c67bf33609', k: '07fff4181ac6cc95ec1c16a94a0f74d12da232ce40a77552281d282bb60c0b56fd2464c335543936521c24403085d59a449a5037514a879d' },
+                mlkem:     { dk: '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', ct: '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', k: '925f2a81026f33a88d8bb9152004736dd1306253f3579f8b0f5144d6b6a08c1b' }
+            };
+
+            function hexToBytes(h) {
+                const out = new Uint8Array(h.length / 2);
+                for (let i = 0; i < h.length; i += 2) out[i / 2] = parseInt(h.substr(i, 2), 16);
+                return out;
+            }
+
+            // 任一向量不符都意味着运行环境异常、代码被篡改或移植出错 —— 必须停用密码学功能，
+            // 否则用户会在"看似正常"的界面里使用事实上已损坏的算法。
+            function runSelfTests() {
+                const fails = [];
+                const enc = new TextEncoder();
+                const chk = (name, fn) => { try { if (!fn()) fails.push(name); } catch (e) { fails.push(name + '(异常)'); } };
+                const hexEq = (a, b) => bytesToHex(a) === String(b).toLowerCase();
+
+                chk('SHA3-256', () => hexEq(sha3_256(enc.encode(KAT.sha3_256.in)), KAT.sha3_256.out));
+                chk('SHA3-512', () => hexEq(sha3_512(enc.encode(KAT.sha3_512.in)), KAT.sha3_512.out));
+                chk('SHAKE256', () => hexEq(shake256(enc.encode(KAT.shake256.in), 64), KAT.shake256.out));
+                chk('ChaCha20-Poly1305', () => hexEq(
+                    chacha20Poly1305Encrypt(hexToBytes(KAT.chacha20.key), hexToBytes(KAT.chacha20.nonce),
+                        hexToBytes(KAT.chacha20.pt), hexToBytes(KAT.chacha20.aad)), KAT.chacha20.out));
+                chk('XChaCha20-Poly1305', () => hexEq(
+                    xchacha20Poly1305Encrypt(hexToBytes(KAT.xchacha20.key), hexToBytes(KAT.xchacha20.nonce),
+                        hexToBytes(KAT.xchacha20.pt), hexToBytes(KAT.xchacha20.aad)), KAT.xchacha20.out));
+                chk('X448', () => hexEq(x448(hexToBytes(KAT.x448.a), hexToBytes(KAT.x448.b)), KAT.x448.k));
+                chk('ML-KEM-1024 解封装', () => hexEq(
+                    mlkemDecaps(b64decode(KAT.mlkem.dk), b64decode(KAT.mlkem.ct)), KAT.mlkem.k));
+                return { ok: fails.length === 0, fails: fails };
+            }
 
             // ════════════════════ 初始化 ════════════════════
             setHint(resultHint, '就绪');
@@ -3195,6 +3355,24 @@
             updateStrength();
             refreshAsymStatsIdle();
             syncOutputHeight();
+
+            // ── 启动自检：先于任何用户操作完成，失败则停用全部密码学功能 ──
+            (function initSelfTest() {
+                let res;
+                try { res = runSelfTests(); }
+                catch (e) { res = { ok:false, fails:['自检抛出异常: ' + ((e && e.message) || e)] }; }
+                selfTestOk = res.ok;
+                const lines = document.querySelectorAll('.selftest-line');
+                for (let i = 0; i < lines.length; i++) {
+                    lines[i].textContent = res.ok
+                        ? '通过 · Keccak / ChaCha20 / XChaCha20 / X448 / ML-KEM-1024 已知答案测试全部一致'
+                        : '未通过：' + res.fails.join('、');
+                }
+                if (!res.ok) {
+                    setStatus('密码学自检未通过（' + res.fails.join('、') + '）：已停用全部加解密功能，请勿在本页处理敏感数据。', 'error');
+                }
+                setBusy(false);
+            })();
 
             try {
                 const savedTab = localStorage.getItem(TAB_KEY);
