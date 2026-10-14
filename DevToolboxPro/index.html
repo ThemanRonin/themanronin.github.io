@@ -267,11 +267,22 @@
         .util-stat-value { display:block; font-size:18px; font-family:var(--font-mono); margin-top:4px; overflow-wrap:anywhere; }
         #utilStopwatchLaps { max-height:180px; }
 
+        /* ============ 扩展工具样式 ============ */
+        .barcode-wrap { display:flex; align-items:center; justify-content:center; min-height:150px; padding:14px; background:#fff; border:1px dashed var(--border); border-radius:4px; overflow:auto; }
+        .barcode-wrap canvas { max-width:100%; height:auto; }
+        .fileb64-preview { display:none; align-items:center; justify-content:center; padding:12px; background:#fff; border:1px dashed var(--border); border-radius:4px; }
+        .fileb64-preview img { max-width:100%; max-height:320px; }
+        .reaction-stage { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; height:220px; border-radius:8px; cursor:pointer; user-select:none; -webkit-user-select:none; touch-action:manipulation; color:#fff; text-align:center; padding:12px; transition:background 80ms linear; }
+        .reaction-stage .main { font-size:22px; font-weight:700; letter-spacing:0.02em; }
+        .reaction-stage .sub { font-size:12px; opacity:.85; }
+        .reaction-rounds { max-height:220px; }
+        .digits-details summary { cursor:pointer; }
+
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="header"><span class="header-title">DevToolbox Pro</span><span class="header-dot"></span><span class="header-subtitle">编码·哈希·加密·生成·转换·智能解码·开发辅助</span></div>
+    <div class="header"><span class="header-title">DevToolbox Pro</span><span class="header-dot"></span><span class="header-subtitle">编码·哈希·加密·生成·转换·中文·智能解码·开发辅助</span></div>
     <section class="global-tools" aria-label="全局工具导航">
         <div class="global-tools-top">
             <input id="globalToolSearch" type="search" placeholder="搜索所有工具… 例如 Markdown、Base58、JSON 树（Ctrl+K）" autocomplete="off" aria-label="搜索所有工具">
@@ -309,6 +320,7 @@
             <button class="tab-secondary" data-sub="base32">Base32</button>
             <button class="tab-secondary" data-sub="base58">Base58</button>
             <button class="tab-secondary" data-sub="rot13">ROT13</button>
+            <button class="tab-secondary" data-sub="fileb64" data-keywords="base64 文件 图片 image file 编码 转换">文件 ⇋ Base64</button>
         </div>
         <div class="panel active" id="sub-encode-base64">
             <div class="section-label mb-sm">输入</div>
@@ -346,25 +358,46 @@
         </div>
         <div class="panel" id="sub-encode-htmlentity">
             <div class="section-label mb-sm">输入</div>
-            <textarea id="htmlEntityInput" placeholder="输入HTML特殊字符文本..."></textarea>
+            <textarea id="htmlEntityInput" placeholder="输入要编码 / 解码的文本，例如：<div>你好 &amp; 'test'</div>"></textarea>
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label for="htmlEntityMode">编码范围（点击「编码实体」生效）</label>
+                    <select id="htmlEntityMode">
+                        <option value="min" selected>特殊字符 + 非 ASCII → 实体（推荐）</option>
+                        <option value="specials">仅 HTML 特殊字符（保留中文等原样）</option>
+                        <option value="all">全部字符 → 数字实体（&amp;#nn;）</option>
+                    </select>
+                </div>
+            </div>
             <div class="row mt-sm gap-sm">
                 <button class="btn primary" id="htmlEntityEnc">编码实体</button>
                 <button class="btn" id="htmlEntityDec">解码实体</button>
                 <button class="btn small copy-btn" data-target="htmlEntityOutput">复制</button>
+                <span class="note" id="htmlEntityStatus"></span>
             </div>
             <div class="section-label mt-md mb-sm">输出</div>
             <textarea id="htmlEntityOutput" class="output-area" readonly placeholder="结果..."></textarea>
+            <p class="note mt-sm">「推荐」模式只转义 &amp; &lt; &gt; " ' 与中文等非 ASCII 字符；纯英文数字输入保持不变属于正常行为，如需逐字符转义请在编码范围中选择「全部字符」，解码支持命名实体、十进制与十六进制数字实体。</p>
         </div>
         <div class="panel" id="sub-encode-unicode">
             <div class="section-label mb-sm">输入</div>
-            <textarea id="uniInput" placeholder="输入文本..."></textarea>
+            <textarea id="uniInput" placeholder="输入要转义或还原的文本，例如：你好😀 或 \u4f60\u597d"></textarea>
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label for="uniEncodeMode">编码范围（点击「转为 Unicode 转义」生效）</label>
+                    <select id="uniEncodeMode">
+                        <option value="nonascii" selected>仅非 ASCII 字符（保留英文与符号）</option>
+                        <option value="all">全部字符（含 ASCII，换行除外）</option>
+                    </select>
+                </div>
+            </div>
             <div class="row mt-sm gap-sm">
-                <button class="btn primary" id="uniEnc">转为\uXXXX</button>
-                <button class="btn" id="uniDec">解析\uXXXX</button>
+                <button class="btn primary" id="uniEnc">转为 Unicode 转义</button>
+                <button class="btn" id="uniDec">解析转义序列</button>
                 <button class="btn small copy-btn" data-target="uniOutput">复制</button>
+                <span class="note" id="uniStatus"></span>
             </div>
             <div class="section-label mt-md mb-sm">输出</div>
             <textarea id="uniOutput" class="output-area" readonly placeholder="结果..."></textarea>
+            <p class="note mt-sm">支持 \uXXXX、\u{XXXX}（补充平面字符）与 \xNN；“仅非 ASCII”模式下英文数字保持不变属于正常行为，如需逐字符转义请在编码范围中选择「全部字符」。</p>
         </div>
         <div class="panel" id="sub-encode-hextext">
             <div class="section-label mb-sm">输入</div>
@@ -394,6 +427,30 @@
             <div class="section-label mb-sm">ROT13 / ROT47</div><textarea id="rotInput" placeholder="输入文本…"></textarea>
             <div class="row mt-sm gap-sm"><button class="btn primary" id="rot13Run">ROT13（字母）</button><button class="btn" id="rot47Run">ROT47（可打印 ASCII）</button><button class="btn small copy-btn" data-target="rotOutput">复制</button></div>
             <div class="section-label mt-md mb-sm">输出</div><textarea id="rotOutput" class="output-area" readonly placeholder="转换结果…"></textarea>
+        </div>
+        <div class="panel" id="sub-encode-fileb64">
+            <div class="section-label mb-sm">文件 → Base64</div>
+            <input id="fileB64Input" type="file" style="font-family:var(--font-sans);font-size:12px;max-width:100%;">
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label for="fileB64Format">输出格式</label><select id="fileB64Format"><option value="pure" selected>纯 Base64</option><option value="dataurl">Data URL（data:...;base64,…）</option></select></div>
+                <div class="tool-field" style="align-self:end;"><label class="checkbox-label"><input type="checkbox" id="fileB64Preview" checked> 图片文件显示预览</label></div>
+            </div>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="fileB64Encode">转换为 Base64</button>
+                <button class="btn small copy-btn" data-target="fileB64Output">复制</button>
+                <span class="note" id="fileB64Status">文件在浏览器本地读取，不会上传；单个文件上限 30 MiB。</span>
+            </div>
+            <div id="fileB64PreviewBox" class="fileb64-preview mt-sm"></div>
+            <textarea id="fileB64Output" class="output-area mt-sm" readonly placeholder="Base64 结果…" style="min-height:150px;"></textarea>
+            <hr class="divider">
+            <div class="section-label mb-sm">Base64 → 文件</div>
+            <textarea id="fileB64DecodeInput" class="small-textarea" placeholder="粘贴纯 Base64 或 Data URL（如 data:image/png;base64,…）…"></textarea>
+            <div class="row gap-sm mt-sm">
+                <div class="flex-1"><label class="tool-kicker" for="fileB64FileName">保存文件名（可选，留空自动推断）</label><input id="fileB64FileName" type="text" placeholder="例如 image.png"></div>
+                <button class="btn primary" id="fileB64Decode">解析并下载</button>
+            </div>
+            <span class="note" id="fileB64DecodeStatus"></span>
+            <p class="note mt-sm">图片 Data URL 会在上方预览；Base64 体积约为原文件的 133%。大文件转换会占用较多内存，请耐心等待。</p>
         </div>
     </div>
 
@@ -530,6 +587,7 @@
             <button class="tab-secondary" data-sub="password">密码</button>
             <button class="tab-secondary" data-sub="randomstr">随机字符串</button>
             <button class="tab-secondary" data-sub="securetools">安全令牌 / 随机整数</button>
+            <button class="tab-secondary" data-sub="barcode" data-keywords="条码 code128 ean13 code39 一维码 商品码">条形码</button>
         </div>
         <div class="panel active" id="sub-gen-uuid">
             <div class="section-label mb-sm">UUID 生成器</div>
@@ -616,6 +674,27 @@
             <div class="result-mono mt-sm" id="randIntResult">—</div>
             <p class="note mt-sm">使用 crypto.getRandomValues 和拒绝采样，不会降级到 Math.random()。令牌适合测试或本地生成；生产系统的密钥发放、轮换与存储仍应由安全的密钥管理流程负责。</p>
         </div>
+        <div class="panel" id="sub-gen-barcode">
+            <div class="section-label mb-sm">条形码生成（Code 128 / Code 39 / EAN-13）</div>
+            <textarea id="barcodeText" class="small-textarea" spellcheck="false" placeholder="输入条码内容：Code 128 支持全部可打印 ASCII；EAN-13 输入 12 或 13 位数字（自动计算 / 验证校验位）">DevToolbox-2026</textarea>
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label for="barcodeType">条码类型</label><select id="barcodeType">
+                    <option value="code128" selected>Code 128（字母数字混合，自动选择子集）</option>
+                    <option value="code39">Code 39（A–Z 0–9 与 - . 空格 $ / + %）</option>
+                    <option value="ean13">EAN-13（12 / 13 位数字）</option>
+                </select></div>
+                <div class="tool-field"><label for="barcodeScale">模块宽度（像素/模块）</label><select id="barcodeScale"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option></select></div>
+                <div class="tool-field"><label for="barcodeHeight">条码高度（像素）</label><select id="barcodeHeight"><option value="60">60</option><option value="80">80</option><option value="100" selected>100</option><option value="140">140</option><option value="200">200</option></select></div>
+                <div class="tool-field" style="align-self:end;"><label class="checkbox-label"><input type="checkbox" id="barcodeShowText" checked> 在条码下方显示内容</label></div>
+            </div>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="barcodeGenerate">生成条形码</button>
+                <button class="btn" id="barcodeDownload">下载 PNG</button>
+                <span class="note" id="barcodeStatus"></span>
+            </div>
+            <div id="barcodeWrap" class="barcode-wrap mt-sm"><span class="note">输入内容后点击「生成条形码」。</span></div>
+            <p class="note mt-sm">Code 128 自动使用 B / C 子集并附加 mod-103 校验位；EAN-13 支持 12 位自动补校验位、13 位校验验证；Code 39 按规范不附加校验字符。全部在浏览器本地渲染，可离线使用。</p>
+        </div>
     </div>
 
     <!-- ==================== 转换 ==================== -->
@@ -625,6 +704,8 @@
             <button class="tab-secondary" data-sub="jsonfmt">JSON</button>
             <button class="tab-secondary" data-sub="caseconv">大小写</button>
             <button class="tab-secondary" data-sub="numconv">进制</button>
+            <button class="tab-secondary" data-sub="zhconv" data-keywords="繁体 简体 拼音 pinyin 汉字 中文 转换">简繁 / 拼音</button>
+            <button class="tab-secondary" data-sub="rmb" data-keywords="人民币 金额 大写 财务 发票 报销">人民币大写</button>
             <button class="tab-secondary" data-sub="csvjson">CSV / JSON</button>
             <button class="tab-secondary" data-sub="texttools">文本批处理</button>
         </div>
@@ -674,24 +755,78 @@
             <textarea id="caseOutput" class="output-area" readonly placeholder="结果..."></textarea>
         </div>
         <div class="panel" id="sub-convert-numconv">
-            <div class="section-label mb-sm">输入</div>
+            <div class="section-label mb-sm">输入（支持 2–64 进制，任意大整数）</div>
             <div class="row gap-sm">
-                <input type="text" id="numInput" class="flex-1" placeholder="数字">
-                <select id="numFromBase">
-                    <option value="10">十进制</option>
-                    <option value="16">十六进制</option>
-                    <option value="8">八进制</option>
-                    <option value="2">二进制</option>
-                </select>
+                <input type="text" id="numInput" class="flex-1" placeholder="输入数字，如 ff、0b1010、64、/ 等" spellcheck="false">
+                <select id="numFromBase" style="max-width:150px" aria-label="源进制"></select>
+                <span class="note">→</span>
+                <select id="numToBase" style="max-width:150px" aria-label="目标进制"></select>
             </div>
-            <button class="btn primary mt-sm" id="numConvert">转换</button>
-            <div class="result-mono mt-md" style="line-height:2;">
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="numConvert">转换</button>
+                <label class="checkbox-label"><input type="checkbox" id="numPrefix"> 结果添加 0b/0o/0x 前缀（仅 2/8/16 进制）</label>
+            </div>
+            <div class="section-label mt-md mb-sm">结果</div>
+            <div class="result-mono" style="line-height:2;"><div>目标进制结果：<strong id="numOut" style="word-break:break-all;">—</strong></div></div>
+            <div class="section-label mt-md mb-sm">常用进制速览</div>
+            <div class="result-mono" style="line-height:2;">
+                <div>二进制：<strong id="numBin">—</strong></div>
+                <div>八进制：<strong id="numOct">—</strong></div>
                 <div>十进制：<strong id="numDec">—</strong></div>
                 <div>十六进制：<strong id="numHex">—</strong></div>
-                <div>八进制：<strong id="numOct">—</strong></div>
-                <div>二进制：<strong id="numBin">—</strong></div>
+                <div>Base64（64 进制）：<strong id="numB64">—</strong></div>
             </div>
             <span class="note" id="numFeedback"></span>
+            <details class="digits-details mt-sm"><summary class="note">数字字母表（点击展开）</summary><p class="note mt-sm">0–9 = 0–9；A–Z = 10–35；a–z = 36–61；+ = 62；/ = 63。<br>36 进制及以下：字母不区分大小写、输出小写；37 进制及以上：区分大小写、按上述标准字母表输出（例如 62 进制的“z”表示 61）。<br>支持正负号与 0b / 0o / 0x 前缀；使用 BigInt 任意精度，暂不支持小数。</p></details>
+        </div>
+        <div class="panel" id="sub-convert-zhconv">
+            <div class="section-label mb-sm">中文转换 · 简繁互转 / 汉字转拼音</div>
+            <textarea id="zhConvInput" placeholder="输入中文文本，例如：头发长在头上，银行和音乐…"></textarea>
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label for="zhConvMode">转换模式</label><select id="zhConvMode">
+                    <option value="s2t" selected>简体 → 繁体</option>
+                    <option value="t2s">繁体 → 简体</option>
+                    <option value="pinyin">汉字 → 拼音</option>
+                </select></div>
+                <div class="tool-field" id="zhConvStyleWrap"><label for="zhConvPinyinStyle">拼音样式（拼音模式）</label><select id="zhConvPinyinStyle">
+                    <option value="tone" selected>带声调符号：zhōng</option>
+                    <option value="toneNum">数字声调：zhong1</option>
+                    <option value="plain">无声调：zhong</option>
+                    <option value="initials">仅首字母：z</option>
+                </select></div>
+                <div class="tool-field" id="zhConvSepWrap"><label for="zhConvSep">拼音分隔（拼音模式）</label><select id="zhConvSep">
+                    <option value="space" selected>空格分隔</option>
+                    <option value="none">连写</option>
+                    <option value="apostrophe">撇号分隔</option>
+                </select></div>
+                <div class="tool-field" id="zhConvSandhiWrap" style="align-self:end;"><label class="checkbox-label"><input type="checkbox" id="zhConvSandhi" checked> 「一 / 不」按后字变调标注</label></div>
+            </div>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary" id="zhConvRun">转换</button>
+                <button class="btn small copy-btn" data-target="zhConvOutput">复制</button>
+                <button class="btn" id="zhConvClear">清空</button>
+                <span class="note" id="zhConvStatus"></span>
+            </div>
+            <div class="section-label mt-md mb-sm">结果</div>
+            <textarea id="zhConvOutput" class="output-area" readonly placeholder="转换结果…" style="min-height:150px;"></textarea>
+            <p class="note mt-sm">简繁采用常用字表（覆盖 GB2312 全部汉字）＋常用词语修正；拼音覆盖 6,700+ 常用汉字、1,700+ 多音词修正。生僻字、特殊专名可能按单字默认读音或原样输出。</p>
+        </div>
+        <div class="panel" id="sub-convert-rmb">
+            <div class="section-label mb-sm">数字金额 → 人民币大写</div>
+            <div class="row gap-sm">
+                <input type="text" id="rmbInput" class="flex-1" placeholder="输入金额，如 1234567.89" value="1234567.89" spellcheck="false">
+                <button class="btn primary" id="rmbConvert">转换</button>
+                <button class="btn small copy-btn" data-target="rmbOutput">复制</button>
+            </div>
+            <div class="row mt-sm gap-sm">
+                <label class="checkbox-label"><input type="checkbox" id="rmbPrefix" checked> 添加「人民币」前缀</label>
+                <label class="checkbox-label"><input type="checkbox" id="rmbJiaoZheng"> 「角」后加「整」字</label>
+                <label class="checkbox-label"><input type="checkbox" id="rmbZheng"> 使用「正」代替「整」</label>
+            </div>
+            <div class="section-label mt-md mb-sm">转换结果</div>
+            <div class="result-mono" id="rmbOutput" style="font-size:15px;line-height:1.9;letter-spacing:0.04em;">—</div>
+            <span class="note" id="rmbInfo"></span>
+            <p class="note mt-sm">依据央行《正确填写票据和结算凭证的基本规定》：角位为 0 而分位非 0 时「元」后必写「零」；「元位」（个位）为 0 且角位非 0 时可写「零」（本工具采用规定示例中的写法）。支持最大 16 位整数（万亿级），不支持负数。</p>
         </div>
         <div class="panel" id="sub-convert-csvjson">
             <div class="section-label mb-sm">CSV / JSON 转换</div>
@@ -997,6 +1132,7 @@ Delta,15</textarea>
             <button class="tab-secondary" data-sub="datediff">日期差</button>
             <button class="tab-secondary" data-sub="dateadd">日期加减</button>
             <button class="tab-secondary" data-sub="timer">秒表 / 倒计时</button>
+            <button class="tab-secondary" data-sub="reaction" data-keywords="反应速度 手速 小游戏 测试 变绿">反应力测试</button>
             <button class="tab-secondary" data-sub="units">单位换算</button>
         </div>
 
@@ -1099,6 +1235,23 @@ timeout"></textarea></div>
             <div class="result-mono mt-sm" id="utilCountdownDisplay" style="font-size:24px;text-align:center;font-variant-numeric:tabular-nums;">00:01:00</div><div class="row mt-sm gap-sm"><button class="btn primary" id="utilCountdownStart">开始倒计时</button><button class="btn" id="utilCountdownPause">暂停</button><button class="btn" id="utilCountdownReset">重置</button><span class="note" id="utilCountdownStatus">倒计时结束时页面内提示，不会自动播放声音。</span></div>
         </div>
 
+        <div class="panel" id="sub-utility-reaction">
+            <div class="section-label mb-sm">反应力测试 · 经典变绿点击</div>
+            <div id="reactionStage" class="reaction-stage" style="background:#2f2f33;">
+                <span class="main">点击开始</span>
+                <span class="sub">共 5 轮 · 绿色出现后尽快点击</span>
+            </div>
+            <div class="row mt-sm gap-sm">
+                <button class="btn" id="reactionReset">重新开始</button>
+                <span class="note" id="reactionHint">开始前先做个深呼吸，保持自然坐姿；用鼠标点击（或触屏轻点）即可。</span>
+            </div>
+            <div class="section-label mt-md mb-sm">每轮记录</div>
+            <div id="reactionRounds" class="result-mono tool-output reaction-rounds">完成第一轮后显示各轮反应时间。</div>
+            <div class="section-label mt-md mb-sm">评级与建议</div>
+            <div id="reactionSummary" class="result-mono tool-output">完成 5 轮后自动给出平均反应时间、评级与训练建议。</div>
+            <p class="note mt-sm">计时使用 performance.now()，精确到毫秒；变绿前点击视为抢跑、本轮重新开始。反应时间受显示器刷新率、输入设备与身体状态影响，结果仅供娱乐与自我对比。</p>
+        </div>
+
         <div class="panel" id="sub-utility-units">
             <div class="section-label mb-sm">多类别单位换算</div><div class="tool-grid"><div class="tool-field"><label for="utilUnitCategory">换算类别</label><select id="utilUnitCategory"><option value="length">长度</option><option value="area">面积</option><option value="volume">体积</option><option value="mass">质量</option><option value="speed">速度</option><option value="temperature">温度</option><option value="pressure">压力</option><option value="energy">能量</option><option value="power">功率</option><option value="data">数据容量</option><option value="time">时间</option><option value="angle">角度</option></select></div><div class="tool-field"><label for="utilUnitValue">输入数值</label><input id="utilUnitValue" type="number" value="1" step="any"></div><div class="tool-field"><label for="utilUnitFrom">从单位</label><select id="utilUnitFrom"></select></div><div class="tool-field"><label for="utilUnitTo">转换为</label><select id="utilUnitTo"></select></div></div>
             <div class="row mt-sm gap-sm"><button class="btn primary" id="utilUnitConvert">换算</button><button class="btn" id="utilUnitSwap">交换单位</button></div><div class="section-label mt-md mb-sm">换算结果</div><div id="utilUnitOutput" class="result-mono tool-output">输入数值后换算。</div><p class="note mt-sm">覆盖长度、面积、体积、质量、速度、温度、压力、能量、功率、数据容量、时间和角度。数值按标准单位比例换算；温度使用单独的偏移公式。</p>
@@ -1106,8 +1259,394 @@ timeout"></textarea></div>
     </div>
 
     <hr class="divider">
-    <p class="note" style="text-align:center;">主要工具逻辑在浏览器端运行；CryptoJS、Markdown、Mermaid、二维码和代码格式化等部分功能依赖外部 CDN。HTML 预览使用隔离沙箱与 CSP；仍请勿运行不可信代码。处理敏感内容前，建议自行托管依赖并配置完整性校验。</p>
+    <p class="note" style="text-align:center;">主要工具逻辑在浏览器端运行；CryptoJS、Markdown、Mermaid、二维码和代码格式化等部分功能依赖外部 CDN。条形码、中文转换、进制转换与人民币大写等新增工具完全本地运行，不依赖外部资源。HTML 预览使用隔离沙箱与 CSP；仍请勿运行不可信代码。处理敏感内容前，建议自行托管依赖并配置完整性校验。</p>
 </div>
+
+<script>
+/* 中文转换数据（由 pypinyin 0.55.0 + OpenCC 生成，勿手改）：window.ZH_CONV_DATA */
+window.ZH_CONV_DATA = {"v":1,"s2t":"万萬与與丑醜专專业業丛叢东東丝絲丢丟两兩严嚴丧喪个個丰豐临臨为爲丽麗举舉么麼义義乌烏乐樂乔喬习習乡鄉书書买買乱亂争爭于於亏虧云雲亘亙亚亞产產亩畝亲親亵褻亸嚲亿億仅僅仆僕从從仑侖仓倉仪儀们們价價众衆优優伙夥会會伛傴伞傘伟偉传傳伡俥伣俔伤傷伥倀伦倫伧傖伪僞伫佇体體余餘佣傭佥僉侠俠侣侶侥僥侦偵侧側侨僑侩儈侪儕侬儂侭儘俣俁俦儔俨儼俩倆俪儷俫倈俭儉债債倾傾偬傯偻僂偾僨偿償傤儎傥儻傧儐储儲傩儺儿兒兑兌兖兗党黨兰蘭关關兴興兹茲养養兽獸冁囅内內冈岡册冊写寫军軍农農冯馮冲衝决決况況冻凍净淨凄悽准準凉涼减減凑湊凛凜几幾凤鳳凫鳧凭憑凯凱凶兇击擊凿鑿刍芻划劃刘劉则則刚剛创創删刪别別刬剗刭剄刹剎刽劊刾㓨刿劌剀剴剂劑剐剮剑劍剥剝剧劇劝勸办辦务務劢勱动動励勵劲勁劳勞势勢勋勳勚勩匀勻匦匭匮匱区區医醫华華协協单單卖賣占佔卢盧卤滷卧臥卫衛却卻卺巹厂廠厅廳历歷厉厲压壓厌厭厍厙厐龎厕廁厘釐厢廂厣厴厦廈厨廚厩廄厮廝县縣叁叄参參叆靉叇靆双雙发發变變叙敘叠疊台臺叶葉号號叹嘆叽嘰吁籲吃喫后後吓嚇吕呂吗嗎吨噸听聽启啓吴吳呐吶呒嘸呓囈呕嘔呖嚦呗唄员員呙咼呛嗆呜嗚咏詠咙嚨咛嚀咝噝咤吒咨諮咸鹹响響哑啞哒噠哓嘵哔嗶哕噦哗譁哙噲哜嚌哝噥哟喲唇脣唛嘜唝嗊唠嘮唡啢唢嗩唤喚啧嘖啬嗇啭囀啮齧啯嘓啰囉啴嘽啸嘯喷噴喽嘍喾嚳嗫囁嗳噯嘘噓嘤嚶嘱囑噜嚕嚣囂团團园園囱囪围圍囵圇国國图圖圆圓圣聖圹壙场場坏壞块塊坚堅坛壇坜壢坝壩坞塢坟墳坠墜垄壟垅壠垆壚垒壘垦墾垩堊垫墊垭埡垯墶垱壋垲塏垴堖埘塒埙壎埚堝堑塹堕墮塆壪墙牆壮壯声聲壳殼壶壺壸壼处處备備复復够夠头頭夸誇夹夾夺奪奁奩奂奐奋奮奖獎奥奧妆妝妇婦妈媽妩嫵妪嫗妫嬀姗姍姹奼娄婁娅婭娆嬈娇嬌娈孌娱娛娲媧娴嫺婳嫿婴嬰婵嬋婶嬸媪媼媭嬃嫒嬡嫔嬪嫱嬙嬷嬤孙孫学學孪孿宁寧宝寶实實宠寵审審宪憲宫宮宽寬宾賓寝寢对對寻尋导導寿壽将將尔爾尘塵尝嘗尧堯尴尷尸屍尽盡层層屃屓屉屜届屆属屬屡屢屦屨屿嶼岁歲岂豈岖嶇岗崗岘峴岚嵐岛島岩巖岭嶺岳嶽岽崬岿巋峃嶨峄嶧峡峽峣嶢峤嶠峥崢峦巒峰峯崂嶗崃崍崄嶮崭嶄嵘嶸嵚嶔嵝嶁巅巔巩鞏巯巰币幣帅帥师師帏幃帐帳帘簾帜幟带帶帧幀帮幫帱幬帻幘帼幗幂冪干幹并並广廣庄莊庆慶床牀庐廬庑廡库庫应應庙廟庞龐废廢庼廎廪廩开開异異弃棄弑弒张張弥彌弪弳弯彎弹彈强強归歸当當录錄彟彠彦彥彨彲彻徹征徵径徑徕徠忆憶忏懺忧憂忾愾怀懷态態怂慫怃憮怄慪怅悵怆愴怜憐总總怼懟怿懌恋戀恒恆恳懇恶惡恸慟恹懨恺愷恻惻恼惱恽惲悦悅悫愨悬懸悭慳悮悞悯憫惊驚惧懼惨慘惩懲惫憊惬愜惭慚惮憚惯慣愠慍愤憤愦憒愿願慑懾慭憖懑懣懒懶懔懍戆戇戋戔戏戲戗戧战戰戬戩戯戱户戶扑撲托託执執扩擴扪捫扫掃扬揚扰擾抚撫抛拋抟摶抠摳抡掄抢搶护護报報担擔拟擬拢攏拣揀拥擁拦攔拧擰拨撥择擇挂掛挚摯挛攣挜掗挝撾挞撻挟挾挠撓挡擋挢撟挣掙挤擠挥揮挦撏捝挩捞撈损損捡撿换換捣搗据據掳擄掴摑掷擲掸撣掺摻掼摜揽攬揾搵揿撳搀攙搁擱搂摟搄揯搅攪携攜摄攝摅攄摆擺摇搖摈擯摊攤撄攖撑撐撵攆撷擷撸擼撺攛擜㩵擞擻攒攢敌敵敚敓敛斂敩斆数數斋齋斓斕斗鬥斩斬断斷无無旧舊时時旷曠旸暘昙曇昵暱昼晝昽曨显顯晋晉晒曬晓曉晔曄晕暈晖暉暂暫暧曖术術朴樸机機杀殺杂雜权權杠槓条條来來杨楊杩榪杰傑极極构構枞樅枢樞枣棗枥櫪枧梘枨棖枪槍枫楓枭梟柜櫃柠檸柽檉栀梔栅柵标標栈棧栉櫛栊櫳栋棟栌櫨栎櫟栏欄树樹栖棲栗慄样樣栾欒桠椏桡橈桢楨档檔桤榿桥橋桦樺桧檜桨槳桩樁桪樳梦夢梼檮梾棶梿槤检檢棁梲棂欞椁槨椝槼椟櫝椠槧椢槶椤欏椫樿椭橢椮槮楼樓榄欖榅榲榇櫬榈櫚榉櫸榝樧槚檟槛檻槟檳槠櫧横橫樯檣樱櫻橥櫫橱櫥橹櫓橼櫞檩檁欢歡欤歟欧歐歼殲殁歿殇殤残殘殒殞殓殮殚殫殡殯殴毆毁毀毂轂毕畢毙斃毡氈毵毿氇氌气氣氢氫氩氬氲氳汇匯汉漢汤湯汹洶沄澐沟溝没沒沣灃沤漚沥瀝沦淪沧滄沨渢沩潙沪滬泞濘泪淚泶澩泷瀧泸瀘泺濼泻瀉泼潑泽澤泾涇洁潔洒灑洼窪浃浹浅淺浆漿浇澆浈湞浉溮浊濁测測浍澮济濟浏瀏浐滻浑渾浒滸浓濃浔潯浕濜涂塗涌湧涚涗涛濤涝澇涞淶涟漣涠潿涡渦涢溳涣渙涤滌润潤涧澗涨漲涩澀淀澱渊淵渌淥渍漬渎瀆渐漸渑澠渔漁渖瀋渗滲温溫游遊湾灣湿溼溁濚溃潰溅濺溆漵溇漊滗潷滚滾滞滯滟灩滠灄满滿滢瀅滤濾滥濫滦灤滨濱滩灘滪澦潆瀠潇瀟潋瀲潍濰潜潛潴瀦澛瀂澜瀾濑瀨濒瀕灏灝灭滅灯燈灵靈灶竈灾災灿燦炀煬炉爐炖燉炜煒炝熗点點炼煉炽熾烁爍烂爛烃烴烛燭烟煙烦煩烧燒烨燁烩燴烫燙烬燼热熱焕煥焖燜焘燾煴熅熏燻爱愛爷爺牍牘牦犛牵牽牺犧犊犢状狀犷獷犸獁犹猶狈狽狝獮狞獰独獨狭狹狮獅狯獪狰猙狱獄狲猻猃獫猎獵猕獼猡玀猪豬猫貓猬蝟献獻獭獺玑璣玙璵玚瑒玛瑪玮瑋环環现現玱瑲玺璽珐琺珑瓏珰璫珲琿琎璡琏璉琐瑣琼瓊瑶瑤瑷璦瑸璸璎瓔瓒瓚瓮甕瓯甌电電画畫畅暢畴疇疖癤疗療疟瘧疠癘疡瘍疬癧疭瘲疮瘡疯瘋疱皰疴痾痈癰痉痙痒癢痖瘂痨癆痪瘓痫癇痴癡瘅癉瘆瘮瘗瘞瘘瘻瘪癟瘫癱瘾癮瘿癭癞癩癣癬癫癲皂皁皑皚皱皺皲皸盏盞盐鹽监監盖蓋盗盜盘盤眍瞘眦眥眬矓睁睜睐睞睑瞼瞆瞶瞒瞞瞩矚矫矯矶磯矾礬矿礦砀碭码碼砖磚砗硨砚硯砜碸砺礪砻礱砾礫础礎硁硜硕碩硖硤硗磽硙磑硚礄确確硵磠硷礆碍礙碛磧碜磣碱鹼礼禮祃禡祎禕祢禰祯禎祷禱祸禍禀稟禄祿禅禪离離秃禿秆稈种種秘祕积積称稱秽穢秾穠稆穭税稅稣穌稳穩穑穡穞穭穷窮窃竊窍竅窎窵窑窯窜竄窝窩窥窺窦竇窭窶竖豎竞競笃篤笋筍笔筆笕筧笺箋笼籠笾籩筑築筚篳筛篩筜簹筝箏筹籌筼篔签籤筿篠简簡箓籙箦簀箧篋箨籜箩籮箪簞箫簫篑簣篓簍篮籃篯籛篱籬簖籪籁籟籴糴类類籼秈粜糶粝糲粤粵粪糞粮糧粽糉糁糝糇餱糍餈紧緊絷縶緼縕縆緪纟糹纠糾纡紆红紅纣紂纤纖纥紇约約级級纨紈纩纊纪紀纫紉纬緯纭紜纮紘纯純纰紕纱紗纲綱纳納纴紝纵縱纶綸纷紛纸紙纹紋纺紡纻紵纼紖纽紐纾紓线線绀紺绁紲绂紱练練组組绅紳细細织織终終绉縐绊絆绋紼绌絀绍紹绎繹经經绐紿绑綁绒絨结結绔絝绕繞绖絰绗絎绘繪给給绚絢绛絳络絡绝絕绞絞统統绠綆绡綃绢絹绣繡绤綌绥綏绦絛继繼绨綈绩績绪緒绫綾绬緓续續绮綺绯緋绰綽绱鞝绲緄绳繩维維绵綿绶綬绷繃绸綢绹綯绺綹绻綣综綜绽綻绾綰绿綠缀綴缁緇缂緙缃緗缄緘缅緬缆纜缇緹缈緲缉緝缊縕缋繢缌緦缍綞缎緞缏緶缐線缑緱缒縋缓緩缔締缕縷编編缗緡缘緣缙縉缚縛缛縟缜縝缝縫缞縗缟縞缠纏缡縭缢縊缣縑缤繽缥縹缦縵缧縲缨纓缩縮缪繆缫繅缬纈缭繚缮繕缯繒缰繮缱繾缲繰缳繯缴繳缵纘罂罌网網罗羅罚罰罢罷罴羆羁羈羟羥羡羨群羣翘翹翙翽翚翬耢耮耧耬耸聳耻恥聂聶聋聾职職聍聹联聯聩聵聪聰肃肅肠腸肤膚肮骯肴餚肾腎肿腫胀脹胁脅胆膽胜勝胧朧胨腖胪臚胫脛胶膠脉脈脍膾脏髒脐臍脑腦脓膿脔臠脚腳脱脫脶腡脸臉腊臘腌醃腘膕腭齶腻膩腼靦腽膃腾騰膑臏膻羶臜臢舆輿舣艤舰艦舱艙舻艫艰艱艳豔艺藝节節芈羋芗薌芜蕪芦蘆苁蓯苇葦苈藶苋莧苌萇苍蒼苎苧苏蘇苧薴苹蘋范範茎莖茏蘢茑蔦茔塋茕煢茧繭荆荊荐薦荙薘荚莢荛蕘荜蓽荝萴荞蕎荟薈荠薺荡蕩荣榮荤葷荥滎荦犖荧熒荨蕁荩藎荪蓀荫蔭荬蕒荭葒荮葤药藥莅蒞莱萊莲蓮莳蒔莴萵莶薟获獲莸蕕莹瑩莺鶯莼蓴萚蘀萝蘿萤螢营營萦縈萧蕭萨薩葱蔥蒀蒕蒇蕆蒉蕢蒋蔣蒌蔞蒏醟蓝藍蓟薊蓠蘺蓣蕷蓥鎣蓦驀蔂虆蔷薔蔹蘞蔺藺蔼藹蕰薀蕲蘄蕴蘊薮藪藓蘚藴蘊蘖櫱虏虜虑慮虚虛虫蟲虬虯虮蟣虱蝨虽雖虾蝦虿蠆蚀蝕蚁蟻蚂螞蚃蠁蚕蠶蚝蠔蚬蜆蛊蠱蛎蠣蛏蟶蛮蠻蛰蟄蛱蛺蛲蟯蛳螄蛴蠐蜕蛻蜗蝸蜡蠟蝇蠅蝈蟈蝉蟬蝎蠍蝼螻蝾蠑螀螿螨蟎蟏蠨衅釁衔銜补補衬襯衮袞袄襖袅嫋袆褘袜襪袭襲袯襏装裝裆襠裈褌裢褳裣襝裤褲裥襉褛褸褴襤襕襴见見观觀觃覎规規觅覓视視觇覘览覽觉覺觊覬觋覡觌覿觍覥觎覦觏覯觐覲觑覷觞觴触觸觯觶訚誾詟讋誉譽誊謄讠訁计計订訂讣訃认認讥譏讦訐讧訌讨討让讓讪訕讫訖讬託训訓议議讯訊记記讱訒讲講讳諱讴謳讵詎讶訝讷訥许許讹訛论論讻訩讼訟讽諷设設访訪诀訣证證诂詁诃訶评評诅詛识識诇詗诈詐诉訴诊診诋詆诌謅词詞诎詘诏詔诐詖译譯诒詒诓誆诔誄试試诖詿诗詩诘詰诙詼诚誠诛誅诜詵话話诞誕诟詬诠詮诡詭询詢诣詣诤諍该該详詳诧詫诨諢诩詡诪譸诫誡诬誣语語诮誚误誤诰誥诱誘诲誨诳誑说說诵誦诶誒请請诸諸诹諏诺諾读讀诼諑诽誹课課诿諉谀諛谁誰谂諗调調谄諂谅諒谆諄谇誶谈談谉讅谊誼谋謀谌諶谍諜谎謊谏諫谐諧谑謔谒謁谓謂谔諤谕諭谖諼谗讒谘諮谙諳谚諺谛諦谜謎谝諞谞諝谟謨谠讜谡謖谢謝谣謠谤謗谥諡谦謙谧謐谨謹谩謾谪謫谫譾谬謬谭譚谮譖谯譙谰讕谱譜谲譎谳讞谴譴谵譫谶讖豮豶贝貝贞貞负負贠貟贡貢财財责責贤賢败敗账賬货貨质質贩販贪貪贫貧贬貶购購贮貯贯貫贰貳贱賤贲賁贳貰贴貼贵貴贶貺贷貸贸貿费費贺賀贻貽贼賊贽贄贾賈贿賄赀貲赁賃赂賂赃贓资資赅賅赆贐赇賕赈賑赉賚赊賒赋賦赌賭赍齎赎贖赏賞赐賜赑贔赒賙赓賡赔賠赕賧赖賴赗賵赘贅赙賻赚賺赛賽赜賾赝贗赞贊赟贇赠贈赡贍赢贏赣贛赪赬赵趙赶趕趋趨趱趲趸躉跃躍跄蹌跖蹠跞躒践踐跶躂跷蹺跸蹕跹躚跻躋踌躊踪蹤踬躓踯躑蹑躡蹒蹣蹰躕蹿躥躏躪躜躦躯軀輼轀车車轧軋轨軌轩軒轪軑轫軔转轉轭軛轮輪软軟轰轟轱軲轲軻轳轤轴軸轵軹轶軼轷軤轸軫轹轢轺軺轻輕轼軾载載轾輊轿轎辀輈辁輇辂輅较較辄輒辅輔辆輛辇輦辈輩辉輝辊輥辋輞辌輬辍輟辎輜辏輳辐輻辑輯辒轀输輸辔轡辕轅辖轄辗輾辘轆辙轍辚轔辞辭辟闢辩辯辫辮边邊辽遼达達迁遷过過迈邁运運还還这這进進远遠违違连連迟遲迩邇迳逕迹跡适適选選逊遜递遞逦邐逻邏遗遺遥遙邓鄧邝鄺邬鄔邮郵邹鄒邺鄴邻鄰郁鬱郏郟郐鄶郑鄭郓鄆郦酈郧鄖郸鄲酂酇酝醞酦醱酱醬酽釅酾釃酿釀醖醞采採释釋里裏鉴鑑銮鑾錾鏨钅釒钆釓钇釔针針钉釘钊釗钋釙钌釕钍釷钎釺钏釧钐釤钑鈒钒釩钓釣钔鍆钕釹钖鍚钗釵钘鈃钙鈣钚鈈钛鈦钜鉅钝鈍钞鈔钟鍾钠鈉钡鋇钢鋼钣鈑钤鈐钥鑰钦欽钧鈞钨鎢钩鉤钪鈧钫鈁钬鈥钭鈄钮鈕钯鈀钰鈺钱錢钲鉦钳鉗钴鈷钵鉢钶鈳钷鉕钸鈽钹鈸钺鉞钻鑽钼鉬钽鉭钾鉀钿鈿铀鈾铁鐵铂鉑铃鈴铄鑠铅鉛铆鉚铇鉋铈鈰铉鉉铊鉈铋鉍铌鈮铍鈹铎鐸铏鉶铐銬铑銠铒鉺铓鋩铔錏铕銪铖鋮铗鋏铘鋣铙鐃铚銍铛鐺铜銅铝鋁铞銱铟銦铠鎧铡鍘铢銖铣銑铤鋌铥銩铦銛铧鏵铨銓铩鎩铪鉿铫銚铬鉻铭銘铮錚铯銫铰鉸铱銥铲鏟铳銃铴鐋铵銨银銀铷銣铸鑄铹鐒铺鋪铻鋙铼錸铽鋱链鏈铿鏗销銷锁鎖锂鋰锃鋥锄鋤锅鍋锆鋯锇鋨锈鏽锉銼锊鋝锋鋒锌鋅锍鋶锎鐦锏鐧锐銳锑銻锒鋃锓鋟锔鋦锕錒锖錆锗鍺锘鍩错錯锚錨锛錛锜錡锝鍀锞錁锟錕锠錩锡錫锢錮锣鑼锤錘锥錐锦錦锧鑕锨鍁锩錈锪鍃锫錇锬錟锭錠键鍵锯鋸锰錳锱錙锲鍥锳鍈锴鍇锵鏘锶鍶锷鍔锸鍤锹鍬锺鍾锻鍛锼鎪锽鍠锾鍰锿鎄镀鍍镁鎂镂鏤镃鎡镄鐨镅鎇镆鏌镇鎮镈鎛镉鎘镊鑷镋钂镌鐫镍鎳镎鎿镏鎦镐鎬镑鎊镒鎰镓鎵镔鑌镕鎔镖鏢镗鏜镘鏝镙鏍镚鏰镛鏞镜鏡镝鏑镞鏃镟鏇镠鏐镡鐔镢钁镣鐐镤鏷镥鑥镦鐓镧鑭镨鐠镩鑹镪鏹镫鐙镬鑊镭鐳镮鐶镯鐲镰鐮镱鐿镲鑔镳鑣镴鑞镵鑱镶鑲长長门門闩閂闪閃闫閆闬閈闭閉问問闯闖闰閏闱闈闲閒闳閎间間闵閔闶閌闷悶闸閘闹鬧闺閨闻聞闼闥闽閩闾閭闿闓阀閥阁閣阂閡阃閫阄鬮阅閱阆閬阇闍阈閾阉閹阊閶阋鬩阌閿阍閽阎閻阏閼阐闡阑闌阒闃阓闠阔闊阕闋阖闔阗闐阘闒阙闕阚闞阛闤队隊阳陽阴陰阵陣阶階际際陆陸陇隴陈陳陉陘陕陝陦隯陧隉陨隕险險随隨隐隱隶隸隽雋难難雇僱雏雛雠讎雳靂雾霧霁霽霉黴霡霢霭靄靓靚靔靝静靜靥靨鞑韃鞒鞽鞯韉鞲韝韦韋韧韌韨韍韩韓韪韙韫韞韬韜韵韻页頁顶頂顷頃顸頇项項顺順须須顼頊顽頑顾顧顿頓颀頎颁頒颂頌颃頏预預颅顱领領颇頗颈頸颉頡颊頰颋頲颌頜颍潁颎熲颏頦颐頤频頻颒頮颓頹颔頷颕頴颖穎颗顆题題颙顒颚顎颛顓颜顏额額颞顳颟顢颠顛颡顙颢顥颣纇颤顫颥顬颦顰颧顴风風飏颺飐颭飑颮飒颯飓颶飔颸飕颼飖颻飗飀飘飄飙飆飚飈飞飛飨饗餍饜饣飠饤飣饥飢饦飥饧餳饨飩饩餼饪飪饫飫饬飭饭飯饮飲饯餞饰飾饱飽饲飼饳飿饴飴饵餌饶饒饷餉饸餄饹餎饺餃饻餏饼餅饽餑饾餖饿餓馀餘馁餒馂餕馃餜馄餛馅餡馆館馇餷馈饋馉餶馊餿馋饞馌饁馍饃馎餺馏餾馐饈馑饉馒饅馓饊馔饌馕饢马馬驭馭驮馱驯馴驰馳驱驅驲馹驳駁驴驢驵駔驶駛驷駟驸駙驹駒驺騶驻駐驼駝驽駑驾駕驿驛骀駘骁驍骂罵骃駰骄驕骅驊骆駱骇駭骈駢骉驫骊驪骋騁验驗骍騂骎駸骏駿骐騏骑騎骒騍骓騅骔騌骕驌骖驂骗騙骘騭骙騤骚騷骛騖骜驁骝騮骞騫骟騸骠驃骡騾骢驄骣驏骤驟骥驥骦驦骧驤髅髏髋髖髌髕鬓鬢鬶鬹魇魘魉魎鱼魚鱽魛鱾魢鱿魷鲀魨鲁魯鲂魴鲃䰾鲄魺鲅鮁鲆鮃鲇鮎鲈鱸鲉鮋鲊鮓鲋鮒鲌鮊鲍鮑鲎鱟鲏鮍鲐鮐鲑鮭鲒鮚鲓鮳鲔鮪鲕鮞鲖鮦鲗鰂鲘鮜鲙鱠鲚鱭鲛鮫鲜鮮鲝鮺鲞鯗鲟鱘鲠鯁鲡鱺鲢鰱鲣鰹鲤鯉鲥鰣鲦鰷鲧鯀鲨鯊鲩鯇鲪鮶鲫鯽鲬鯒鲭鯖鲮鯪鲯鯕鲰鯫鲱鯡鲲鯤鲳鯧鲴鯝鲵鯢鲶鯰鲷鯛鲸鯨鲹鰺鲺鯴鲻鯔鲼鱝鲽鰈鲾鰏鲿鱨鳀鯷鳁鰮鳂鰃鳃鰓鳄鱷鳅鰍鳆鰒鳇鰉鳈鰁鳉鱂鳊鯿鳋鰠鳌鰲鳍鰭鳎鰨鳏鰥鳐鰩鳑鰟鳒鰜鳓鰳鳔鰾鳕鱈鳖鱉鳗鰻鳘鰵鳙鱅鳚䲁鳛鰼鳜鱖鳝鱔鳞鱗鳟鱒鳠鱯鳡鱤鳢鱧鳣鱣鳤䲘鸟鳥鸠鳩鸡雞鸢鳶鸣鳴鸤鳲鸥鷗鸦鴉鸧鶬鸨鴇鸩鴆鸪鴣鸫鶇鸬鸕鸭鴨鸮鴞鸯鴦鸰鴒鸱鴟鸲鴝鸳鴛鸴鷽鸵鴕鸶鷥鸷鷙鸸鴯鸹鴰鸺鵂鸻鴴鸼鵃鸽鴿鸾鸞鸿鴻鹀鵐鹁鵓鹂鸝鹃鵑鹄鵠鹅鵝鹆鵒鹇鷳鹈鵜鹉鵡鹊鵲鹋鶓鹌鵪鹍鵾鹎鵯鹏鵬鹐鵮鹑鶉鹒鶊鹓鵷鹔鷫鹕鶘鹖鶡鹗鶚鹘鶻鹙鶖鹚鷀鹛鶥鹜鶩鹝鷊鹞鷂鹟鶲鹠鶹鹡鶺鹢鷁鹣鶼鹤鶴鹥鷖鹦鸚鹧鷓鹨鷚鹩鷯鹪鷦鹫鷲鹬鷸鹭鷺鹮䴉鹯鸇鹰鷹鹱鸌鹲鸏鹳鸛鹴鸘鹾鹺麦麥麸麩麹麴麺麵麽麼黄黃黉黌黡黶黩黷黪黲黾黽鼋黿鼌鼂鼍鼉鼹鼴齐齊齑齏齿齒龀齔龁齕龂齗龃齟龄齡龅齙龆齠龇齜龈齦龉齬龊齪龋齲龌齷龙龍龚龔龛龕龟龜鿎䃮鿏䥑鿒鿓鿔鎶","t2s":"丟丢並并乾干亂乱亙亘亞亚佇伫佈布佔占併并來来侖仑侶侣侷局俁俣係系俔伣俠侠俥伡俬私倀伥倆俩倈俫倉仓個个們们倖幸倫伦倲㑈偉伟偑㐽側侧偵侦偽伪傌㐷傑杰傖伧傘伞備备傢家傭佣傯偬傳传傴伛債债傷伤傾倾僂偻僅仅僉佥僑侨僕仆僞伪僥侥僨偾僱雇價价儀仪儁俊儂侬億亿儈侩儉俭儎傤儐傧儔俦儕侪儘尽償偿優优儲储儷俪儸㑩儺傩儻傥儼俨兇凶兌兑兒儿兗兖內内兩两冊册冑胄冪幂凈净凍冻凜凛凱凯別别刪删剄刭則则剋克剎刹剗刬剛刚剝剥剮剐剴剀創创剷铲劃划劇剧劉刘劊刽劌刿劍剑劏㓥劑剂劚㔉勁劲動动務务勛勋勝胜勞劳勢势勩勚勱劢勳勋勵励勸劝勻匀匭匦匯汇匱匮區区協协卹恤卻却卽即厙厍厠厕厤历厭厌厲厉厴厣參参叄叁叢丛吒咤吳吴吶呐呂吕咼呙員员唄呗唸念問问啓启啞哑啟启啢唡喎㖞喚唤喪丧喫吃喬乔單单喲哟嗆呛嗇啬嗊唝嗎吗嗚呜嗩唢嗶哔嘆叹嘍喽嘓啯嘔呕嘖啧嘗尝嘜唛嘩哗嘮唠嘯啸嘰叽嘵哓嘸呒嘽啴噁恶噓嘘噚㖊噝咝噠哒噥哝噦哕噯嗳噲哙噴喷噸吨噹当嚀咛嚇吓嚌哜嚐尝嚕噜嚙啮嚥咽嚦呖嚨咙嚮向嚲亸嚳喾嚴严嚶嘤囀啭囁嗫囂嚣囅冁囈呓囉啰囌苏囑嘱囪囱圇囵國国圍围園园圓圆圖图團团垻坝埡垭埰采執执堅坚堊垩堖垴堝埚堯尧報报場场塊块塋茔塏垲塒埘塗涂塚冢塢坞塤埙塵尘塹堑墊垫墜坠墮堕墰坛墳坟墶垯墻墙墾垦壇坛壋垱壎埙壓压壘垒壙圹壚垆壜坛壞坏壟垄壠垅壢坜壩坝壪塆壯壮壺壶壼壸壽寿夠够夢梦夥伙夾夹奐奂奧奥奩奁奪夺奬奖奮奋奼姹妝妆姍姗姦奸娛娱婁娄婦妇婭娅媧娲媯妫媰㛀媼媪媽妈嫋袅嫗妪嫵妩嫺娴嫻娴嫿婳嬀妫嬃媭嬈娆嬋婵嬌娇嬙嫱嬡嫒嬤嬷嬪嫔嬰婴嬸婶孃娘孋㛤孌娈孫孙學学孿孪宮宫寀采寢寝實实寧宁審审寫写寬宽寵宠寶宝將将專专尋寻對对導导尷尴屆届屍尸屓屃屜屉屢屡層层屨屦屬属岡冈峯峰峴岘島岛峽峡崍崃崑昆崗岗崙仑崢峥崬岽嵐岚嵗岁嵾㟥嶁嵝嶄崭嶇岖嶔嵚嶗崂嶠峤嶢峣嶧峄嶨峃嶮崄嶸嵘嶺岭嶼屿嶽岳巋岿巒峦巔巅巖岩巰巯巹卺帥帅師师帳帐帶带幀帧幃帏幓㡎幗帼幘帻幟帜幣币幫帮幬帱幹干幾几庫库廁厕廂厢廄厩廈厦廎庼廕荫廚厨廝厮廟庙廠厂廡庑廢废廣广廩廪廬庐廳厅弒弑弔吊弳弪張张強强彆别彈弹彌弥彎弯彔录彙汇彠彟彥彦彫雕彲彨彿佛後后徑径從从徠徕復复徵征徹彻恆恒恥耻悅悦悞悮悵怅悶闷悽凄惡恶惱恼惲恽惻恻愛爱愜惬愨悫愴怆愷恺愾忾慄栗態态慍愠慘惨慚惭慟恸慣惯慤悫慪怄慫怂慮虑慳悭慶庆慺㥪慼戚慾欲憂忧憊惫憐怜憑凭憒愦憖慭憚惮憤愤憫悯憮怃憲宪憶忆懇恳應应懌怿懍懔懞蒙懟怼懣懑懤㤽懨恹懲惩懶懒懷怀懸悬懺忏懼惧懾慑戀恋戇戆戔戋戧戗戩戬戰战戱戯戲戏戶户拋抛挩捝挱挲挾挟捨舍捫扪捱挨捲卷掃扫掄抡掆㧏掗挜掙挣掛挂採采揀拣揚扬換换揮挥揯搄損损搖摇搗捣搵揾搶抢摑掴摜掼摟搂摯挚摳抠摶抟摺折摻掺撈捞撏挦撐撑撓挠撝㧑撟挢撣掸撥拨撫抚撲扑撳揿撻挞撾挝撿捡擁拥擄掳擇择擊击擋挡擓㧟擔担據据擠挤擣捣擬拟擯摈擰拧擱搁擲掷擴扩擷撷擺摆擻擞擼撸擽㧰擾扰攄摅攆撵攏拢攔拦攖撄攙搀攛撺攜携攝摄攢攒攣挛攤摊攪搅攬揽敎教敓敚敗败敘叙敵敌數数斂敛斃毙斆敩斕斓斬斩斷断於于旂旗旣既昇升時时晉晋晝昼暈晕暉晖暘旸暢畅暫暂曄晔曆历曇昙曉晓曏向曖暧曠旷曨昽曬晒書书會会朧胧朮术東东枴拐柵栅柺拐査查桿杆梔栀梘枧條条梟枭梲棁棄弃棊棋棖枨棗枣棟栋棡㭎棧栈棲栖棶梾椏桠椲㭏楊杨楓枫楨桢業业極极榘矩榦干榪杩榮荣榲榅榿桤構构槍枪槓杠槤梿槧椠槨椁槮椮槳桨槶椢槼椝樁桩樂乐樅枞樑梁樓楼標标樞枢樢㭤樣样樧榝樫㭴樳桪樸朴樹树樺桦樿椫橈桡橋桥機机橢椭橫横檁檩檉柽檔档檜桧檟槚檢检檣樯檮梼檯台檳槟檸柠檻槛櫃柜櫓橹櫚榈櫛栉櫝椟櫞橼櫟栎櫥橱櫧槠櫨栌櫪枥櫫橥櫬榇櫱蘖櫳栊櫸榉櫻樱欄栏欅榉權权欏椤欒栾欖榄欞棂欽钦歎叹歐欧歟欤歡欢歲岁歷历歸归歿殁殘残殞殒殤殇殨㱮殫殚殭僵殮殓殯殡殰㱩殲歼殺杀殻壳殼壳毀毁毆殴毿毵氂牦氈毡氌氇氣气氫氢氬氩氳氲氾泛汎泛汙污決决沒没沖冲況况泝溯洩泄洶汹浹浃涇泾涗涚涼凉淒凄淚泪淥渌淨净淩凌淪沦淵渊淶涞淺浅渙涣減减渢沨渦涡測测渾浑湊凑湞浈湧涌湯汤溈沩準准溝沟溫温溮浉溳涢溼湿滄沧滅灭滌涤滎荥滙汇滬沪滯滞滲渗滷卤滸浒滻浐滾滚滿满漁渔漊溇漚沤漢汉漣涟漬渍漲涨漵溆漸渐漿浆潁颍潑泼潔洁潙沩潚㴋潛潜潤润潯浔潰溃潷滗潿涠澀涩澆浇澇涝澐沄澗涧澠渑澤泽澦滪澩泶澮浍澱淀澾㳠濁浊濃浓濄㳡濕湿濘泞濚溁濛蒙濜浕濟济濤涛濧㳔濫滥濰潍濱滨濺溅濼泺濾滤瀂澛瀅滢瀆渎瀇㲿瀉泻瀋沈瀏浏瀕濒瀘泸瀝沥瀟潇瀠潆瀦潴瀧泷瀨濑瀰弥瀲潋瀾澜灃沣灄滠灑洒灕漓灘滩灝灏灡㳕灣湾灤滦灧滟灩滟災灾為为烏乌烴烃無无煉炼煒炜煙烟煢茕煥焕煩烦煬炀煱㶽熅煴熒荧熗炝熱热熲颎熾炽燁烨燈灯燉炖燒烧燙烫燜焖營营燦灿燬毁燭烛燴烩燶㶶燻熏燼烬燾焘爍烁爐炉爛烂爭争爲为爺爷爾尔牀床牆墙牘牍牽牵犖荦犛牦犢犊犧牺狀状狹狭狽狈猙狰猶犹猻狲獁犸獃呆獄狱獅狮獎奖獨独獪狯獫猃獮狝獰狞獱㺍獲获獵猎獷犷獸兽獺獭獻献獼猕玀猡現现琱雕琺珐琿珲瑋玮瑒玚瑣琐瑤瑶瑩莹瑪玛瑲玱璉琏璡琎璣玑璦瑷璫珰璯㻅環环璵玙璸瑸璽玺璿璇瓊琼瓏珑瓔璎瓚瓒甌瓯甕瓮產产産产甦苏甯宁畝亩畢毕畫画異异畵画當当疇畴疊叠痙痉痠酸痾疴瘂痖瘋疯瘍疡瘓痪瘞瘗瘡疮瘧疟瘮瘆瘲疭瘺瘘瘻瘘療疗癆痨癇痫癉瘅癒愈癘疠癟瘪癡痴癢痒癤疖癥症癧疬癩癞癬癣癭瘿癮瘾癰痈癱瘫癲癫發发皁皂皚皑皰疱皸皲皺皱盃杯盜盗盞盏盡尽監监盤盘盧卢盪荡眞真眥眦眾众睏困睜睁睞睐瞘眍瞜䁖瞞瞒瞶瞆瞼睑矇蒙矓眬矚瞩矯矫硃朱硜硁硤硖硨砗硯砚碕埼碩硕碭砀碸砜確确碼码碽䂵磑硙磚砖磠硵磣碜磧碛磯矶磽硗磾䃅礄硚礆硷礎础礙碍礦矿礪砺礫砾礬矾礱砻祕秘祿禄禍祸禎祯禕祎禡祃禦御禪禅禮礼禰祢禱祷禿秃秈籼稅税稈秆稏䅉稜棱稟禀種种稱称穀谷穇䅟穌稣積积穎颖穠秾穡穑穢秽穩稳穫获穭穞窩窝窪洼窮穷窯窑窵窎窶窭窺窥竄窜竅窍竇窦竈灶竊窃竪竖競竞筆笔筍笋筧笕筴䇲箇个箋笺箏筝節节範范築筑篋箧篔筼篠筿篤笃篩筛篳筚簀箦簍篓簑蓑簞箪簡简簣篑簫箫簹筜簽签簾帘籃篮籌筹籔䉤籙箓籛篯籜箨籟籁籠笼籤签籩笾籪簖籬篱籮箩籲吁粵粤糉粽糝糁糞粪糧粮糰团糲粝糴籴糶粜糹纟糾纠紀纪紂纣約约紅红紆纡紇纥紈纨紉纫紋纹納纳紐纽紓纾純纯紕纰紖纼紗纱紘纮紙纸級级紛纷紜纭紝纴紡纺紬䌷紮扎細细紱绂紲绁紳绅紵纻紹绍紺绀紼绋紿绐絀绌終终絃弦組组絅䌹絆绊絎绗結结絕绝絛绦絝绔絞绞絡络絢绚給给絨绒絰绖統统絲丝絳绛絶绝絹绢綁绑綃绡綆绠綈绨綉绣綌绤綏绥綐䌼綑捆經经綜综綞缍綠绿綢绸綣绻綫线綬绶維维綯绹綰绾綱纲網网綳绷綴缀綵彩綸纶綹绺綺绮綻绽綽绰綾绫綿绵緄绲緇缁緊紧緋绯緑绿緒绪緓绬緔绱緗缃緘缄緙缂線线緝缉緞缎締缔緡缗緣缘緦缌編编緩缓緬缅緯纬緱缑緲缈練练緶缏緹缇緻致緼缊縈萦縉缙縊缢縋缒縐绉縑缣縕缊縗缞縛缚縝缜縞缟縟缛縣县縧绦縫缝縭缡縮缩縱纵縲缧縳䌸縴纤縵缦縶絷縷缕縹缥總总績绩繃绷繅缫繆缪繒缯織织繕缮繚缭繞绕繡绣繢缋繩绳繪绘繫系繭茧繮缰繯缳繰缲繳缴繸䍁繹绎繼继繽缤繾缱繿䍀纇颣纈缬纊纩續续纍累纏缠纓缨纔才纖纤纘缵纜缆缽钵罃䓨罈坛罌罂罎坛罰罚罵骂罷罢羅罗羆罴羈羁羋芈羣群羥羟羨羡義义羶膻習习翫玩翬翚翹翘翽翙耬耧耮耢聖圣聞闻聯联聰聪聲声聳耸聵聩聶聂職职聹聍聽听聾聋肅肃脅胁脈脉脛胫脣唇脩修脫脱脹胀腎肾腖胨腡脶腦脑腫肿腳脚腸肠膃腽膕腘膚肤膞䏝膠胶膩腻膽胆膾脍膿脓臉脸臍脐臏膑臘腊臚胪臟脏臠脔臢臜臥卧臨临臺台與与興兴舉举舊旧舘馆艙舱艤舣艦舰艫舻艱艰艷艳芻刍苧苎茲兹荊荆莊庄莖茎莢荚莧苋華华菴庵菸烟萇苌萊莱萬万萴荝萵莴葉叶葒荭葤荮葦苇葯药葷荤蒐搜蒓莼蒔莳蒕蒀蒞莅蒼苍蓀荪蓆席蓋盖蓮莲蓯苁蓴莼蓽荜蔔卜蔘参蔞蒌蔣蒋蔥葱蔦茑蔭荫蕁荨蕆蒇蕎荞蕒荬蕓芸蕕莸蕘荛蕢蒉蕩荡蕪芜蕭萧蕷蓣薀蕰薈荟薊蓟薌芗薑姜薔蔷薘荙薟莶薦荐薩萨薳䓕薴苧薵䓓薹苔薺荠藍蓝藎荩藝艺藥药藪薮藭䓖藴蕴藶苈藹蔼藺蔺蘀萚蘄蕲蘆芦蘇苏蘊蕴蘋苹蘚藓蘞蔹蘢茏蘭兰蘺蓠蘿萝虆蔂處处虛虚虜虏號号虧亏虯虬蛺蛱蛻蜕蜆蚬蝕蚀蝟猬蝦虾蝨虱蝸蜗螄蛳螞蚂螢萤螮䗖螻蝼螿螀蟄蛰蟈蝈蟎螨蟣虮蟬蝉蟯蛲蟲虫蟶蛏蟻蚁蠁蚃蠅蝇蠆虿蠍蝎蠐蛴蠑蝾蠔蚝蠟蜡蠣蛎蠨蟏蠱蛊蠶蚕蠻蛮衆众衊蔑術术衕同衚胡衛卫衝冲袞衮裊袅裏里補补裝装裡里製制複复褌裈褘袆褲裤褳裢褸褛褻亵襇裥襉裥襏袯襖袄襝裣襠裆襤褴襪袜襬摆襯衬襲袭襴襕覈核見见覎觃規规覓觅視视覘觇覡觋覥觍覦觎親亲覬觊覯觏覲觐覷觑覺觉覽览覿觌觀观觴觞觶觯觸触訁讠訂订訃讣計计訊讯訌讧討讨訐讦訒讱訓训訕讪訖讫託托記记訛讹訝讶訟讼訢䜣訣诀訥讷訩讻訪访設设許许訴诉訶诃診诊註注証证詁诂詆诋詎讵詐诈詒诒詔诏評评詖诐詗诇詘诎詛诅詞词詠咏詡诩詢询詣诣試试詩诗詫诧詬诟詭诡詮诠詰诘話话該该詳详詵诜詼诙詿诖誄诔誅诛誆诓誇夸誌志認认誑诳誒诶誕诞誘诱誚诮語语誠诚誡诫誣诬誤误誥诰誦诵誨诲說说説说誰谁課课誶谇誹诽誼谊誾訚調调諂谄諄谆談谈諉诿請请諍诤諏诹諑诼諒谅論论諗谂諛谀諜谍諝谞諞谝諡谥諢诨諤谔諦谛諧谐諫谏諭谕諮咨諱讳諳谙諶谌諷讽諸诸諺谚諼谖諾诺謀谋謁谒謂谓謄誊謅诌謊谎謎谜謐谧謔谑謖谡謗谤謙谦謚谥講讲謝谢謠谣謡谣謨谟謫谪謬谬謭谫謳讴謹谨謾谩譁哗證证譎谲譏讥譖谮識识譙谯譚谭譜谱譟噪譫谵譭毁譯译議议譴谴護护譸诪譽誉譾谫讀读讅谉變变讋詟讌䜩讎雠讒谗讓让讕谰讖谶讚赞讜谠讞谳豈岂豎竖豐丰豔艳豬猪豶豮貓猫貙䝙貝贝貞贞貟贠負负財财貢贡貧贫貨货販贩貪贪貫贯責责貯贮貰贳貲赀貳贰貴贵貶贬買买貸贷貺贶費费貼贴貽贻貿贸賀贺賁贲賂赂賃赁賄贿賅赅資资賈贾賊贼賑赈賒赊賓宾賕赇賙赒賚赉賜赐賞赏賠赔賡赓賢贤賣卖賤贱賦赋賧赕質质賫赍賬账賭赌賰䞐賴赖賵赗賺赚賻赙購购賽赛賾赜贄贽贅赘贇赟贈赠贊赞贋赝贍赡贏赢贐赆贓赃贔赑贖赎贗赝贛赣贜赃赬赪趕赶趙赵趨趋趲趱跡迹踐践踰逾踴踊蹌跄蹕跸蹟迹蹠跖蹣蹒蹤踪蹺跷躂跶躉趸躊踌躋跻躍跃躎䟢躑踯躒跞躓踬躕蹰躚跹躡蹑躥蹿躦躜躪躏軀躯車车軋轧軌轨軍军軑轪軒轩軔轫軛轭軟软軤轷軫轸軲轱軸轴軹轵軺轺軻轲軼轶軾轼較较輅辂輇辁輈辀載载輊轾輒辄輓挽輔辅輕轻輛辆輜辎輝辉輞辋輟辍輥辊輦辇輩辈輪轮輬辌輯辑輳辏輸输輻辐輼辒輾辗輿舆轀辒轂毂轄辖轅辕轆辘轉转轍辙轎轿轔辚轟轰轡辔轢轹轤轳辦办辭辞辮辫辯辩農农迴回逕迳這这連连週周進进遊游運运過过達达違违遙遥遜逊遞递遠远遡溯適适遲迟遷迁選选遺遗遼辽邁迈還还邇迩邊边邏逻邐逦郟郏郵邮鄆郓鄉乡鄒邹鄔邬鄖郧鄧邓鄭郑鄰邻鄲郸鄴邺鄶郐鄺邝酇酂酈郦醃腌醖酝醜丑醞酝醟蒏醣糖醫医醬酱醱酦釀酿釁衅釃酾釅酽釋释釐厘釒钅釓钆釔钇釕钌釗钊釘钉釙钋針针釣钓釤钐釦扣釧钏釩钒釵钗釷钍釹钕釺钎釾䥺鈀钯鈁钫鈃钘鈄钭鈅钥鈈钚鈉钠鈍钝鈎钩鈐钤鈑钣鈒钑鈔钞鈕钮鈞钧鈡钟鈣钙鈥钬鈦钛鈧钪鈮铌鈰铈鈳钶鈴铃鈷钴鈸钹鈹铍鈺钰鈽钸鈾铀鈿钿鉀钾鉅巨鉆钻鉈铊鉉铉鉋铇鉍铋鉑铂鉕钷鉗钳鉚铆鉛铅鉞钺鉢钵鉤钩鉦钲鉬钼鉭钽鉳锫鉶铏鉸铰鉺铒鉻铬鉿铪銀银銃铳銅铜銍铚銑铣銓铨銖铢銘铭銚铫銛铦銜衔銠铑銣铷銥铱銦铟銨铵銩铥銪铕銫铯銬铐銱铞銳锐銷销銹锈銻锑銼锉鋁铝鋃锒鋅锌鋇钡鋌铤鋏铗鋒锋鋙铻鋝锊鋟锓鋣铘鋤锄鋥锃鋦锔鋨锇鋩铓鋪铺鋭锐鋮铖鋯锆鋰锂鋱铽鋶锍鋸锯鋼钢錁锞錄录錆锖錇锫錈锩錏铔錐锥錒锕錕锟錘锤錙锱錚铮錛锛錟锬錠锭錡锜錢钱錦锦錨锚錩锠錫锡錮锢錯错録录錳锰錶表錸铼錼镎鍀锝鍁锨鍃锪鍅钫鍆钔鍇锴鍈锳鍊炼鍋锅鍍镀鍔锷鍘铡鍚钖鍛锻鍠锽鍤锸鍥锲鍩锘鍬锹鍰锾鍵键鍶锶鍺锗鍼针鍾钟鎂镁鎄锿鎇镅鎊镑鎌镰鎔镕鎖锁鎘镉鎚锤鎛镈鎡镃鎢钨鎣蓥鎦镏鎧铠鎩铩鎪锼鎬镐鎭镇鎮镇鎰镒鎲镋鎳镍鎵镓鎶鿔鎸镌鎿镎鏃镞鏇旋鏈链鏌镆鏍镙鏐镠鏑镝鏗铿鏘锵鏜镗鏝镘鏞镛鏟铲鏡镜鏢镖鏤镂鏨錾鏰镚鏵铧鏷镤鏹镪鏺䥽鏽锈鐃铙鐋铴鐐镣鐒铹鐓镦鐔镡鐘钟鐙镫鐝镢鐠镨鐥䦅鐦锎鐧锏鐨镄鐫镌鐮镰鐯䦃鐲镯鐳镭鐵铁鐶镮鐸铎鐺铛鐿镱鑄铸鑊镬鑌镔鑑鉴鑒鉴鑔镲鑕锧鑞镴鑠铄鑣镳鑥镥鑭镧鑰钥鑱镵鑲镶鑷镊鑹镩鑼锣鑽钻鑾銮鑿凿钁镢钂镋長长門门閂闩閃闪閆闫閈闬閉闭開开閌闶閎闳閏闰閑闲閒闲間间閔闵閘闸閡阂閣阁閤合閥阀閨闺閩闽閫阃閬阆閭闾閱阅閲阅閶阊閹阉閻阎閼阏閽阍閾阈閿阌闃阒闆板闇暗闈闱闊阔闋阕闌阑闍阇闐阗闒阘闓闿闔阖闕阙闖闯關关闞阚闠阓闡阐闢辟闤阛闥闼陘陉陝陕陞升陣阵陰阴陳陈陸陆陽阳隉陧隊队階阶隕陨際际隨随險险隯陦隱隐隴陇隸隶隻只雋隽雖虽雙双雛雏雜杂雞鸡離离難难雲云電电霑沾霢霡霧雾霽霁靂雳靄霭靆叇靈灵靉叆靚靓靜静靝靔靦腼靨靥鞏巩鞝绱鞦秋鞽鞒韁缰韃鞑韆千韉鞯韋韦韌韧韍韨韓韩韙韪韜韬韝鞲韞韫韻韵響响頁页頂顶頃顷項项順顺頇顸須须頊顼頌颂頎颀頏颃預预頑顽頒颁頓顿頗颇領领頜颌頡颉頤颐頦颏頭头頮颒頰颊頲颋頴颕頷颔頸颈頹颓頻频頽颓顆颗題题額额顎颚顏颜顒颙顓颛顔颜願愿顙颡顛颠類类顢颟顥颢顧顾顫颤顬颥顯显顰颦顱颅顳颞顴颧風风颭飐颮飑颯飒颱台颳刮颶飓颸飔颺飏颻飖颼飕飀飗飄飘飆飙飈飚飛飞飠饣飢饥飣饤飥饦飩饨飪饪飫饫飭饬飯饭飱飧飲饮飴饴飼饲飽饱飾饰飿饳餃饺餄饸餅饼餈糍餉饷養养餌饵餎饹餏饻餑饽餒馁餓饿餕馂餖饾餘余餚肴餛馄餜馃餞饯餡馅館馆餬糊餱糇餳饧餵喂餶馉餷馇餺馎餼饩餾馏餿馊饁馌饃馍饅馒饈馐饉馑饊馓饋馈饌馔饑饥饒饶饗飨饜餍饞馋饢馕馬马馭驭馮冯馱驮馳驰馴驯馹驲駁驳駐驻駑驽駒驹駔驵駕驾駘骀駙驸駛驶駝驼駟驷駡骂駢骈駭骇駰骃駱骆駸骎駿骏騁骋騂骍騅骓騌骔騍骒騎骑騏骐騖骛騙骗騤骙騧䯄騫骞騭骘騮骝騰腾騶驺騷骚騸骟騾骡驀蓦驁骜驂骖驃骠驄骢驅驱驊骅驌骕驍骁驏骣驕骄驗验驚惊驛驿驟骤驢驴驤骧驥骥驦骦驪骊驫骉骯肮髏髅髒脏體体髕髌髖髋髮发鬆松鬍胡鬚须鬢鬓鬥斗鬧闹鬨哄鬩阋鬮阄鬱郁鬹鬶魎魉魘魇魚鱼魛鱽魢鱾魨鲀魯鲁魴鲂魷鱿魺鲄鮁鲅鮃鲆鮊鲌鮋鲉鮍鲏鮎鲇鮐鲐鮑鲍鮒鲋鮓鲊鮚鲒鮜鲘鮝鲞鮞鲕鮣䲟鮦鲖鮪鲔鮫鲛鮭鲑鮮鲜鮳鲓鮶鲪鮺鲝鯀鲧鯁鲠鯇鲩鯉鲤鯊鲨鯒鲬鯔鲻鯕鲯鯖鲭鯗鲞鯛鲷鯝鲴鯡鲱鯢鲵鯤鲲鯧鲳鯨鲸鯪鲮鯫鲰鯰鲶鯴鲺鯷鳀鯽鲫鯿鳊鰁鳈鰂鲗鰃鳂鰆䲠鰈鲽鰉鳇鰌䲡鰍鳅鰏鲾鰐鳄鰒鳆鰓鳃鰛鳁鰜鳒鰟鳑鰠鳋鰣鲥鰥鳏鰧䲢鰨鳎鰩鳐鰭鳍鰮鳁鰱鲢鰲鳌鰳鳓鰵鳘鰷鲦鰹鲣鰺鲹鰻鳗鰼鳛鰾鳔鱂鳉鱅鳙鱈鳕鱉鳖鱒鳟鱔鳝鱖鳜鱗鳞鱘鲟鱝鲼鱟鲎鱠鲙鱣鳣鱤鳡鱧鳢鱨鲿鱭鲚鱯鳠鱷鳄鱸鲈鱺鲡鳥鸟鳧凫鳩鸠鳬凫鳲鸤鳳凤鳴鸣鳶鸢鳾䴓鴆鸩鴇鸨鴉鸦鴒鸰鴕鸵鴛鸳鴝鸲鴞鸮鴟鸱鴣鸪鴦鸯鴨鸭鴯鸸鴰鸹鴴鸻鴷䴕鴻鸿鴿鸽鵁䴔鵂鸺鵃鸼鵐鹀鵑鹃鵒鹆鵓鹁鵜鹈鵝鹅鵠鹄鵡鹉鵪鹌鵬鹏鵮鹐鵯鹎鵰雕鵲鹊鵷鹓鵾鹍鶄䴖鶇鸫鶉鹑鶊鹒鶓鹋鶖鹙鶘鹕鶚鹗鶡鹖鶥鹛鶩鹜鶪䴗鶬鸧鶯莺鶲鹟鶴鹤鶹鹠鶺鹡鶻鹘鶼鹣鶿鹚鷀鹚鷁鹢鷂鹞鷄鸡鷉䴘鷊鹝鷓鹧鷖鹥鷗鸥鷙鸷鷚鹨鷥鸶鷦鹪鷫鹔鷯鹩鷲鹫鷳鹇鷴鹇鷸鹬鷹鹰鷺鹭鷽鸴鸂㶉鸇鹯鸊䴙鸌鹱鸏鹲鸕鸬鸘鹴鸚鹦鸛鹳鸝鹂鸞鸾鹵卤鹹咸鹺鹾鹼碱鹽盐麗丽麥麦麩麸麪面麫面麯曲麴曲麵面麼么麽么黃黄黌黉點点黨党黲黪黴霉黶黡黷黩黽黾黿鼋鼂鼌鼉鼍鼕冬鼴鼹齊齐齋斋齎赍齏齑齒齿齔龀齕龁齗龂齙龅齜龇齟龃齠龆齡龄齣出齦龈齧啮齪龊齬龉齲龋齶腭齷龌龍龙龎厐龐庞龑䶮龔龚龕龛龜龟鿁䜤鿓鿒","s2tP":{"关系":"關係","公里":"公里","分布":"分佈","了解":"瞭解","批准":"批准","联系":"聯繫","发布":"發佈","宣布":"宣佈","尽管":"儘管","一只":"一隻","若干":"若干","制造":"製造","分钟":"分鐘","复杂":"複雜","刚才":"剛纔","研制":"研製","公布":"公佈","制作":"製作","令狐冲":"令狐沖","发布会":"發佈會","老板":"老闆","标志":"標誌","平方公里":"平方公里","签订":"簽訂","皇后":"皇后","仿佛":"彷彿","头发":"頭髮","合并":"合併","太后":"太后","反复":"反覆","防御":"防禦","制成":"製成","抵触":"牴觸","两只":"兩隻","颁布":"頒佈","杂志":"雜誌","布局":"佈局","周期":"週期","布置":"佈置","签署":"簽署","尽量":"儘量","考核":"考覈","干涉":"干涉","岩石":"岩石","轻松":"輕鬆","干净":"乾淨","尽快":"儘快","重复":"重複","复习":"複習","上游":"上游","胡同":"衚衕","桥梁":"橋樑","锻炼":"鍛鍊","万历":"萬曆","世界杯":"世界盃","花岗岩":"花崗岩","咸宁":"咸寧","下游":"下游","团子":"糰子","征服":"征服","汇报":"彙報","干扰":"干擾","凭借":"憑藉","家伙":"傢伙","咸宁市":"咸寧市","周年":"週年","制品":"製品","沈阳":"瀋陽","故里":"故里","借口":"藉口","出征":"出征","注册":"註冊","答复":"答覆","黄金周":"黃金週","里程":"里程","名胜古迹":"名勝古蹟","方才":"方纔","心脏":"心臟","胡子":"鬍子","干脆":"乾脆","干燥":"乾燥","古迹":"古蹟","回归":"迴歸","放松":"放鬆","签字":"簽字","浓郁":"濃郁","干旱":"乾旱","面粉":"麵粉","向往":"嚮往","收获":"收穫","船只":"船隻","日历":"日曆","称赞":"稱讚","日志":"日誌","尽可能":"儘可能","遗迹":"遺蹟","皇太后":"皇太后","制药":"製藥","中游":"中游","一周":"一週","审核":"審覈","回避":"迴避","每周":"每週","奇迹":"奇蹟","周刊":"週刊","干预":"干預","借助":"藉助","游泳":"游泳","复合":"複合","欲望":"慾望","汇集":"彙集","周转":"週轉","兼并":"兼併","家具":"傢俱","面包":"麵包","长征":"長征","面条":"麵條","抵御":"抵禦","海里":"海里","密布":"密佈","遍布":"遍佈","制造业":"製造業","游击队":"游擊隊","万里":"萬里","胜迹":"勝蹟","坐标":"座標","亲征":"親征","词汇":"詞彙","并入":"併入","千里":"千里","局限":"侷限","驻扎":"駐紮","阿里":"阿里","编钟":"編鐘","事迹":"事蹟","恶心":"噁心","谷物":"穀物","细致":"細緻","搜集":"蒐集","注定":"註定","烟草":"菸草","范蠡":"范蠡","板栗":"板栗","岳飞":"岳飛","农历":"農曆","广布":"廣佈","复制":"複製","舍不得":"捨不得","动荡":"動盪","布满":"佈滿","中下游":"中下游","侥幸":"僥倖","周末":"週末","舍得":"捨得","风采":"風采","系数":"係數","折子":"摺子","咸丰":"咸豐","昆仑":"崑崙","精致":"精緻","关系人":"關係人","陆游":"陸游","朱红":"硃紅","吸烟":"吸菸","赞扬":"讚揚","弥漫":"瀰漫","愈合":"癒合","巨额":"鉅額","僵尸":"殭屍","肝脏":"肝臟","散布":"散佈","签名":"簽名","回旋":"迴旋","岩浆":"岩漿","赞赏":"讚賞","赞叹":"讚歎","上周":"上週","烹制":"烹製","烧毁":"燒燬","冲积平原":"沖積平原","借以":"藉以","夸特":"夸特","东升":"東昇","注释":"註釋","林冲":"林沖","克里特":"克里特","拿破仑":"拿破崙","五里":"五里","远征":"遠征","岳父":"岳父","干干净净":"乾乾淨淨","奏折":"奏摺","绘制":"繪製","克制":"剋制","心脏病":"心臟病","调制":"調製","食欲":"食慾","娘家":"孃家","稻谷":"稻穀","香烟":"香菸","制剂":"製劑","师娘":"師孃","周岁":"週歲","一分钟":"一分鐘","回复":"回覆","泛滥":"氾濫","批复":"批覆","人际关系":"人際關係","扎实":"紮實","复辟":"復辟","折合":"摺合","艰巨":"艱鉅","尽早":"儘早","借着":"藉着","震荡":"震盪","胡萝卜":"胡蘿蔔","若干个":"若干個","变质岩":"變質岩","筋斗":"筋斗","签证":"簽證","马夫":"馬伕","签约":"簽約","内脏":"內臟","张三丰":"張三丰","卷起":"捲起","复苏":"復甦","几只":"幾隻","松软":"鬆軟","白发":"白髮","摩托车":"摩托車","制备":"製備","获准":"獲准","制造商":"製造商","东征":"東征","十里":"十里","凄凉":"淒涼","苇席":"葦蓆","并购":"併購","抽烟":"抽菸","斗拱":"斗拱","杆菌":"桿菌","赞美":"讚美","岩层":"岩層","拐杖":"柺杖","石灰岩":"石灰岩","周二":"週二","托马斯":"托馬斯","周期性":"週期性","谷子":"穀子","昆仑山":"崑崙山","脏腑":"臟腑","轮回":"輪迴","烧制":"燒製","肾脏":"腎臟","柜台":"櫃檯","松弛":"鬆弛","辟邪":"辟邪","朱砂":"硃砂","精制":"精製","咸阳":"咸陽","干系":"干係","尽管如此":"儘管如此","饥民":"饑民","一并":"一併","冲虚":"沖虛","海参":"海蔘","炼制":"煉製","五谷":"五穀","人参":"人蔘","萝卜":"蘿蔔","岩盐":"岩鹽","周六":"週六","面皮":"麵皮","台风":"颱風","周日":"週日","染发":"染髮","制糖":"製糖","焚毁":"焚燬","哈里":"哈里","卷入":"捲入","熔岩":"熔岩","数里":"數里","注明":"註明","核算":"覈算","冲洗":"沖洗","岳家":"岳家","针灸":"鍼灸","周一":"週一","治愈":"治癒","向导":"嚮導","复线":"複線","卧薪尝胆":"臥薪嚐膽","定制":"定製","手表":"手錶","胡须":"鬍鬚","几分钟":"幾分鐘","杠杆":"槓桿","茶几":"茶几","品尝":"品嚐","征战":"征戰","爹娘":"爹孃","情欲":"情慾","一周年":"一週年","三只":"三隻","核实":"覈實","核查":"覈查","包扎":"包紮","磨制":"磨製","销毁":"銷燬","仿制":"仿製","卷烟":"捲菸","吞并":"吞併","布雷":"佈雷","亚里士多德":"亞里士多德","斯里兰卡":"斯里蘭卡","制取":"製取","历法":"曆法","挨打":"捱打","面团":"麵糰","复杂性":"複雜性","惊叹":"驚歎","松开":"鬆開","激荡":"激盪","炒面":"炒麵","景致":"景緻","并发症":"併發症","回转":"迴轉","老娘":"老孃","纤夫":"縴夫","炸毁":"炸燬","疏松":"疏鬆","背包":"揹包","范文程":"范文程","松散":"鬆散","折扇":"摺扇","汇编":"彙編","兴高采烈":"興高采烈","钟声":"鐘聲","回游":"迴游","尝尝":"嚐嚐","秒钟":"秒鐘","曲酒":"麴酒","痊愈":"痊癒","配制":"配製","砂岩":"砂岩","二里头":"二里頭","回廊":"迴廊","肥皂":"肥皂","泥灰岩":"泥灰岩","冲天":"沖天","席卷":"席捲","别扭":"彆扭","毕升":"畢昇","周五":"週五","喝采":"喝采","冲积":"沖積","干重":"乾重","宽松":"寬鬆","准许":"准許","北斗":"北斗","复查":"複查","游击战":"游擊戰","里程碑":"里程碑","干贝":"乾貝","星罗棋布":"星羅棋佈","干面":"乾麵","鱼松":"魚鬆","毛发":"毛髮","涂长望":"涂長望","干粮":"乾糧","振荡":"振盪","维系":"維繫","背负":"揹負","迂回":"迂迴","咸丰县":"咸豐縣","咸安区":"咸安區","乡里":"鄉里","欧几里得":"歐幾里得","酸麻":"痠麻","扎营":"紮營","里昂":"里昂","复试":"複試","念书":"唸書","纸烟":"紙菸","特制":"特製","岳母":"岳母","性欲":"性慾","烟叶":"菸葉","染发剂":"染髮劑","折叠":"摺疊","车夫":"車伕","升华":"昇華","基岩":"基岩","王后":"王后","借机":"藉機","马德里":"馬德里","没关系":"沒關係","气喘吁吁":"氣喘吁吁","摆布":"擺佈","玄武岩":"玄武岩","守御":"守禦","舍命":"捨命","奸淫":"姦淫","德里":"德里","不相干":"不相干","木制":"木製","西西里":"西西里","索马里":"索馬里","后妃":"后妃","繁复":"繁複","慈禧太后":"慈禧太后","相干":"相干","脏器":"臟器","两周":"兩週","核准":"覈准","借助于":"藉助於","单于":"單于","种师道":"种師道","鼻梁":"鼻樑","朱笔":"硃筆","松手":"鬆手","酸软":"痠軟","克里":"克里","占卜":"占卜","舍弃":"捨棄","征伐":"征伐","征讨":"征討","致密":"緻密","取舍":"取捨","周三":"週三","强奸":"強姦","百里":"百里","本周":"本週","荡漾":"盪漾","长发":"長髮","试制":"試製","飞升":"飛昇","海淀区":"海淀區","钟头":"鐘頭","周四":"週四","四只":"四隻","干尸":"乾屍","熏陶":"薰陶","饼干":"餅乾","大胡子":"大鬍子","错综复杂":"錯綜複雜","赞誉":"讚譽","娘儿":"孃兒","喂养":"餵養","挽联":"輓聯","兴冲冲":"興沖沖","干涸":"乾涸","辛丑":"辛丑","摩托罗拉":"摩托羅拉","制造厂":"製造廠","若干年":"若干年","念经":"唸經","起哄":"起鬨","杂志社":"雜誌社","签发":"簽發","墨索里尼":"墨索里尼","时钟":"時鐘","饥荒":"饑荒","苏醒":"甦醒","松懈":"鬆懈","别致":"別緻","复方":"複方","多只":"多隻","居里":"居里","巡回":"巡迴","朴刀":"朴刀","酸痛":"痠痛","项链":"項鍊","复合材料":"複合材料","奖杯":"獎盃","尝到":"嚐到","浮游":"浮游","漏斗":"漏斗","舰只":"艦隻","制革":"製革","御制":"御製","炼钢":"鍊鋼","坐标系":"座標系","昆曲":"崑曲","雅致":"雅緻","鼓噪":"鼓譟","前仆后继":"前仆後繼","注解":"註解","制片厂":"製片廠","分布区":"分佈區","复印":"複印","页岩":"頁岩","吊唁":"弔唁","摄制":"攝製","南征":"南征","回流":"迴流","通奸":"通姦","克里特岛":"克里特島","胡萝卜素":"胡蘿蔔素","斗篷":"斗篷","回音":"迴音","核对":"覈對","卤素":"鹵素","汇总":"彙總","新德里":"新德里","复数":"複數","钟表":"鐘錶","叮当":"叮噹","血症":"血癥","祖冲之":"祖沖之","冲刷":"沖刷","松动":"鬆動","冲绳":"沖繩","夸克":"夸克","并发":"併發","幸免":"倖免","施舍":"施捨","钢梁":"鋼樑","中上游":"中上游","扎扎实实":"紮紮實實","云云":"云云","印制":"印製","一目了然":"一目瞭然","赶制":"趕製","十余里":"十餘里","吉凶":"吉凶","录制":"錄製","伙食":"伙食","发型":"髮型","衬托":"襯托","游泳池":"游泳池","扎根":"紮根","梁柱":"樑柱","台州":"台州","拐子":"柺子","乌干达":"烏干達","征服者":"征服者","摩托化":"摩托化","远征军":"遠征軍","团伙":"團伙","钟楼":"鐘樓","征途":"征途","赞许":"讚許","准考证":"准考證","一里":"一里","党项":"党項","枪托":"槍托","白面":"白麵","沉积岩":"沉積岩","吞咽":"吞嚥","咽下":"嚥下","幸存":"倖存","横梁":"橫樑","金发":"金髮","世界杯赛":"世界盃賽","克星":"剋星","划船":"划船","凄厉":"淒厲","炼铁":"鍊鐵","岩石圈":"岩石圈","千里迢迢":"千里迢迢","念佛":"唸佛","冲掉":"沖掉","昆山":"崑山","华里":"華里","巨著":"鉅著","彩绸":"綵綢","签定":"簽定","症结":"癥結","老板娘":"老闆娘","十分钟":"十分鐘","巴里":"巴里","抗御":"抗禦","冲淡":"沖淡","念叨":"唸叨","烟袋":"菸袋","脊梁":"脊樑","回路":"迴路","蓬松":"蓬鬆","轿夫":"轎伕","托勒密":"托勒密","浮游生物":"浮游生物","标注":"標註","回荡":"迴盪","舍身":"捨身","塔里木盆地":"塔里木盆地","周济":"賙濟","托盘":"托盤","特里":"特里","娘舅":"孃舅","抚恤":"撫卹","叮叮当当":"叮叮噹噹","蒙在鼓里":"矇在鼓裏","复叶":"複葉","并州":"幷州","火山岩":"火山岩","口吃":"口吃","警钟":"警鐘","傅里叶":"傅里葉","二娘":"二孃","奥托":"奧托","布里":"布里","布设":"佈設","布阵":"佈陣","干湿":"乾溼","戒烟":"戒菸","签注":"簽註","腌制":"醃製","西西里岛":"西西里島","托叶":"托葉","旱烟":"旱菸","制法":"製法","幸存者":"倖存者","写字台":"寫字檯","沈阳市":"瀋陽市","毛里求斯":"毛里求斯","五脏":"五臟","摩托":"摩托","栗子":"栗子","核定":"覈定","铲除":"剷除","佣金":"佣金","制冷":"製冷","周报":"週報","漓江":"灕江","郁郁":"鬱郁","炮制":"炮製","了如指掌":"瞭如指掌","卷土重来":"捲土重來","琴弦":"琴絃","蒙住":"矇住","阴历":"陰曆","佛罗里达":"佛羅里達","巨变":"鉅變","诬蔑":"誣衊","钟山":"鐘山","塔里木河":"塔里木河","里约热内卢":"里約熱內盧","扣子":"釦子","英里":"英里","克扣":"剋扣","并力":"併力","万里长城":"萬里長城","五脏六腑":"五臟六腑","一斗":"一斗","包谷":"包穀","发髻":"髮髻","凭借着":"憑藉着","理发师":"理髮師","千钧一发":"千鈞一髮","三里":"三里","须眉":"鬚眉","塔什干":"塔什干","歇斯底里":"歇斯底里","困倦":"睏倦","里斯本":"里斯本","坛子":"罈子","布告":"佈告","干草":"乾草","烟斗":"菸斗","冠军杯":"冠軍盃","油页岩":"油頁岩","困乏":"睏乏","干支":"干支","干爹":"乾爹","复杂化":"複雜化","布景":"佈景","搜罗":"蒐羅","洄游":"洄游","船夫":"船伕","一干二净":"一乾二淨","制片":"製片","砾岩":"礫岩","制成品":"製成品","利比里亚":"利比里亞","半里":"半里","巨款":"鉅款","生姜":"生薑","方便面":"方便麵","制陶":"製陶","里加":"里加","黑发":"黑髮","冲积扇":"沖積扇","借此机会":"藉此機會","凶多吉少":"凶多吉少","划算":"划算","哄笑":"鬨笑","毛里塔尼亚":"毛里塔尼亞","复述":"複述","神采":"神采","缝制":"縫製","合眼":"閤眼","干将":"干將","烘托":"烘托","白须":"白鬚","秀发":"秀髮","划着":"划着","征程":"征程","短发":"短髮","乌托邦":"烏托邦","制图":"製圖","烟头":"菸頭","复合型":"複合型","斗胆":"斗膽","毫不相干":"毫不相干","哗啦":"嘩啦","复命":"覆命","标致":"標緻","秋千":"鞦韆","二里":"二里","夸赞":"誇讚","脱发":"脫髮","拜占庭":"拜占庭","只身":"隻身","干热":"乾熱","海淀":"海淀","乌苏里江":"烏蘇里江","恋恋不舍":"戀戀不捨","防御工事":"防禦工事","传布":"傳佈","刮风":"颳風","当啷":"噹啷","文采":"文采","欧里":"歐里","碎屑岩":"碎屑岩","何干":"何干","复式":"複式","复眼":"複眼","里拉":"里拉","锤炼":"錘鍊","火成岩":"火成岩","糊里糊涂":"糊里糊塗","西里西亚":"西里西亞","厄立特里亚":"厄立特里亞","加里":"加里","布施":"佈施","托拉斯":"托拉斯","水烟袋":"水菸袋","升平":"昇平","岩溶":"岩溶","干咳":"乾咳","和弦":"和絃","冲泡":"沖泡","制鞋":"製鞋","西征":"西征","里根":"里根","卤化":"鹵化","卷曲":"捲曲","局促":"侷促","熔炼":"熔鍊","克里木":"克里木","了然":"瞭然","糊口":"餬口","公历":"公曆","理发":"理髮","邻里":"鄰里","须发":"鬚髮","克里斯":"克里斯","史迹":"史蹟","布托":"布托","干杯":"乾杯","蒙蒙":"濛濛","片麻岩":"片麻岩","莱索托":"萊索托","谷氨酸":"穀氨酸","汇丰银行":"滙豐銀行","划水":"划水","干枯":"乾枯","烘干":"烘乾","脚夫":"腳伕","叹为观止":"歎爲觀止","天台":"天台","冲走":"沖走","割舍":"割捨","念咒":"唸咒","才刚":"纔剛","辽沈":"遼瀋","塔里木":"塔里木","不知所云":"不知所云","胡里胡涂":"胡里胡塗","五斗":"五斗","复用":"複用","贝里":"貝里","周杰伦":"周杰倫","标志性":"標誌性","三弦":"三絃","干柴":"乾柴","格里":"格里","五分钟":"五分鐘","洋面":"洋麵","稀松":"稀鬆","天台山":"天台山","生物钟":"生物鐘","白洋淀":"白洋淀","反反复复":"反反覆覆","汇编语言":"彙編語言","台山":"台山","弦乐":"絃樂","念诵":"唸誦","胶卷":"膠捲","蒙蔽":"矇蔽","贪欲":"貪慾","周期表":"週期表","响当当":"響噹噹","范仲淹":"范仲淹","克里姆林宫":"克里姆林宮","丹参":"丹蔘","升天":"昇天","发卡":"髮卡","叹服":"歎服","拮据":"拮据","生发":"生髮","肉欲":"肉慾","理发店":"理髮店","防御性":"防禦性","乌兰巴托":"烏蘭巴托","复议":"複議","归并":"歸併","赞颂":"讚頌","钟鼓":"鐘鼓","乳制品":"乳製品","卷心菜":"捲心菜","斗笠":"斗笠","烟酒":"菸酒","蒙昧":"矇昧","铁制":"鐵製","康托尔":"康托爾","凶神恶煞":"凶神惡煞","托尔斯泰":"托爾斯泰","磨炼":"磨鍊","左光斗":"左光斗","依依不舍":"依依不捨","披头散发":"披頭散髮","松赞干布":"松贊干布","神采飞扬":"神采飛揚","阿里巴巴":"阿里巴巴","下摆":"下襬","存折":"存摺","挨骂":"捱罵","北回归线":"北迴歸線","大肠杆菌":"大腸桿菌","夏历":"夏曆","小丑":"小丑","托起":"托起","注销":"註銷","稽核":"稽覈","窦太后":"竇太后","几里":"幾里","山岩":"山岩","并吞":"併吞","挨饿":"捱餓","注文":"註文","结扎":"結紮","念念有词":"唸唸有詞","借故":"藉故","制盐":"製鹽","巡回演出":"巡迴演出","下周":"下週","喂奶":"餵奶","家私":"傢俬","布下":"佈下","御寒":"禦寒","诋毁":"詆譭","希拉克":"希拉剋","络腮胡子":"絡腮鬍子","布防":"佈防","马扎":"馬紮","白云岩":"白雲岩","豆制品":"豆製品","无精打采":"無精打采","五只":"五隻","烟灰":"菸灰","千里马":"千里馬","干扰素":"干擾素","面包车":"麵包車","历书":"曆書","婶娘":"嬸孃","山梁":"山樑","布道":"佈道","欺蒙":"欺矇","采邑":"采邑","好家伙":"好傢伙","昆仑山脉":"崑崙山脈","佛罗里达州":"佛羅里達州","下咽":"下嚥","岩床":"岩牀","禁烟":"禁菸","制片人":"製片人","平安里":"平安里","周而复始":"週而復始","亲娘":"親孃","尤里":"尤里","干涩":"乾澀","板岩":"板岩","金杯":"金盃","三分钟":"三分鐘","莫里斯":"莫里斯","准予":"准予","凭吊":"憑弔","包干":"包乾","奶娘":"奶孃","对冲":"對沖","里斯":"里斯","制造者":"製造者","制出":"製出","复姓":"複姓","甲胄":"甲冑","腰杆":"腰桿","大理岩":"大理岩","个旧":"箇舊","复检":"複檢","屋梁":"屋樑","谷类":"穀類","酿制":"釀製","阳历":"陽曆","默念":"默唸","龙卷风":"龍捲風","准将":"准將","文丑":"文丑","盛赞":"盛讚","里奥":"里奧","赞不绝口":"讚不絕口","食欲不振":"食慾不振","乱发":"亂髮","台灯":"檯燈","回响":"迴響","拉链":"拉鍊","方志":"方誌","诗云":"詩云","铁杆":"鐵桿","墓志铭":"墓誌銘","丰度":"丰度","半只":"半隻","复核":"複覈","打制":"打製","枪杆":"槍桿","根须":"根鬚","纵欲":"縱慾","干涉仪":"干涉儀","桑托斯":"桑托斯","狼吞虎咽":"狼吞虎嚥","锲而不舍":"鍥而不捨","台球":"檯球","液面":"液麵","烟丝":"菸絲","里尔":"里爾","预制":"預製","鬓发":"鬢髮","剪彩":"剪綵","杯赛":"盃賽","面食":"麵食","南征北战":"南征北戰","八里":"八里","岩土":"岩土","干果":"乾果","斗室":"斗室","毁弃":"譭棄","附注":"附註","奶制品":"奶製品","哄堂大笑":"鬨堂大笑","屯扎":"屯紮","庆历":"慶曆","背着":"揹着","里长":"里長","分布式":"分佈式","回归年":"迴歸年","复制品":"複製品","干巴巴":"乾巴巴","苏里南":"蘇里南","的黎波里":"的黎波里","制表":"製表","十只":"十隻","台面":"檯面","复审":"複審","天干":"天干","脾脏":"脾臟","赞歌":"讚歌","闹钟":"鬧鐘","阿斗":"阿斗","打游击":"打游擊","神采奕奕":"神采奕奕","准入":"准入","干瘪":"乾癟","岩石学":"岩石學","闹别扭":"鬧彆扭","舍生忘死":"捨生忘死","奸夫":"姦夫","心弦":"心絃","怀表":"懷錶","毫发":"毫髮","熏染":"薰染","密苏里":"密蘇里","冲断":"沖斷","尼采":"尼采","并拢":"併攏","恩准":"恩准","拉里":"拉里","火并":"火併","制药厂":"製藥廠","复印机":"複印機","灰蒙蒙":"灰濛濛","八只":"八隻","普里":"普里","污蔑":"污衊","亚洲杯":"亞洲盃","伙食费":"伙食費","伟晶岩":"偉晶岩","关系式":"關係式","干电池":"乾電池","徐家汇":"徐家彙","枪杆子":"槍桿子","梳妆台":"梳妝檯","朴茨茅斯":"朴茨茅斯","逢凶化吉":"逢凶化吉","间不容发":"間不容髮","咏叹":"詠歎","复赛":"複賽","悬梁":"懸樑","悲戚":"悲慼","星斗":"星斗","米面":"米麵","面点":"麵點","咸阳市":"咸陽市","折叠式":"摺疊式","北斗七星":"北斗七星","生物制品":"生物製品","咣当":"咣噹","挂面":"掛麵","注疏":"註疏","胡匪":"鬍匪","薄幸":"薄倖","半分钟":"半分鐘","不干不净":"不乾不淨","穷追不舍":"窮追不捨","喀喇昆仑山":"喀喇崑崙山","备注":"備註","花药":"花葯","集注":"集註","风干":"風乾","巡回赛":"巡迴賽","本周一":"本週一","自鸣钟":"自鳴鐘","莫里森":"莫里森","阿里山":"阿里山","稳扎稳打":"穩紮穩打","伙房":"伙房","划桨":"划槳","削发":"削髮","大钟":"大鐘","娘胎":"孃胎","彩带":"綵帶","游鱼":"游魚","结发":"結髮","迷蒙":"迷濛","丈母娘":"丈母孃","制冷剂":"製冷劑","复合物":"複合物","和盘托出":"和盤托出","卷进":"捲進","县志":"縣誌","发丝":"髮絲","合家":"閤家","干戈":"干戈","曲霉":"麴黴","订制":"訂製","购并":"購併","死胡同":"死衚衕","脊梁骨":"脊樑骨","阿托品":"阿托品","万里迢迢":"萬里迢迢","七里":"七里","六只":"六隻","咽气":"嚥氣","干笑":"乾笑","年历":"年曆","泥岩":"泥岩","箭杆":"箭桿","蒙骗":"矇騙","须根":"鬚根","岩浆岩":"岩漿岩","岳阳楼":"岳陽樓","控制台":"控制檯","一哄而散":"一鬨而散","动荡不安":"動盪不安","费尔干纳":"費爾干納","干政":"干政","相克":"相剋","禁欲":"禁慾","连杆":"連桿","面汤":"麵湯","鼓荡":"鼓盪","安全系数":"安全係數","亚得里亚海":"亞得里亞海","电表":"電錶","面饼":"麵餅","馥郁":"馥郁","天台宗":"天台宗","振荡器":"振盪器","白发苍苍":"白髮蒼蒼","迂回曲折":"迂迴曲折","干渠":"乾渠","数周":"數週","斑岩":"斑岩","汇丰":"滙豐","草席":"草蓆","谷仓":"穀倉","分布图":"分佈圖","巴厘岛":"巴厘島","干儿子":"乾兒子","服务台":"服務檯","牛肉面":"牛肉麵","膨松剂":"膨鬆劑","开诚布公":"開誠佈公","张灯结彩":"張燈結綵","万只":"萬隻","厚朴":"厚朴","墓志":"墓誌","干休":"干休","征辟":"徵辟","捉奸":"捉姦","节欲":"節慾","铁托":"鐵托","香皂":"香皂","吸烟者":"吸菸者","鼻烟壶":"鼻菸壺","只字不提":"隻字不提","大动干戈":"大動干戈","轻轻松松":"輕輕鬆鬆","冲毁":"沖毀","冷面":"冷麵","凯里":"凱里","制做":"製做","岩屑":"岩屑","藏历":"藏曆","弥漫性":"瀰漫性","长吁短叹":"長吁短嘆","底格里斯河":"底格里斯河","复本":"複本","家什":"傢什","干妈":"乾媽","斯托":"斯托","晃荡":"晃盪","栋梁":"棟樑","私欲":"私慾","信天游":"信天游","制冷机":"製冷機","玉米面":"玉米麵","古里古怪":"古里古怪","赞叹不已":"讚歎不已","冲垮":"沖垮","几案":"几案","多里":"多里","搜括":"蒐括","晾干":"晾乾","美发":"美髮","蒙头":"矇頭","酒坛":"酒罈","黑面":"黑麵","仿制品":"仿製品","卤代烃":"鹵代烴","小胡子":"小鬍子","游泳馆":"游泳館","防御战":"防禦戰","七情六欲":"七情六慾","兼容并包":"兼容幷包","喂食":"餵食","回环":"迴環","波里":"波里","监制":"監製","钮扣":"鈕釦","铜制":"銅製","一箭双雕":"一箭雙鵰","托洛茨基":"托洛茨基","制版":"製版","干渴":"乾渴","干瘦":"乾瘦","念白":"唸白","总汇":"總彙","扶余":"扶余","精采":"精采","草庵":"草菴","里尼":"里尼","里弄":"里弄","金表":"金錶","铝制":"鋁製","铲平":"剷平","陈冲":"陳沖","豆腐干":"豆腐乾","足总杯":"足總盃","傻里傻气":"傻里傻氣","养家糊口":"養家餬口","口干舌燥":"口乾舌燥","慌里慌张":"慌里慌張","没精打采":"沒精打采","香格里拉":"香格里拉","大曲":"大麴","干馏":"乾餾","捆扎":"捆紮","斗柄":"斗柄","游水":"游水","笋干":"筍乾","续弦":"續絃","银发":"銀髮","黄岩":"黃岩","周期律":"週期律","复合式":"複合式","苏哈托":"蘇哈托","莫里哀":"莫里哀","蒙蒙亮":"矇矇亮","南回归线":"南迴歸線","卷上":"捲上","卷筒":"捲筒","回历":"回曆","大历":"大曆","干酪":"乾酪","抬杠":"擡槓","昆剧":"崑劇","上下游":"上下游","卤化物":"鹵化物","台州市":"台州市","手术台":"手術檯","安营扎寨":"安營紮寨","歌舞升平":"歌舞昇平","马格里布":"馬格里布","七只":"七隻","加注":"加註","巨子":"鉅子","席棚":"蓆棚","拉杆":"拉桿","斤斗":"斤斗","流布":"流佈","淳于":"淳于","触须":"觸鬚","鲜于":"鮮于","复合体":"複合體","安山岩":"安山岩","葡萄干":"葡萄乾","克里米亚":"克里米亞","兼收并蓄":"兼收幷蓄","基里巴斯":"基里巴斯","外强中干":"外強中乾","紧追不舍":"緊追不捨","哄抬":"哄擡","岩礁":"岩礁","干冷":"乾冷","御侮":"禦侮","松紧":"鬆緊","烟民":"菸民","病愈":"病癒","签押":"簽押","花托":"花托","阳谷":"陽穀","桑干河":"桑乾河","满洲里":"滿洲里","五谷丰登":"五穀豐登","布里斯班":"布里斯班","斗转星移":"斗轉星移","相生相克":"相生相剋","禁欲主义":"禁慾主義","丑角":"丑角","伙夫":"伙伕","单弦":"單絃","卤莽":"鹵莽","吊丧":"弔喪","复利":"複利","巨富":"鉅富","注脚":"註腳","笔杆":"筆桿","系辞":"繫辭","铜钟":"銅鐘","地方志":"地方誌","气冲冲":"氣沖沖","力争上游":"力爭上游","假发":"假髮","发菜":"髮菜","发辫":"髮辮","岳丈":"岳丈","布线":"佈線","干季":"乾季","拟制":"擬製","杆状":"桿狀","烟蒂":"菸蒂","管弦":"管絃","语汇":"語彙","指挥台":"指揮台","赞美诗":"讚美詩","反复无常":"反覆無常","大不里士":"大不里士","如坐针毡":"如坐鍼氈","怒气冲天":"怒氣沖天","膨胀系数":"膨脹係數","乌发":"烏髮","卡里":"卡里","巨鹿":"鉅鹿","撒布":"撒佈","栗色":"栗色","泰斗":"泰斗","洪钟":"洪鐘","烩面":"燴麵","百只":"百隻","肉干":"肉乾","酸疼":"痠疼","钢制":"鋼製","面筋":"麵筋","奴儿干":"奴兒干","折子戏":"摺子戲","求知欲":"求知慾","百余里":"百餘里","范文澜":"范文瀾","范登堡":"范登堡","角砾岩":"角礫岩","阳谷县":"陽穀縣","如法炮制":"如法炮製","九里":"九里","发式":"髮式","恒生":"恒生","欲念":"慾念","欲火":"慾火","物欲":"物慾","衣扣":"衣釦","钟点":"鐘點","卡路里":"卡路里","合并症":"合併症","干女儿":"乾女兒","荡秋千":"盪鞦韆","郁达夫":"郁達夫","令人发指":"令人髮指","只言片语":"隻言片語","雕梁画栋":"雕樑畫棟","马里亚纳":"馬里亞納","弗里德里希":"弗里德里希","骨质疏松症":"骨質疏鬆症","三周":"三週","卷帘":"捲簾","复信":"覆信","拐棍":"柺棍","梅里":"梅里","白术":"白朮","碑志":"碑誌","轧制":"軋製","饥馑":"饑饉","饭团":"飯糰","髭须":"髭鬚","龙卷":"龍捲","关系法":"關係法","凌退思":"淩退思","北斗星":"北斗星","占星术":"占星術","注册表":"註冊表","电熨斗":"電熨斗","笔杆子":"筆桿子","萨布里":"薩布里","帕特里克":"帕特里克","罗斯托夫":"羅斯托夫","阿里地区":"阿里地區","塔克拉玛干":"塔克拉瑪干","卷发":"捲髮","吊孝":"弔孝","干裂":"乾裂","挽歌":"輓歌","炕席":"炕蓆","钟摆":"鐘擺","关系户":"關係戶","雾蒙蒙":"霧濛濛","黄曲霉":"黃麴黴","人云亦云":"人云亦云","加里曼丹":"加里曼丹","吊民伐罪":"弔民伐罪","复种指数":"複種指數","欧几里德":"歐幾里德","粗制滥造":"粗製濫造","丰采":"丰采","发梢":"髮梢","哄动":"鬨動","回文":"迴文","巨舰":"鉅艦","征尘":"征塵","竹制":"竹製","荡涤":"盪滌","里巷":"里巷","喘吁吁":"喘吁吁","烟灰缸":"菸灰缸","珍珠岩":"珍珠岩","阴阳历":"陰陽曆","不远千里":"不遠千里","清心寡欲":"清心寡慾","稀里哗啦":"稀里嘩啦","马里兰州":"馬里蘭州","丝弦":"絲絃","丰姿":"丰姿","冲剂":"沖劑","凶宅":"凶宅","后娘":"後孃","岩心":"岩心","昆腔":"崑腔","熨斗":"熨斗","神迹":"神蹟","凝灰岩":"凝灰岩","干瞪眼":"乾瞪眼","瓦西里":"瓦西里","两性关系":"兩性關係","干姜":"乾薑","拉面":"拉麵","朴子":"朴子","汤面":"湯麵","秤杆":"秤桿","背带":"揹帶","跟斗":"跟斗","于永波":"于永波","于海洋":"于海洋","人参果":"人蔘果","原子钟":"原子鐘","王太后":"王太后","幸免于难":"倖免於難","花样游泳":"花樣游泳","蒙混过关":"矇混過關","丧钟":"喪鐘","剪发":"剪髮","回天":"迴天","尽速":"儘速","布列":"佈列","干娘":"乾孃","干性":"乾性","花卷":"花捲","草签":"草簽","谷梁":"穀梁","布谷鸟":"布穀鳥","洗发水":"洗髮水","游击区":"游擊區","腾格里":"騰格里","钟乳石":"鐘乳石","马普托":"馬普托","万里无云":"萬里無雲","啧啧称赞":"嘖嘖稱讚","泰山北斗":"泰山北斗","立方厘米":"立方厘米","细致入微":"細緻入微","荡气回肠":"蕩氣迴腸","里程碑式":"里程碑式","罗德里格斯":"羅德里格斯","余里":"餘里","制浆":"製漿","台布":"檯布","复种":"複種","娘姨":"孃姨","烟碱":"菸鹼","疲困":"疲睏","禁毁":"禁燬","签到":"簽到","绑扎":"綁紮","西里":"西里","三里屯":"三里屯","党项族":"党項族","冲绳岛":"沖繩島","哈里斯":"哈里斯","复发率":"複發率","擀面杖":"擀麵杖","游泳队":"游泳隊","谢里夫":"謝里夫","顶梁柱":"頂樑柱","乳臭未干":"乳臭未乾","密苏里州":"密蘇里州","风卷残云":"風捲殘雲","低回":"低迴","光采":"光采","制假":"製假","制售":"製售","卷须":"卷鬚","发根":"髮根","夺杯":"奪盃","换发":"換髮","旋回":"旋迴","松土":"鬆土","烟缸":"菸缸","玄参":"玄蔘","瓦里":"瓦里","续签":"續簽","芦席":"蘆蓆","荫蔽":"廕庇","金钟":"金鐘","银制":"銀製","二杆子":"二桿子","五里雾":"五里霧","巴里坤":"巴里坤","强奸罪":"強姦罪","皮划艇":"皮划艇","签字笔":"簽字筆","脑震荡":"腦震盪","一日千里":"一日千里","密苏里河":"密蘇里河","晴空万里":"晴空萬里","松松垮垮":"鬆鬆垮垮","亿只":"億隻","凉席":"涼蓆","制衣":"製衣","发际":"髮際","后羿":"后羿","心系":"心繫","托尔":"托爾","托幼":"托幼","托里":"托里","撤并":"撤併","春卷":"春捲","松绑":"鬆綁","汤团":"湯糰","点烟":"點菸","烟卷":"菸捲","皂化":"皂化","碗面":"碗麵","落发":"落髮","大明历":"大明曆","干燥器":"乾燥器","操纵杆":"操縱桿","科托努":"科托努","维克托":"維克托","肠系膜":"腸繫膜","一飞冲天":"一飛沖天","了若指掌":"瞭若指掌","偷梁换柱":"偷樑換柱","兼容并蓄":"兼容幷蓄","居里夫人":"居里夫人","怒发冲冠":"怒髮衝冠","科纳克里":"科納克里","窗明几净":"窗明几淨","主梁":"主樑","借词":"藉詞","入托":"入托","冲服":"沖服","凌河":"淩河","南里":"南里","回銮":"迴鑾","地志":"地誌","奸污":"姦污","干城":"干城","简并":"簡併","采制":"採製","里氏":"里氏","陶制":"陶製","龙里":"龍里","橄榄岩":"橄欖岩","峰回路转":"峯迴路轉","结核杆菌":"結核桿菌","允准":"允准","划拳":"划拳","划艇":"划艇","华发":"華髮","并合":"併合","庇荫":"庇廕","弘历":"弘曆","拉纤":"拉縴","挨整":"捱整","撞钟":"撞鐘","改签":"改簽","肺脏":"肺臟","针砭":"鍼砭","难挨":"難捱","面塑":"麵塑","鼻烟":"鼻菸","仙后座":"仙后座","剃发令":"剃髮令","旱烟袋":"旱菸袋","流纹岩":"流紋岩","签约国":"簽約國","范成大":"范成大","交口称赞":"交口稱讚","干涉现象":"干涉現象","摩擦系数":"摩擦係數","难舍难分":"難捨難分","冲印":"沖印","准尉":"准尉","后土":"后土","四里":"四里","奸杀":"姦殺","干式":"乾式","护发":"護髮","暗弱":"闇弱","枯干":"枯乾","毁誉":"譭譽","评注":"評註","三元里":"三元里","干眼症":"乾眼症","白萝卜":"白蘿蔔","肥皂泡":"肥皂泡","马里兰":"馬里蘭","不远万里":"不遠萬里","休戚相关":"休慼相關","回光返照":"迴光返照","干脆利落":"乾脆利落","烟熏火燎":"煙熏火燎","皇天后土":"皇天后土","谷类作物":"穀類作物","克里斯托弗":"克里斯托弗","双拐":"雙柺","巨野":"鉅野","干冰":"乾冰","球台":"球檯","笺注":"箋註","蚁后":"蟻后","转游":"轉游","辟谷":"辟穀","三周年":"三週年","冲绳县":"沖繩縣","千里眼":"千里眼","批准书":"批准書","游泳赛":"游泳賽","辉长岩":"輝長岩","光杆司令":"光桿司令","回肠荡气":"迴腸蕩氣","托木尔峰":"托木爾峯","烟雾弥漫":"煙霧瀰漫","九只":"九隻","二斗":"二斗","于田":"于田","六周":"六週","凝炼":"凝鍊","叨念":"叨唸","寡欲":"寡慾","巨商":"鉅商","干呕":"乾嘔","志哀":"誌哀","快干":"快乾","摇荡":"搖盪","旧历":"舊曆","苗栗":"苗栗","赞语":"讚語","鞣制":"鞣製","制作者":"製作者","布雷舰":"佈雷艦","干性油":"乾性油","木制品":"木製品","特里尔":"特里爾","碱性岩":"鹼性岩","范志毅":"范志毅","面包房":"麵包房","东征西讨":"東征西討","利欲熏心":"利慾薰心","声如洪钟":"聲如洪鐘","明见万里":"明見萬里","溜须拍马":"溜鬚拍馬","加里宁格勒":"加里寧格勒","党参":"黨蔘","兽欲":"獸慾","划子":"划子","干巴":"乾巴","托拉":"托拉","摆钟":"擺鐘","晒烟":"曬菸","朱批":"硃批","杂面":"雜麵","松松":"鬆鬆","烫发":"燙髮","硬面":"硬麵","礼赞":"禮讚","签收":"簽收","系带":"繫帶","肉松":"肉鬆","钟塔":"鐘塔","龙游":"龍游","儒略历":"儒略曆","剃须刀":"剃鬚刀","占有欲":"佔有慾","大本钟":"大本鐘","奥里萨":"奧里薩","托斯卡":"托斯卡","辉绿岩":"輝綠岩","里士满":"里士滿","马车夫":"馬車伕","龙须沟":"龍鬚溝","心向往之":"心嚮往之","物欲横流":"物慾橫流","难分难舍":"難分難捨","冲凉":"沖涼","冲茶":"沖茶","凶神":"凶神","制件":"製件","千只":"千隻","历元":"曆元","名表":"名錶","吧台":"吧檯","复函":"覆函","巨细":"鉅細","干货":"乾貨","总台":"總檯","恒指":"恒指","烟厂":"菸廠","苍术":"蒼朮","萨里":"薩里","酒曲":"酒麴","银须":"銀鬚","卷铺盖":"捲鋪蓋","复合词":"複合詞","巴里斯":"巴里斯","干燥剂":"乾燥劑","徐汇区":"徐彙區","托莱多":"托萊多","红萝卜":"紅蘿蔔","美发师":"美髮師","腰杆子":"腰桿子","万里长征":"萬里長征","加里波第":"加里波第","形单影只":"形單影隻","神采焕发":"神采煥發","舍我其谁":"捨我其誰","丁丑":"丁丑","凶兆":"凶兆","北里":"北里","厂部":"厂部","发面":"發麵","复视":"複視","奸情":"姦情","姜汤":"薑湯","岩羊":"岩羊","巨作":"鉅作","巨制":"鉅製","干爽":"乾爽","干结":"乾結","干菜":"乾菜","干饭":"乾飯","批注":"批註","整只":"整隻","斗门":"斗門","月岩":"月岩","沙参":"沙蔘","烟圈":"菸圈","编发":"編髮","美仑":"美崙","译制":"譯製","谷粒":"穀粒","赞佩":"讚佩","车斗":"車斗","五斗橱":"五斗櫥","凌小姐":"淩小姐","太阳历":"太陽曆","安萨里":"安薩里","弗里敦":"弗里敦","挑大梁":"挑大樑","杰里科":"傑里科","炸酱面":"炸醬麵","粗面岩":"粗面岩","词汇学":"詞彙學","一泻千里":"一瀉千里","五谷杂粮":"五穀雜糧","栋梁之材":"棟樑之材","舍己救人":"捨己救人","舍本逐末":"捨本逐末","舍生取义":"捨生取義","上梁":"上樑","仙台":"仙台","借此":"藉此","内哄":"內鬨","冲水":"沖水","几杆":"幾桿","卷云":"捲雲","吊客":"弔客","回绕":"迴繞","回肠":"迴腸","奇台":"奇台","工致":"工緻","干嚎":"乾嚎","彩棚":"綵棚","抬价":"擡價","挨揍":"捱揍","松劲":"鬆勁","查核":"查覈","皂荚":"皂莢","背篓":"揹簍","色欲":"色慾","蒙混":"矇混","裹扎":"裹紮","香熏":"香薰","于汉超":"于漢超","八千里":"八千里","刮胡子":"刮鬍子","制药业":"製藥業","十余只":"十餘隻","千余里":"千餘里","卷尾猴":"捲尾猴","并购案":"併購案","极坐标":"極座標","炼金术":"鍊金術","炼钢厂":"鍊鋼廠","炼钢炉":"鍊鋼爐","禁制品":"禁製品","肾脏病":"腎臟病","哄然大笑":"鬨然大笑","封妻荫子":"封妻廕子","席卷而来":"席捲而來","才高八斗":"才高八斗","日行千里":"日行千里","凤台":"鳳台","刁斗":"刁斗","发妻":"髮妻","发簪":"髮簪","哗哗":"嘩嘩","墨斗":"墨斗","挂钟":"掛鐘","暗扣":"暗釦","核销":"覈銷","烟嘴":"菸嘴","秒表":"秒錶","莫里":"莫里","译注":"譯註","转台":"轉檯","银杯":"銀盃","阮咸":"阮咸","面人":"麵人","制糖厂":"製糖廠","干着急":"乾着急","炼铁炉":"鍊鐵爐","范甘迪":"范甘迪","蛇纹岩":"蛇紋岩","西太后":"西太后","鸭跖草":"鴨跖草","布干维尔":"布干維爾","怒火冲天":"怒火沖天","满洲里市":"滿洲里市","立方公里":"立方公里","等价关系":"等價關係","罗斯托克":"羅斯托克","利欲":"利慾","叹赏":"歎賞","咸池":"咸池","哀戚":"哀慼","对折":"對摺","干洗":"乾洗","弦歌":"絃歌","松快":"鬆快","永历":"永曆","溶岩":"溶岩","灯彩":"燈綵","烟农":"菸農","牵系":"牽繫","筑波":"筑波","老雕":"老鵰","范晔":"范曄","蓄发":"蓄髮","表盘":"錶盤","裙摆":"裙襬","钟体":"鐘體","钻杆":"鑽桿","面糊":"麵糊","饲喂":"飼餵","龙须":"龍鬚","动干戈":"動干戈","希拉里":"希拉里","打卤面":"打滷麵","松紧带":"鬆緊帶","欧洲杯":"歐洲盃","水龙卷":"水龍捲","牛肉干":"牛肉乾","莫干山":"莫干山","蛇绿岩":"蛇綠岩","下里巴人":"下里巴人","叮当作响":"叮噹作響","后台老板":"後臺老闆","坛坛罐罐":"罈罈罐罐","奥里萨邦":"奧里薩邦","心细如发":"心細如髮","片言只语":"片言隻語","鄂托克旗":"鄂托克旗","乌里":"烏里","凄冷":"淒冷","几席":"几席","占卦":"占卦","占星":"占星","后街":"后街","夸父":"夸父","字汇":"字彙","家俱":"傢俱","干制":"乾製","干爸":"乾爸","干犯":"干犯","抽斗":"抽斗","松口":"鬆口","松脆":"鬆脆","棋布":"棋佈","熏制":"熏製","皮制":"皮製","竹席":"竹蓆","系留":"繫留","纸制":"紙製","舒卷":"舒捲","螺杆":"螺桿","裸岩":"裸岩","轮奸":"輪姦","采地":"采地","里布":"里布","铲球":"剷球","须生":"鬚生","题签":"題簽","三秒钟":"三秒鐘","党支书":"党支書","全斗焕":"全斗煥","制作业":"製作業","制鞋业":"製鞋業","加里宁":"加里寧","宣传周":"宣傳週","格里历":"格里曆","熏蒸剂":"熏蒸劑","电子表":"電子錶","白里安":"白里安","石钟乳":"石鐘乳","碳酸岩":"碳酸岩","美发店":"美髮店","萧太后":"蕭太后","费里尼":"費里尼","长寿面":"長壽麵","决胜千里":"決勝千里","别别扭扭":"彆彆扭扭","只身一人":"隻身一人","墨迹未干":"墨跡未乾","沃野千里":"沃野千里","爱丽舍宫":"愛麗捨宮","电磁振荡":"電磁振盪","画栋雕梁":"畫棟雕樑","百炼成钢":"百鍊成鋼","联系汇率":"聯繫匯率","舍己为人":"捨己爲人","须发皆白":"鬚髮皆白","饱暖思淫欲":"飽暖思淫慾","余天":"余天","光杆":"光桿","几出":"幾齣","发廊":"髮廊","台历":"檯曆","姜汁":"薑汁","射干":"射干","布谷":"布穀","彩球":"綵球","手链":"手鍊","拨弦":"撥絃","斗方":"斗方","条几":"條几","校核":"校覈","洋烟":"洋菸","洗荡":"洗盪","漂游":"漂游","焙干":"焙乾","癸丑":"癸丑","皇历":"皇曆","蒙眬":"矇矓","蜗杆":"蝸桿","行针":"行鍼","表壳":"錶殼","谬赞":"謬讚","豆面":"豆麵","赞词":"讚詞","采诗":"采詩","阴干":"陰乾","首只":"首隻","三只手":"三隻手","于右任":"于右任","凿岩机":"鑿岩機","十公里":"十公里","十周年":"十週年","合家欢":"閤家歡","复印纸":"複印紙","康采恩":"康采恩","护发素":"護髮素","深成岩":"深成岩","炼铁厂":"鍊鐵廠","白蒙蒙":"白濛濛","老皇历":"老皇曆","足协杯":"足協盃","闹饥荒":"鬧饑荒","龙须草":"龍鬚草","乌云密布":"烏雲密佈","动荡不定":"動盪不定","周期函数":"週期函數","复合肥料":"複合肥料","旭日东升":"旭日東昇","炊烟袅袅":"炊煙裊裊","舍死忘生":"捨死忘生","舍近求远":"捨近求遠","赤地千里":"赤地千里","冲决":"沖決","冲霄":"沖霄","凶年":"凶年","凶气":"凶氣","北征":"北征","发蜡":"髮蠟","吊祭":"弔祭","嗜欲":"嗜慾","姜黄":"薑黃","干粉":"乾粉","干红":"乾紅","托克":"托克","挂历":"掛曆","斗山":"斗山","松糕":"鬆糕","枕席":"枕蓆","武丑":"武丑","浮梁":"浮樑","潘岳":"潘岳","签章":"簽章","系泊":"繫泊","绕梁":"繞樑","膨松":"膨鬆","芸薹":"蕓薹","裁并":"裁併","谷糠":"穀糠","过梁":"過樑","钟鼎":"鐘鼎","锁扣":"鎖釦","须子":"鬚子","于光远":"于光遠","光卤石":"光鹵石","冲天炉":"沖天爐","刀削面":"刀削麵","大曲酒":"大麴酒","干粮袋":"乾糧袋","支努干":"支努干","机械表":"機械錶","林郁方":"林郁方","游泳衣":"游泳衣","白杆兵":"白桿兵","胡椒面":"胡椒麵","试验台":"試驗檯","辣椒面":"辣椒麵","金钟罩":"金鐘罩","任人摆布":"任人擺佈","休戚与共":"休慼與共","公布于众":"公佈於衆","千回百转":"千迴百轉","压缩饼干":"壓縮餅乾","山重水复":"山重水複","底格里斯":"底格里斯","抗干扰性":"抗干擾性","生殖洄游":"生殖洄游","翻来复去":"翻來覆去","能征惯战":"能征慣戰","连带关系":"連帶關係","鹤发童颜":"鶴髮童顏","乌里雅苏台":"烏里雅蘇臺","乙丑":"乙丑","代签":"代簽","余只":"餘隻","制材":"製材","咸兴":"咸興","复盐":"複鹽","复诊":"複診","大里":"大里","尸解":"尸解","座钟":"座鐘","影后":"影后","征夫":"征夫","戚戚":"慼慼","抵牾":"牴牾","挽词":"輓詞","正凶":"正凶","涤荡":"滌盪","葵涌":"葵涌","钟行":"鐘行","面馆":"麵館","黄历":"黃曆","三里河":"三里河","两周年":"兩週年","五公里":"五公里","制作商":"製作商","卷扬机":"捲揚機","咸阳宫":"咸陽宮","复合句":"複合句","复杂度":"複雜度","复色光":"複色光","天文钟":"天文鐘","干洗店":"乾洗店","捋虎须":"捋虎鬚","石英钟":"石英鐘","肉丝面":"肉絲麵","马里奥":"馬里奧","高丽参":"高麗蔘","交通标志":"交通標誌","卡尔加里":"卡爾加里","干柴烈火":"乾柴烈火","托克托县":"托克托縣","片言只字":"片言隻字","胡子拉碴":"鬍子拉碴","裙带关系":"裙帶關係","赛里木湖":"賽里木湖","邋里邋遢":"邋里邋遢","铺盖卷儿":"鋪蓋捲兒","除旧布新":"除舊佈新","鱼肉乡里":"魚肉鄉里","麻栗坡县":"麻栗坡縣","克里斯蒂安":"克里斯蒂安","东里":"東里","二周":"二週","休戚":"休慼","八斗":"八斗","六里":"六里","冲销":"沖銷","土制":"土製","圣迹":"聖蹟","娘亲":"孃親","寿面":"壽麵","干亲":"乾親","干花":"乾花","折纸":"摺紙","斗南":"斗南","晚钟":"晚鐘","朴树":"朴樹","核减":"覈減","核计":"覈計","点钟":"點鐘","猪只":"豬隻","白干":"白乾","舍去":"捨去","萦回":"縈迴","谷穗":"穀穗","面茶":"麵茶","风斗":"風斗","万年历":"萬年曆","制衣厂":"製衣廠","制造品":"製造品","台山市":"台山市","吸烟率":"吸菸率","复合性":"複合性","岳阳县":"岳陽縣","巡回展":"巡迴展","强奸犯":"強姦犯","李连杰":"李連杰","每分钟":"每分鐘","白发人":"白髮人","百余只":"百餘隻","萨里郡":"薩里郡","行李卷":"行李捲","通布图":"通佈圖","里程表":"里程錶","金属制":"金屬製","铝制品":"鋁製品","面包店":"麵包店","韶山冲":"韶山沖","五脏俱全":"五臟俱全","十里洋场":"十里洋場","基本词汇":"基本詞彙","尸位素餐":"尸位素餐","暮鼓晨钟":"暮鼓晨鐘","童颜鹤发":"童顏鶴髮","跳梁小丑":"跳樑小醜","黄钟大吕":"黃鐘大呂","丰韵":"丰韻","制毒":"製毒","刺参":"刺蔘","医托":"醫托","卷逃":"捲逃","姜片":"薑片","尝鲜":"嚐鮮","巨贪":"鉅貪","干沟":"乾溝","打谷":"打穀","托儿":"托兒","托架":"托架","托蒂":"托蒂","承制":"承製","折页":"摺頁","旁注":"旁註","水表":"水錶","沙岩":"沙岩","淫欲":"淫慾","熏风":"薰風","空钟":"空鐘","米里":"米里","脚注":"腳註","谦冲":"謙沖","谷神":"穀神","递回":"遞迴","里纳":"里納","一秒钟":"一秒鐘","个旧市":"箇舊市","五周年":"五週年","倪嗣冲":"倪嗣沖","划得来":"划得來","吨公里":"噸公里","复写纸":"複寫紙","岩石层":"岩石層","干草堆":"乾草堆","干衣机":"乾衣機","打谷场":"打穀場","托克托":"托克托","托克逊":"托克遜","收获量":"收穫量","旧历年":"舊曆年","淳于意":"淳于意","淳于髡":"淳于髡","秦少游":"秦少游","签证费":"簽證費","范佩西":"范佩西","范公堤":"范公堤","范冰冰":"范冰冰","范德萨":"范德薩","血制品":"血製品","闵采尔":"閔采爾","个中滋味":"箇中滋味","克里斯托":"克里斯托","南征北讨":"南征北討","太皇太后":"太皇太后","小泽征尔":"小澤征爾","干干脆脆":"乾乾脆脆","披红挂彩":"披紅掛綵","斯科普里":"斯科普里","结发夫妻":"結髮夫妻","老少咸宜":"老少咸宜","诗云子曰":"詩云子曰","身体发肤":"身體髮膚","钟鸣鼎食":"鐘鳴鼎食","鞭辟入里":"鞭辟入裏","波托马克河":"波托馬克河","乳娘":"乳孃","二只":"二隻","仆倒":"仆倒","冲喜":"沖喜","凶信":"凶信","凶煞":"凶煞","削面":"削麵","发夹":"髮夾","复写":"複寫","干枝":"乾枝","托马":"托馬","拐棒":"柺棒","挽诗":"輓詩","提梁":"提樑","斗六":"斗六","断弦":"斷絃","朱色":"硃色","杆秤":"桿秤","松垮":"鬆垮","梁上":"樑上","棉制":"棉製","泡制":"泡製","淬炼":"淬鍊","灌制":"灌製","熏香":"薰香","绳扣":"繩釦","腕表":"腕錶","茶托":"茶托","西历":"西曆","谷壳":"穀殼","转注":"轉註","闾里":"閭里","面酱":"麵醬","万余里":"萬餘里","于贝尔":"于貝爾","凯里市":"凱里市","十多只":"十多隻","压力表":"壓力錶","台球桌":"檯球桌","夏后氏":"夏后氏","大衍历":"大衍曆","干打垒":"乾打壘","操作台":"操作檯","操纵台":"操縱檯","时宪历":"時憲曆","玉米须":"玉米鬚","甘托克":"甘托克","甜面酱":"甜麵醬","站柜台":"站櫃檯","苗栗县":"苗栗縣","阴历年":"陰曆年","面包师":"麵包師","马占山":"馬占山","劈里啪啦":"劈里啪啦","合作伙伴":"合作伙伴","咸镜南道":"咸鏡南道","妖里妖气":"妖里妖氣","报章杂志":"報章雜誌","离题万里":"離題萬里","迷迷蒙蒙":"迷迷濛濛","马尼托巴":"馬尼托巴","黄曲霉菌":"黃麴黴菌","圣帕特里克":"聖帕特里克","乡愿":"鄉愿","全彩":"全綵","六欲":"六慾","刻钟":"刻鐘","发胶":"髮膠","叶韵":"叶韻","噜苏":"嚕囌","困觉":"睏覺","坤表":"坤錶","夹注":"夾註","密致":"密緻","布势":"佈勢","幸臣":"倖臣","惺松":"惺鬆","托子":"托子","斗车":"斗車","暗火":"闇火","果干":"果乾","汇算":"彙算","洋参":"洋蔘","津梁":"津樑","签单":"簽單","系念":"繫念","胎发":"胎髮","胡吣":"胡唚","蓄须":"蓄鬚","钱谷":"錢穀","于凤至":"于鳳至","伊里奇":"伊里奇","占卜术":"占卜術","双周刊":"雙週刊","发型师":"髮型師","复辅音":"複輔音","天台县":"天台縣","宋干节":"宋干節","岳家军":"岳家軍","托勒尔":"托勒爾","朴永训":"朴永訓","标准杆":"標準桿","毛栗子":"毛栗子","洗发精":"洗髮精","烟屁股":"菸屁股","肥皂粉":"肥皂粉","萝卜干":"蘿蔔乾","过水面":"過水麵","通奸罪":"通姦罪","阳春面":"陽春麵","面疙瘩":"麵疙瘩","香烟盒":"香菸盒","驻扎地":"駐紮地","龙须面":"龍鬚麵","丰姿绰约":"丰姿綽約","乒乓球台":"乒乓球檯","前程万里":"前程萬里","千里之堤":"千里之堤","千里之行":"千里之行","合理布局":"合理佈局","奥特朗托":"奧特朗托","志在千里":"志在千里","日进斗金":"日進斗金","星移斗转":"星移斗轉","梅里雪山":"梅里雪山","毁誉参半":"譭譽參半","烘云托月":"烘雲托月","谷贱伤农":"穀賤傷農","连鬓胡子":"連鬢鬍子","阿里亚斯":"阿里亞斯","鸿篇巨制":"鴻篇鉅製","斯克里亚宾":"斯克里亞賓","万俟":"万俟","丑牛":"丑牛","升阳":"昇陽","卤族":"鹵族","发乳":"髮乳","发饰":"髮飾","台秤":"檯秤","吉里":"吉里","后里":"后里","周薪":"週薪","哄堂":"鬨堂","回冲":"回沖","复盘":"覆盤","奸妇":"姦婦","姜丝":"薑絲","开伙":"開伙","悠荡":"悠盪","拖斗":"拖斗","摆荡":"擺盪","晨钟":"晨鐘","月历":"月曆","朴茂":"朴茂","栗暴":"栗暴","江干":"江干","烧干":"燒乾","烫面":"燙麵","笆斗":"笆斗","系紧":"繫緊","编余":"編余","苦参":"苦蔘","表针":"錶針","谷苗":"穀苗","谷草":"穀草","钟面":"鐘面","铁钟":"鐵鐘","铲斗":"剷鬥","门斗":"門斗","阿娘":"阿孃","香干":"香乾","七分钟":"七分鐘","三尸神":"三尸神","世纪钟":"世紀鐘","于志宁":"于志寧","于慎行":"于慎行","于田县":"于田縣","公孙丑":"公孫丑","制图学":"製圖學","制革厂":"製革廠","回归热":"迴歸熱","夜光表":"夜光錶","太阴历":"太陰曆","威奇托":"威奇托","托木尔":"托木爾","扶余县":"扶余縣","星历表":"星曆錶","朴智星":"朴智星","水成岩":"水成岩","洗发剂":"洗髮劑","熏衣草":"薰衣草","理发匠":"理髮匠","精制品":"精製品","络腮胡":"絡腮鬍","范文虎":"范文虎","警世钟":"警世鐘","赞叹声":"讚歎聲","道里区":"道里區","里维拉":"里維拉","长须鲸":"長鬚鯨","黄俊杰":"黃俊杰","黑曜岩":"黑曜岩","一天星斗":"一天星斗","余音绕梁":"餘音繞樑","六道轮回":"六道輪迴","升斗小民":"升斗小民","口腹之欲":"口腹之慾","善罢干休":"善罷干休","四舍五入":"四捨五入","复杂劳动":"複雜勞動","多姿多采":"多姿多采","干戈扰攘":"干戈擾攘","形影相吊":"形影相弔","怪里怪气":"怪里怪氣","悠悠荡荡":"悠悠盪盪","悬梁刺股":"懸樑刺股","戴维斯杯":"戴維斯盃","梁上君子":"樑上君子","永志不忘":"永誌不忘","火中取栗":"火中取栗","片纸只字":"片紙隻字","荣归故里":"榮歸故里","卡拉布里亚":"卡拉布里亞","布干维尔岛":"布干維爾島","僵蚕":"殭蠶","冰岩":"冰岩","冰斗":"冰斗","准假":"准假","几几":"几几","卷动":"捲動","卷扬":"捲揚","卷舌":"捲舌","参茸":"蔘茸","吹干":"吹乾","坐台":"坐檯","复训":"複訓","复评":"複評","复验":"複驗","巨万":"鉅萬","巨奖":"鉅獎","干股":"乾股","干薪":"乾薪","当周":"當週","托米":"托米","曲菌":"麴菌","松气":"鬆氣","核收":"覈收","正梁":"正樑","烘制":"烘製","电钟":"電鐘","箕斗":"箕斗","船娘":"船孃","表带":"錶帶","醋栗":"醋栗","钟律":"鐘律","钟罩":"鐘罩","铲车":"剷車","面碗":"麵碗","须鲸":"鬚鯨","七里河":"七里河","于尔根":"于爾根","于都县":"于都縣","余光中":"余光中","公布栏":"公佈欄","冲天炮":"沖天炮","包干制":"包乾制","千里驹":"千里駒","卷舌音":"捲舌音","反复性":"反覆性","回归线":"迴歸線","埔里镇":"埔里鎮","墨斗鱼":"墨斗魚","复音词":"複音詞","奥布里":"奧布里","姜辣素":"薑辣素","山羊胡":"山羊鬍","巴托丽":"巴托麗","布告栏":"佈告欄","布里斯":"布里斯","干干的":"乾乾的","干燥机":"乾燥機","担担面":"擔擔麵","李钟郁":"李鍾郁","松一松":"鬆一鬆","林俊杰":"林俊杰","梅里美":"梅里美","浮梁县":"浮樑縣","潜水表":"潛水錶","烟草味":"菸草味","米利托":"米利托","美洲杯":"美洲盃","艾里森":"艾里森","购买欲":"購買慾","赞美歌":"讚美歌","赫里斯":"赫里斯","里奥斯":"里奧斯","里程计":"里程計","阿里郎":"阿里郎","鼻梁骨":"鼻樑骨","龙游县":"龍游縣","克里普斯":"克里普斯","全盘托出":"全盤托出","利古里亚":"利古里亞","利默里克":"利默里克","南征北伐":"南征北伐","只字片语":"隻字片語","咸镜北道":"咸鏡北道","复合元音":"複合元音","小萝卜头":"小蘿蔔頭","布里斯托":"布里斯托","强奸民意":"強姦民意","托克逊县":"托克遜縣","文采风流":"文采風流","明窗净几":"明窗淨几","有征无战":"有征無戰","欲壑难填":"慾壑難填","游龙戏凤":"游龍戲鳳","舍己从人":"捨己從人","谬以千里":"謬以千里","釜底游鱼":"釜底游魚","难割难舍":"難割難捨","预制构件":"預製構件","欲穷千里目":"欲窮千里目","鄂托克前旗":"鄂托克前旗","一干":"一干","丑旦":"丑旦","丑时":"丑時","专征":"專征","中仑":"中崙","串游":"串游","了望":"瞭望","二弦":"二絃","于于":"于于","于思":"于思","云须":"雲鬚","交并":"交併","人云":"人云","介胄":"介冑","仑背":"崙背","仙岩":"仙岩","令岳":"令岳","低荡":"低盪","余干":"餘干","佣钱":"佣錢","佳里":"佳里","供制":"供製","侵并":"侵併","便辟":"便辟","倒念":"倒唸","借借":"藉藉","借托":"借托","借端":"藉端","停制":"停製","先尝":"先嚐","先签":"先簽","克期":"剋期","克死":"剋死","八周":"八週","公斗":"公斗","六谷":"六穀","内制":"內製","冬冬":"鼕鼕","冲冲":"沖沖","冲坏":"沖壞","冲塌":"沖塌","冲帐":"沖帳","冲扩":"沖擴","冲模":"沖模","冲沟":"沖溝","冲蚀":"沖蝕","冲襟":"沖襟","冲鼻":"沖鼻","凄沧":"淒滄","准奏":"准奏","凶事":"凶事","凶岁":"凶歲","凶服":"凶服","凶死":"凶死","凶耗":"凶耗","函复":"函覆","刊布":"刊佈","划具":"划具","划动":"划動","划行":"划行","划走":"划走","划起":"划起","划进":"划進","初征":"初征","别嘴":"彆嘴","别拗":"彆拗","别气":"彆氣","别着":"彆着","刮倒":"颳倒","刮去":"颳去","刮得":"颳得","刮走":"颳走","刮起":"颳起","刮须":"刮鬚","制为":"製爲","制冰":"製冰","制程":"製程","制纸":"製紙","剃发":"剃髮","剃须":"剃鬚","办伙":"辦伙","加卷":"加捲","北回":"北迴","升仙":"昇仙","升斗":"升斗","升汞":"昇汞","南回":"南迴","占梦":"占夢","占筮":"占筮","占课":"占課","卤簿":"鹵簿","卤钝":"鹵鈍","卤面":"滷麵","卷住":"捲住","卷图":"捲圖","卷尺":"捲尺","卷成":"捲成","卷毛":"捲毛","卷纸":"捲紙","卷缠":"捲纏","卷缩":"捲縮","卷菸":"捲菸","卷袖":"捲袖","卷风":"捲風","历本":"曆本","厘金":"厘金","双周":"雙週","反斗":"反斗","发卷":"髮捲","发困":"發睏","发套":"髮套","发姐":"髮姐","发带":"髮帶","发指":"髮指","发油":"髮油","发状":"髮狀","发癣":"髮癬","发结":"髮結","发网":"髮網","发肤":"髮膚","发蒙":"發矇","发针":"髮針","发长":"髮長","发霜":"髮霜","发鬓":"髮鬢","变松":"變鬆","口干":"口乾","台制":"臺製","台扇":"檯扇","台笔":"檯筆","台鉴":"臺鑒","台钟":"檯鐘","叶音":"叶音","号志":"號誌","叹号":"歎號","叹绝":"歎絕","叹羡":"歎羨","吁叹":"吁嘆","吁吁":"吁吁","吁气":"吁氣","各签":"各簽","各里":"各里","合府":"閤府","合签":"合簽","吊古":"弔古","吊慰":"弔慰","吊文":"弔文","吊钟":"吊鐘","后冠":"后冠","后稷":"后稷","向慕":"嚮慕","向迩":"嚮邇","吸干":"吸乾","吹发":"吹髮","咸卤":"鹹鹵","咸宜":"咸宜","咽住":"嚥住","哀吊":"哀弔","哄然":"鬨然","哄闹":"鬨鬧","哥里":"哥里","唱念":"唱唸","喂乳":"餵乳","喂狗":"餵狗","喂猪":"餵豬","喂给":"餵給","喂羊":"餵羊","喂饭":"餵飯","喂饱":"餵飽","喂鱼":"餵魚","喂鸡":"餵雞","喂鸭":"餵鴨","嘴松":"嘴鬆","回向":"迴向","回圈":"迴圈","回心":"迴心","回护":"迴護","回翔":"迴翔","回诵":"迴誦","回风":"迴風","团粉":"糰粉","国历":"國曆","圈梁":"圈樑","圣杯":"聖盃","垂发":"垂髮","垦复":"墾複","埋布":"埋佈","埔里":"埔里","壁钟":"壁鐘","复决":"複決","复列":"複列","复名":"複名","复壁":"複壁","复校":"覆校","复次":"複次","复比":"複比","复测":"複測","复电":"覆電","复目":"複目","复色":"複色","复词":"複詞","复诵":"複誦","复选":"複選","复钱":"複錢","复韵":"複韻","外制":"外製","外欲":"外慾","外烟":"外菸","大只":"大隻","大斗":"大斗","夫役":"伕役","夸尔":"夸爾","夸诞":"夸誕","女丑":"女丑","奸尸":"姦屍","好凶":"好凶","好困":"好睏","姜糖":"薑糖","姜饼":"薑餅","子游":"子游","宝历":"寶曆","察核":"察覈","射雕":"射鵰","小范":"小范","尝个":"嚐個","尝出":"嚐出","尝点":"嚐點","尸位":"尸位","尽可":"儘可","尽尽":"儘儘","尽性":"儘性","尽自":"儘自","尾注":"尾註","岁凶":"歲凶","岩棉":"岩棉","峰回":"峯迴","巨债":"鉅債","巨奸":"鉅奸","己丑":"己丑","布扣":"佈扣","布菜":"佈菜","干丝":"乾絲","干哑":"乾啞","干哭":"乾哭","干土":"乾土","干急":"乾急","干挠":"干撓","干漆":"乾漆","干点":"乾點","干瘾":"乾癮","干眼":"乾眼","干碍":"干礙","干肥":"乾肥","干谒":"干謁","干连":"干連","干透":"乾透","并为":"併爲","并到":"併到","并成":"併成","幸幸":"倖幸","幸进":"倖進","幼托":"幼托","庆吊":"慶弔","床席":"牀蓆","开吊":"開弔","弥蒙":"彌矇","弦声":"絃聲","弦琴":"絃琴","弦线":"絃線","弦音":"絃音","录录":"彔彔","彩楼":"綵樓","彩线":"綵線","彩衣":"綵衣","征帆":"征帆","征衣":"征衣","很松":"很鬆","御寇":"禦寇","御敌":"禦敵","志喜":"誌喜","志庆":"誌慶","志异":"誌異","念作":"唸作","念到":"唸到","念完":"唸完","念曰":"唸曰","念错":"唸錯","悬钟":"懸鐘","惊赞":"驚讚","意面":"意麵","戴表":"戴錶","所云":"所云","手制":"手製","手松":"手鬆","扎好":"紮好","扎寨":"紮寨","扎成":"紮成","扎紧":"紮緊","扎起":"紮起","打钟":"打鐘","托住":"托住","托熟":"托熟","托特":"托特","扞御":"扞禦","扣眼":"釦眼","批回":"批迴","批核":"批覈","折尺":"摺尺","折椅":"摺椅","折痕":"摺痕","披发":"披髮","抬出":"擡出","抬回":"擡回","抱朴":"抱朴","抽干":"抽乾","拈须":"拈鬚","拉升":"拉昇","拌面":"拌麵","拗别":"拗彆","拘系":"拘繫","拧干":"擰乾","拧松":"擰鬆","括发":"括髮","拭干":"拭乾","拱托":"拱托","挂斗":"掛斗","挨到":"捱到","挨过":"捱過","挽额":"輓額","捍御":"捍禦","据云":"據云","捵面":"捵麵","捻针":"捻鍼","捻须":"捻鬚","推挽":"推輓","揉面":"揉麵","提制":"提製","搜购":"蒐購","擦干":"擦乾","支杆":"支桿","改念":"改唸","敬挽":"敬輓","敲钟":"敲鐘","整周":"整週","斗升":"斗升","斗子":"斗子","斗渠":"斗渠","斗箕":"斗箕","斗量":"斗量","新历":"新曆","方里":"方里","无梁":"無樑","旧表":"舊錶","明复":"明覆","星历":"星曆","晒干":"曬乾","晒谷":"曬穀","暗然":"闇然","本里":"本里","术赤":"朮赤","朴硝":"朴硝","杆刀":"桿刀","杆直":"桿直","杆茵":"桿茵","来复":"來複","松柔":"鬆柔","松浮":"鬆浮","松缓":"鬆緩","松脱":"鬆脫","松起":"鬆起","松饼":"鬆餅","架梁":"架樑","栏干":"欄干","栗鼠":"栗鼠","核价":"覈價","核审":"覈審","核批":"覈批","核示":"覈示","核资":"覈資","核验":"覈驗","案几":"案几","梦回":"夢迴","梳发":"梳髮","模制":"模製","欲女":"慾女","欲海":"慾海","欲障":"慾障","母后":"母后","汇映":"彙映","汇纂":"彙纂","汇辑":"彙輯","没签":"沒簽","油面":"油麵","沾恩":"霑恩","泡面":"泡麵","波荡":"波盪","注上":"註上","注失":"註失","注标":"註標","注译":"註譯","洗发":"洗髮","活扣":"活釦","浇制":"澆製","浓发":"濃髮","浮签":"浮簽","淋冲":"淋沖","港制":"港製","游上":"游上","游下":"游下","游出":"游出","游到":"游到","游去":"游去","游回":"游回","游来":"游來","滑杆":"滑桿","漂荡":"漂盪","漓水":"灕水","潜游":"潛游","灰发":"灰髮","炼金":"鍊金","炼铜":"鍊銅","炼铝":"鍊鋁","烟杆":"煙桿","烟蚜":"菸蚜","烤干":"烤乾","焦干":"焦乾","照签":"照簽","熏天":"熏天","熏熏":"熏熏","熏笼":"熏籠","燎发":"燎髮","爷娘":"爺孃","特准":"特准","玉制":"玉製","玩忽":"翫忽","琴杆":"琴桿","琴钟":"琴鐘","瑞签":"瑞簽","申复":"申覆","电复":"電覆","留发":"留髮","畚斗":"畚斗","皓发":"皓髮","皱折":"皺摺","盘回":"盤迴","直摆":"直襬","相冲":"相沖","干部":"幹部","这里":"這裏","哪里":"哪裏","心里":"心裏","以后":"以後"},"t2sP":{"乾隆":"乾隆","乾坤":"乾坤","哪吒":"哪吒","蒜薹":"蒜薹","乾陵":"乾陵","朝乾夕惕":"朝乾夕惕","木吒":"木吒","反覆":"反复","回覆":"回复","於乎":"於乎","沈船":"沉船","沈默":"沉默","申覆":"申复","示覆":"示复","藉以":"借以","藉口":"借口","藉由":"借由","覆上":"复上","覆住":"复住","覆命":"复命","覆成":"复成","覆文":"复文","覆校":"复校","重覆":"重复","乾隆皇帝":"乾隆皇帝","反覆思量":"反复思量","狐藉虎威":"狐借虎威","藉端生事":"借端生事","藉此":"借此","上鍊":"上链","么麼":"幺麽","么麽":"幺麽","乾元":"乾元","乾卦":"乾卦","乾嘉":"乾嘉","乾圖":"乾图","乾宅":"乾宅","乾斷":"乾断","乾旦":"乾旦","乾曜":"乾曜","乾紅":"乾红","乾綱":"乾纲","乾縣":"乾县","乾象":"乾象","乾造":"乾造","乾道":"乾道","傢俱":"家具","凌藉":"凌借","函覆":"函复","射覆":"射复","幺麼":"幺麽","康乾":"康乾","彷彿":"仿佛","徵弦":"徵弦","徵絃":"徵弦","徵聲":"徵声","徵調":"徵调","徵音":"徵音","憑藉":"凭借","手鍊":"手链","拉鍊":"拉链","拜覆":"拜复","於倫":"於伦","於則":"於则","於單":"於单","於坦":"於坦","於戲":"於戏","於敖":"於敖","於潛":"於潜","於琳":"於琳","於穆":"於穆","於菟":"於菟","於邑":"於邑","明瞭":"明了","明覆":"明复","沈沒":"沉没","沈積":"沉积","流徵":"流徵","滑藉":"滑借","牴牾":"抵牾","牴觸":"抵触","甚鉅":"甚钜","畢昇":"毕昇","發覆":"发复","瞭如":"了如","瞭然":"了然","瞭解":"了解","稟覆":"禀复","竺乾":"竺乾","答覆":"答复","篤麼":"笃麽","籌畫":"筹划","素藉":"素借","茵藉":"茵借","萬鍾":"万锺","蕓薹":"芸薹","蕩覆":"荡复","蕭乾":"萧乾","藉代":"借代","藉助":"借助","藉卉":"借卉","藉喻":"借喻","藉手":"借手","藉據":"借据","藉故":"借故","藉方":"借方","藉條":"借条","藉槁":"借槁","藉機":"借机","藉甚":"借甚","藉着":"借着","藉端":"借端","藉詞":"借词","藉讀":"借读","藉資":"借资","衹得":"只得","覆信":"复信","覆冒":"复冒","覆呈":"复呈","覆墓":"复墓","覆宗":"复宗","覆帳":"复帐","覆幬":"复帱","覆按":"复按","覆杯":"复杯","覆瓿":"复瓿","覆盂":"复盂","覆育":"复育","覆逆":"复逆","覆醢":"复醢","覆電":"复电","覆露":"复露","覆鼎":"复鼎","見覆":"见复","角徵":"角徵","計畫":"计划","變徵":"变徵","躪藉":"躏借","醞藉":"酝借","金吒":"金吒","金鍊":"金链","鈞覆":"钧复","鉅子":"钜子","鉅萬":"钜万","鉅防":"钜防","鉸鍊":"铰链","銀鍊":"银链","鍊墜":"链坠","鍊子":"链子","鍊形":"链形","鍊條":"链条","鍊錘":"链锤","鍊鎖":"链锁","鍛鍾":"锻锺","鍾鍛":"锺锻","鍾馗":"锺馗","鎖鍊":"锁链","鐵鍊":"铁链","電覆":"电复","露覆":"露复","項鍊":"项链","頗覆":"颇复","頸鍊":"颈链","顧藉":"顾借","不瞭解":"不了解","乾清宮":"乾清宫","乾盛世":"乾盛世","八濛山":"八濛山","千鍾粟":"千锺粟","反覆性":"反复性","尼乾陀":"尼乾陀","張法乾":"张法乾","憑藉着":"凭借着","找藉口":"找借口","據瞭解":"据了解","於世成":"於世成","於仲完":"於仲完","於其一":"於其一","於勇明":"於勇明","於崇文":"於崇文","於忠祥":"於忠祥","於惟一":"於惟一","於梨華":"於梨华","於清言":"於清言","於竹屋":"於竹屋","於陵子":"於陵子","李乾德":"李乾德","李澤鉅":"李泽钜","李鍊福":"李链福","李鍾郁":"李锺郁","樊於期":"樊於期","瞭解到":"了解到","藉助於":"借助于","藉寇兵":"借寇兵","覆醬瓿":"复酱瓿","角徵羽":"角徵羽","貂覆額":"貂复额","郭子乾":"郭子乾","錢鍾書":"钱锺书","鍾萬梅":"锺万梅","鍾重發":"锺重发","麼些族":"麽些族","黄鍾公":"黄锺公","一目瞭然":"一目了然","乾坤一擲":"乾坤一掷","乾坤再造":"乾坤再造","乾隆年間":"乾隆年间","以免藉口":"以免借口","以功覆過":"以功复过","侔德覆載":"侔德复载","反反覆覆":"反反复复","反覆思維":"反复思维","名覆金甌":"名复金瓯","壺裏乾坤":"壶里乾坤","幺麼小丑":"幺麽小丑","幺麼小醜":"幺麽小丑","徵羽摩柯":"徵羽摩柯","扭轉乾坤":"扭转乾坤","拉鍊工程":"拉链工程","文錦覆阱":"文锦复阱","於呼哀哉":"於呼哀哉","旋乾轉坤":"旋乾转坤","旋轉乾坤":"旋转乾坤","沈沒成本":"沉没成本","浪蕩乾坤":"浪荡乾坤","珍珠項鍊":"珍珠项链","瞭如指掌":"了如指掌","瞭然於心":"了然于心","瞭若指掌":"了若指掌","簡單明瞭":"简单明了","肘手鍊足":"肘手链足","藉故推辭":"借故推辞","藉此機會":"借此机会","藉箸代籌":"借箸代筹","藉草枕塊":"借草枕块","衹見樹木":"只见树木","袖裏乾坤":"袖里乾坤","覆蕉尋鹿":"复蕉寻鹿","覆鹿尋蕉":"复鹿寻蕉","覆鹿遺蕉":"复鹿遗蕉","變徵之聲":"变徵之声","變徵之音":"变徵之音","買臣覆水":"买臣复水","踅門瞭戶":"踅门了户","鑽石項鍊":"钻石项链","雁杳魚沈":"雁杳鱼沉","顛乾倒坤":"颠乾倒坤","顛倒乾坤":"颠倒乾坤","乾坤大挪移":"乾坤大挪移","宫商角徵羽":"宫商角徵羽","頭髮":"头发","乾淨":"干净","幹部":"干部","這裡":"这里","公里":"公里","皇后":"皇后","麵條":"面条","手錶":"手表","複雜":"复杂","重複":"重复"},"py":"一yi1丁ding1七qi1万wan4丈zhang4三san1上shang4下xia4丌ji1不bu4与yu3丐gai4丑chou3专zhuan1且qie3丕pi1世shi4丘qiu1丙bing3业ye4丛cong2东dong1丝si1丞cheng2丢diu1两liang3严yan2丧sang4丨gun3个ge4丫ya1丬qiang2中zhong1丰feng1串chuan4临lin2丶zhu3丸wan2丹dan1为wei4主zhu3丽li4举ju3丿pie3乃nai3久jiu3乇tuo1么me5义yi4之zhi1乌wu1乍zha4乎hu1乏fa2乐le4乒ping1乓pang1乔qiao2乖guai1乘cheng2乙yi3乜mie1九jiu3乞qi3也ye3习xi2乡xiang1书shu1乩ji1买mai3乱luan4乳ru3乾qian2了le5予yu3争zheng1事shi4二er4亍chu4于yu2亏kui1云yun2互hu4亓qi2五wu3井jing3亘gen4亚ya4些xie1亟ji2亠tou2亡wang2亢kang4交jiao1亥hai4亦yi4产chan3亨heng1亩mu3享xiang3京jing1亭ting2亮liang4亲qin1亳bo2亵xie4人ren2亻ren2亿yi4什shen2仁ren2仂le4仃ding1仄ze4仅jin3仆pu1仇chou2仉zhang3今jin1介jie4仍reng2从cong2仑lun2仓cang1仔zai3仕shi4他ta1仗zhang4付fu4仙xian1仝tong2仞ren4仟qian1仡ge1代dai4令ling4以yi3仨sa1仪yi2仫mu4们men5仰yang3仲zhong4仳pi3仵wu3件jian4价jia4任ren4份fen4仿fang3企qi3伉kang4伊yi1伍wu3伎ji4伏fu2伐fa2休xiu1众zhong4优you1伙huo3会hui4伛yu3伞san3伟wei3传chuan2伢ya2伤shang1伥chang1伦lun2伧cang1伪wei3伫zhu4伯bo2估gu1伲ni4伴ban4伶ling2伸shen1伺ci4似shi4伽ga1佃dian4但dan4位wei4低di1住zhu4佐zuo3佑you4体ti3何he2佗tuo2佘she2余yu2佚yi4佛fu2作zuo4佝gou1佞ning4佟tong2你ni3佣yong1佤wa3佥qian1佧ka3佩pei4佬lao3佯yang2佰bai3佳jia1佴er4佶ji2佻tiao1佼jiao3佾yi4使shi3侃kan3侄zhi2侈chi3侉kua3例li4侍shi4侏zhu1侑you4侔mou2侗dong4供gong1依yi1侠xia2侣lv3侥jiao3侦zhen1侧ce4侨qiao2侩kuai4侪chai2侬nong2侮wu3侯hou2侵qin1便bian4促cu4俄e2俅qiu2俊jun4俎zu3俏qiao4俐li4俑yong3俗su2俘fu2俚li3俜ping1保bao3俞yu2俟qi2信xin4俣yu3俦chou2俨yan3俩lia3俪li4俭jian3修xiu1俯fu3俱ju4俳pai2俸feng4俺an3俾bi3倌guan1倍bei4倏shu1倒dao4倔jue2倘tang3候hou4倚yi3倜ti4借jie4倡chang4倥kong1倦juan4倨ju4倩qian4倪ni2倬zhuo1倭wo1倮luo3债zhai4值zhi2倾qing1偃yan3假jia3偈ji4偌ruo4偎wei1偏pian1偕xie2做zuo4停ting2健jian4偬zong3偶ou3偷tou1偻lou2偾fen4偿chang2傀gui1傅fu4傈li4傍bang4傣dai3傥tang3傧bin1储chu3傩nuo2催cui1傲ao4傺chi4傻sha3像xiang4僖xi1僚liao2僦jiu4僧seng1僬jiao1僭jian4僮tong2僳su4僵jiang1僻pi4儆jing3儇xuan1儋dan1儒ru2儡lei3儿er2兀wu4允yun3元yuan2兄xiong1充chong1兆zhao4先xian1光guang1克ke4免mian3兑dui4兔tu4兕si4兖yan3党dang3兜dou1兢jing1入ru4全quan2八ba1公gong1六liu4兮xi1兰lan2共gong4关guan1兴xing1兵bing1其qi2具ju4典dian3兹zi1养yang3兼jian1兽shou4冀ji4冁chan3冂jiong1内nei4冈gang1冉ran3册ce4再zai4冒mao4冕mian3冖mi4冗rong3写xie3军jun1农nong2冠guan1冢zhong3冤yuan1冥ming2冫bing1冬dong1冯feng2冰bing1冱hu4冲chong1决jue2况kuang4冶ye3冷leng3冻dong4冼xian3冽lie4净jing4凄qi1准zhun3凇song1凉liang2凋diao1凌ling2减jian3凑cou4凛lin3凝ning2几ji3凡fan2凤feng4凫fu2凭ping2凯kai3凰huang2凳deng4凵qian3凶xiong1凸tu1凹ao1出chu1击ji1凼dang4函han2凿zao2刀dao1刁diao1刂dao1刃ren4分fen1切qie4刈yi4刊kan1刍chu2刎wen3刑xing2划hua4刖yue4列lie4刘liu2则ze2刚gang1创chuang4初chu1删shan1判pan4刨pao2利li4别bie2刭jing3刮gua1到dao4刳ku1制zhi4刷shua1券quan4刹sha1刺ci4刻ke4刽gui4刿gui4剀kai3剁duo4剂ji4剃ti4削xue1剌la2前qian2剐gua3剑jian4剔ti1剖pou1剜wan1剞ji1剡shan4剥bo1剧ju4剩sheng4剪jian3副fu4割ge1剽piao1剿jiao3劁qiao1劂jue2劈pi1劐huo1劓yi4力li4劝quan4办ban4功gong1加jia1务wu4劢mai4劣lie4动dong4助zhu4努nu3劫jie2劬qu2劭shao4励li4劲jin4劳lao2劾he2势shi4勃bo2勇yong3勉mian3勋xun1勐meng3勒lei1勖xu4勘kan1募mu4勤qin2勰xie2勹bao1勺shao2勾gou1勿wu4匀yun2包bao1匆cong1匈xiong1匍pu2匏pao2匐fu2匕bi3化hua4北bei3匙shi5匚fang1匝za1匠jiang4匡kuang1匣xia2匦gui3匪fei3匮kui4匹pi3区qu1医yi1匾bian3匿ni4十shi2千qian1卅sa4升sheng1午wu3卉hui4半ban4华hua2协xie2卑bei1卒zu2卓zhuo2单dan1卖mai4南nan2博bo2卜bo5卞bian4卟bu3占zhan4卡ka3卢lu2卣you3卤lu3卦gua4卧wo4卩jie2卫wei4卮zhi1卯mao3印yin4危wei1即ji2却que4卵luan3卷juan3卸xie4卺jin3卿qing1厂chang3厄e4厅ting1历li4厉li4压ya1厌yan4厍she4厕ce4厘li2厚hou4厝cuo4原yuan2厢xiang1厣yan3厥jue2厦sha4厨chu2厩jiu4厮si1厶si1去qu4县xian4叁san1参can1又you4叉cha1及ji2友you3双shuang1反fan3发fa1叔shu1取qu3受shou4变bian4叙xu4叛pan4叟sou3叠die2口kou3古gu3句ju4另ling4叨dao1叩kou4只zhi3叫jiao4召zhao4叭ba1叮ding1可ke3台tai2叱chi4史shi3右you4叵po3叶ye4号hao4司si1叹tan4叻le4叼diao1叽ji1吁xu1吃chi1各ge4吆yao1合he2吉ji2吊diao4同tong2名ming2后hou4吏li4吐tu3向xiang4吒zha1吓xia4吕lv3吖ya1吗ma5君jun1吝lin4吞tun1吟yin2吠fei4吡bi3吣qin4否fou3吧ba5吨dun1吩fen1含han2听ting1吭keng1吮shun3启qi3吱zhi1吲yin3吴wu2吵chao3吸xi1吹chui1吻wen3吼hou3吾wu2呀ya5呃e4呆dai1呈cheng2告gao4呋fu1呐na4呒wu3呓yi4呔dai1呕ou3呖li4呗bei5员yuan2呙guo1呛qiang1呜wu1呢ne5呤ling4呦you1周zhou1呱gu1呲ci1味wei4呵he1呶nao2呷ga1呸pei1呻shen1呼hu1命ming4咀ju3咂za1咄duo1咆pao2咋za3和he2咎jiu4咏yong3咐fu4咒zhou4咔ka1咕gu1咖ka1咙long2咚dong1咛ning2咝si1咣guang1咤zha4咦yi2咧lie3咨zi1咩mie1咪mi1咫zhi3咬yao3咭ji1咯ge1咱zan2咳ke2咴hui1咸xian2咻xiu1咽yan4咿yi1哀ai1品pin3哂shen3哄hong3哆duo1哇wa5哈ha1哉zai1哌pai4响xiang3哎ai1哏gen2哐kuang1哑ya3哒da2哓xiao1哔bi4哕hui4哗hua1哙kuai4哚duo3哜ji4哝nong2哞mou1哟yo1哥ge1哦o2哧chi1哨shao4哩li1哪na3哭ku1哮xiao1哲zhe2哳zha1哺bu3哼heng1哽geng3哿ge3唁yan4唆suo1唇chun2唉ai1唏xi1唐tang2唑zuo4唔wu2唛ma4唠lao2唢suo3唣zao4唤huan4唧ji1唪feng3唬hu3售shou4唯wei2唰shua1唱chang4唳li4唷yo1唼sha4唾tuo4唿hu1啁zhao1啃ken3啄zhuo2商shang1啉lin2啊a5啐cui4啕tao2啖dan4啜chuai4啡fei1啤pi2啥sha2啦la5啧ze2啪pa1啬se4啭zhuan4啮nie4啵bo1啶ding4啷lang1啸xiao4啻chi4啼ti2啾jiu1喀ka1喁yong2喂wei4喃nan2善shan4喇la3喈jie1喉hou2喊han3喋die2喏nuo4喑yin1喔o1喘chuan3喙hui4喜xi3喝he1喟kui4喧xuan1喱li2喳zha1喵miao1喷pen1喹kui2喻yu4喽lou2喾ku4嗄a2嗅xiu4嗉su4嗌ai4嗍suo1嗑ke1嗒da1嗓sang3嗔chen1嗖sou1嗜shi4嗝ge2嗟jie1嗡weng1嗣si4嗤chi1嗥hao2嗦suo5嗨hai1嗪qin2嗫nie4嗬he1嗯n2嗲die1嗳ai1嗵tong1嗷ao2嗽sou4嗾sou3嘀di2嘁qi1嘈cao2嘉jia1嘌piao4嘎ga1嘏gu3嘘xu1嘛ma5嘞lei5嘟du1嘣beng1嘤ying1嘧mi4嘬chuai4嘭peng1嘱zhu3嘲chao2嘴zui3嘶si1嘹liao2嘻xi1嘿hei1噌ceng1噍jiao4噎ye1噔deng1噗pu1噘jue1噙qin2噜lu1噢o1噤jin4器qi4噩e4噪zao4噫yi1噬shi4噱jue2噶ga2噻sai1噼pi1嚅ru2嚆hao1嚎hao2嚏ti4嚓ca1嚣xiao1嚯huo4嚷rang3嚼jue2囊nang2囔nang1囗wei2囚qiu2四si4囝jian3回hui2囟xin4因yin1囡nan1团tuan2囤dun4囫hu2园yuan2困kun4囱cong1围wei2囵lun2囹ling2固gu4国guo2图tu2囿you4圃pu3圄yu3圆yuan2圈quan1圉yu3圊qing1圜huan2土tu3圣sheng4在zai4圩wei2圪ge1圬wu1圭gui1圮pi3圯yi2地di4圳zhen4圹kuang4场chang3圻qi2圾ji1址zhi3坂ban3均jun1坊fang1坌ben4坍tan1坎kan3坏huai4坐zuo4坑keng1块kuai4坚jian1坛tan2坜li4坝ba4坞wu4坟fen2坠zhui4坡po1坤kun1坦tan3坨tuo2坩gan1坪ping2坫dian4坭ni2坯pi1坳ao4坶mu3坷ke3坻chi2坼che4垂chui2垃la1垄long3垅long3垆lu2型xing2垌dong4垒lei3垓gai1垛duo3垠yin2垡fa2垢gou4垣yuan2垤die2垦ken3垧shang3垩e4垫dian4垭ya1垮kua3垲kai3垴nao3垸yuan4埂geng3埃ai1埋mai2城cheng2埏shan1埒lie4埔pu3埕cheng2埘shi2埙xun1埚guo1埝nian4域yu4埠bu4埤pi2埭dai4埯an3埴zhi2埸yi4培pei2基ji1埽sao4堀ku1堂tang2堆dui1堇jin3堋peng2堍tu4堑qian4堕duo4堙yin1堞die2堠hou4堡bao3堤di1堪kan1堰yan4堵du3塄leng2塌ta1塍cheng2塑su4塔ta3塘tang2塞sai1塥ge2填tian2塬yuan2塾shu2墀chi2墁man4境jing4墅shu4墉yong1墒shang1墓mu4墙qiang2墚liang2增zeng1墟xu1墨mo4墩dun1墼ji1壁bi4壅yong1壑he4壕hao2壤rang3士shi4壬ren2壮zhuang4声sheng1壳ke2壶hu2壹yi1夂zhi3处chu4备bei4复fu4夏xia4夔kui2夕xi1外wai4夙su4多duo1夜ye4够gou4夤yin2夥huo3大da4天tian1太tai4夫fu1夭yao1央yang1夯hang1失shi1头tou2夷yi2夸kua1夹jia1夺duo2夼kuang3奁lian2奂huan4奄yan3奇qi2奈nai4奉feng4奋fen4奎kui2奏zou4契qi4奔ben1奕yi4奖jiang3套tao4奘zang4奚xi1奠dian4奢she1奥ao4女nv3奴nu2奶nai3奸jian1她ta1好hao3妁shuo4如ru2妃fei1妄wang4妆zhuang1妇fu4妈ma1妊ren4妍yan2妒du4妓ji4妖yao1妗jin4妙miao4妞niu1妣bi3妤yu2妥tuo3妨fang2妩wu3妪yu4妫gui1妮ni1妯zhou2妲da2妹mei4妻qi1妾qie4姆mu3姊zi3始shi3姐jie3姑gu1姒si4姓xing4委wei3姗shan1姘pin1姚yao2姜jiang1姝shu1姣jiao1姥lao3姨yi2姬ji1姹cha4姻yin1姿zi1威wei1娃wa2娄lou2娅ya4娆rao2娇jiao1娈luan2娉ping1娌li3娑suo1娓wei3娘niang2娜na4娟juan1娠shen1娣di4娥e2娩mian3娱yu2娲wa1娴xian2娶qu3娼chang1婀e1婆po2婉wan3婊biao3婕jie2婚hun1婢bi4婧jing4婪lan2婴ying1婵chan2婶shen3婷ting2婺wu4婿xu4媒mei2媚mei4媛yuan4媪ao3媲pi4媳xi2媵ying4媸chi1媾gou4嫁jia4嫂sao3嫉ji2嫌xian2嫒ai4嫔pin2嫖piao2嫘lei2嫜zhang1嫠li2嫡di2嫣yan1嫦chang2嫩nen4嫫mo2嫱qiang2嬉xi1嬖bi4嬗shan4嬲niao3嬴ying2嬷ma1孀shuang1子zi5孑jie2孓jue2孔kong3孕yun4字zi4存cun2孙sun1孚fu2孛bei4孜zi1孝xiao4孟meng4孢bao1季ji4孤gu1孥nu2学xue2孩hai2孪luan2孬nao1孰shu2孱can4孳zi1孵fu1孺ru2孽nie4宀mian2宁ning2它ta1宄gui3宅zhai2宇yu3守shou3安an1宋song4完wan2宏hong2宓mi4宕dang4宗zong1官guan1宙zhou4定ding4宛wan3宜yi2宝bao3实shi2宠chong3审shen3客ke4宣xuan1室shi4宥you4宦huan4宪xian4宫gong1宰zai3害hai4宴yan4宵xiao1家jia1宸chen2容rong2宽kuan1宾bin1宿su4寂ji4寄ji4寅yin2密mi4寇kou4富fu4寐mei4寒han2寓yu4寝qin3寞mo4察cha2寡gua3寤wu4寥liao2寨zhai4寮liao2寰huan2寸cun4对dui4寺si4寻xun2导dao3寿shou4封feng1射she4将jiang1尉wei4尊zun1小xiao3少shao3尔er3尕ga3尖jian1尘chen2尚shang4尜ga2尝chang2尢you2尤you2尥liao4尧yao2尬ga4就jiu4尴gan1尸shi1尹yin3尺chi3尻kao1尼ni2尽jin3尾wei3尿niao4局ju2屁pi4层ceng2居ju1屈qu1屉ti4届jie4屋wu1屎shi3屏ping2屐ji1屑xie4展zhan3屙e1属shu3屠tu2屡lv3屣xi3履lv3屦ju4屮che4屯tun2山shan1屹yi4屺qi3屿yu3岁sui4岂qi3岈ya2岌ji2岍qian1岐qi2岑cen2岔cha4岖qu1岗gang3岘xian4岙ao4岚lan2岛dao3岜ba1岢ke3岣gou3岩yan2岫xiu4岬jia3岭ling3岱dai4岳yue4岵hu4岷min2岸an4岽dong1岿kui1峁mao3峄yi4峋xun2峒dong4峙zhi4峡xia2峤jiao4峥zheng1峦luan2峨e2峪yu4峭qiao4峰feng1峻jun4崂lao2崃lai2崆kong1崇chong2崎qi2崔cui1崖ya2崛jue2崞guo1崤xiao2崦yan1崧song1崩beng1崭zhan3崮gu4崴wai3崽zai3崾yao3嵇ji1嵊sheng4嵋mei2嵌qian4嵘rong2嵛yu2嵝lou3嵩song1嵫zi1嵬wei2嵯cuo2嵴ji3嶂zhang4嶙lin2嶝deng4嶷yi2巅dian1巍wei1巛chuan1川chuan1州zhou1巡xun2巢chao2工gong1左zuo3巧qiao3巨ju4巩gong3巫wu1差cha4巯qiu2己ji3已yi3巳si4巴ba1巷xiang4巽xun4巾jin1币bi4市shi4布bu4帅shuai4帆fan1师shi1希xi1帏wei2帐zhang4帑tang3帔pei4帕pa4帖tie1帘lian2帙zhi4帚zhou3帛bo2帜zhi4帝di4带dai4帧zhen1席xi2帮bang1帱chou2帷wei2常chang2帻ze2帼guo2帽mao4幂mi4幄wo4幅fu2幌huang3幔man4幕mu4幛zhang4幞fu2幡fan1幢chuang2干gan4平ping2年nian2并bing4幸xing4幺yao1幻huan4幼you4幽you1广guang3庀pi3庄zhuang1庆qing4庇bi4床chuang2庋gui3序xu4庐lu2庑wu3库ku4应ying1底di3庖pao2店dian4庙miao4庚geng1府fu3庞pang2废fei4庠xiang2庥xiu1度du4座zuo4庭ting2庳bi4庵an1庶shu4康kang1庸yong1庹tuo3庾yu3廉lian2廊lang2廑jin3廒ao2廓kuo4廖liao4廛chan2廨xie4廪lin3廴yin3延yan2廷ting2建jian4廾gong3廿nian4开kai1弁bian4异yi4弃qi4弄nong4弈yi4弊bi4弋yi4式shi4弑shi4弓gong1引yin3弗fu2弘hong2弛chi2弟di4张zhang1弥mi2弦xian2弧hu2弩nu3弪jing4弭mi3弯wan1弱ruo4弹dan4强qiang2弼bi4彀gou4彐ji4归gui1当dang1录lu4彖tuan4彗hui4彘zhi4彝yi2彡shan1形xing2彤tong2彦yan4彩cai3彪biao1彬bin1彭peng2彰zhang1影ying3彳chi4彷pang2役yi4彻che4彼bi3往wang3征zheng1徂cu2径jing4待dai4徇xun4很hen3徉yang2徊huai2律lv4後hou4徐xu2徒tu2徕lai2得de2徘pai2徙xi3徜chang2御yu4徨huang2循xun2徭yao2微wei1徵zheng1德de2徼jiao3徽hui1心xin1忄xin5必bi4忆yi4忉dao1忌ji4忍ren3忏chan4忐tan3忑te4忒te4忖cun3志zhi4忘wang4忙mang2忝tian3忠zhong1忡chong1忤wu3忧you1忪song1快kuai4忭bian4忮zhi4忱chen2念nian4忸niu3忻xin1忽hu1忾kai4忿fen4怀huai2态tai4怂song3怃wu3怄ou4怅chang4怆chuang4怊chao1怍zuo4怎zen3怏yang4怒nu4怔zheng1怕pa4怖bu4怙hu4怛da2怜lian2思si1怠dai4怡yi2急ji2怦peng1性xing4怨yuan4怩ni2怪guai4怫fu2怯qie4怵chu4总zong3怼dui4怿yi4恁nen4恂xun2恃shi4恋lian4恍huang3恐kong3恒heng2恕shu4恙yang4恚hui4恝jia2恢hui1恣zi4恤xu4恧nv4恨hen4恩en1恪ke4恫dong4恬tian2恭gong1息xi1恰qia4恳ken3恶e4恸tong4恹yan1恺kai3恻ce4恼nao3恽yun4恿yong3悃kun3悄qiao1悉xi1悌ti4悍han4悒yi4悔hui3悖bei4悚song3悛quan1悝kui1悟wu4悠you1患huan4悦yue4您nin2悫que4悬xuan2悭qian1悯min3悱fei3悲bei1悴cui4悸ji4悻xing4悼dao4情qing2惆chou2惊jing1惋wan3惑huo4惕ti4惘wang3惚hu1惜xi1惝chang3惟wei2惠hui4惦dian4惧ju4惨can3惩cheng2惫bei4惬qie4惭can2惮dan4惯guan4惰duo4想xiang3惴zhui4惶huang2惹re3惺xing1愀qiao3愁chou2愆qian1愈yu4愉yu2愍min3愎bi4意yi4愕e4愚yu2感gan3愠yun4愣leng4愤fen4愦kui4愧kui4愫su4愿yuan4慈ci2慊qian4慌huang1慎shen4慑she4慕mu4慝te4慢man4慧hui4慨kai3慰wei4慵yong1慷kang1憋bie1憎zeng1憔qiao2憝dui4憧chong1憨han1憩qi4憬jing3憷chu4憾han4懂dong3懈xie4懊ao4懋mao4懑men4懒lan3懔lin3懦nuo4懵meng3懿yi4戆gang4戈ge1戊wu4戋jian1戌xu1戍shu4戎rong2戏xi4成cheng2我wo3戒jie4戕qiang1或huo4戗qiang1战zhan4戚qi1戛jia2戟ji3戡kan1戢ji2戤gai4戥deng3截jie2戬jian3戮lu4戳chuo1戴dai4户hu4戽hu4戾li4房fang2所suo3扁bian3扃jiong1扇shan4扈hu4扉fei1手shou3扌shou5才cai2扎zha1扑pu1扒ba1打da3扔reng1托tuo1扛kang2扣kou4扦qian1执zhi2扩kuo4扪men2扫sao3扬yang2扭niu3扮ban4扯che3扰rao3扳ban1扶fu2批pi1扼e4找zhao3承cheng2技ji4抄chao1抉jue2把ba3抑yi4抒shu1抓zhua1投tou2抖dou3抗kang4折zhe2抚fu3抛pao1抟tuan2抠kou1抡lun1抢qiang3护hu4报bao4抨peng1披pi1抬tai2抱bao4抵di3抹mo3抻chen1押ya1抽chou1抿min3拂fu2拄zhu3担dan1拆chai1拇mu3拈nian1拉la1拊fu3拌ban4拍pai1拎lin1拐guai3拒ju4拓tuo4拔ba2拖tuo1拗ao3拘ju1拙zhuo1拚pan4招zhao1拜bai4拟ni3拢long3拣jian3拥yong1拦lan2拧ning2拨bo1择ze2括kuo4拭shi4拮jie2拯zheng3拱gong3拳quan2拴shuan1拶za1拷kao3拼pin1拽zhuai1拾shi2拿na2持chi2挂gua4指zhi3挈qie4按an4挎kua4挑tiao1挖wa1挚zhi4挛luan2挝wo1挞ta4挟xie2挠nao2挡dang3挢jiao3挣zheng1挤ji3挥hui1挨ai1挪nuo2挫cuo4振zhen4挲sa1挹yi4挺ting3挽wan3捂wu3捃jun4捅tong3捆kun3捉zhuo1捋lv3捌ba1捍han4捎shao1捏nie1捐juan1捕bu3捞lao1损sun3捡jian3换huan4捣dao3捧peng3捩lie4捭bai3据ju4捱ai2捶chui2捷jie2捺na4捻nian3掀xian1掂dian1掇duo1授shou4掉diao4掊pou2掌zhang3掎ji3掏tao1掐qia1排pai2掖ye1掘jue2掠lve4探tan4掣che4接jie1控kong4推tui1掩yan3措cuo4掬ju1掭tian4掮qian2掰bai1掳lu3掴guai1掷zhi4掸dan3掺can4掼guan4掾yuan4揄yu2揆kui2揉rou2揍zou4揎xuan1描miao2提ti2插cha1揖yi1揞an3揠ya4握wo4揣chuai1揩kai1揪jiu1揭jie1揲die2援yuan2揶ye2揸zha1揽lan3揿qin4搀chan1搁ge1搂lou3搅jiao3搋chuai1搌zhan3搏bo2搐chu4搓cuo1搔sao1搛jian1搜sou1搞gao3搠shuo4搡sang3搦nuo4搪tang2搬ban1搭da1搴qian1携xie2搽cha2搿ge2摁en4摄she4摅shu1摆bai3摇yao2摈bin4摊tan1摒bing3摔shuai1摘zhai1摞luo4摧cui1摩mo2摭zhi2摸mo1摹mo2摺zhe2撂liao4撄ying1撅jue1撇pie1撑cheng1撒sa1撕si1撖han4撙zun3撞zhuang4撤che4撩liao1撬qiao4播bo1撮cuo1撰zhuan4撵nian3撷xie2撸lu1撺cuan1撼han4擀gan3擂lei2擅shan4操cao1擎qing2擐huan4擒qin2擗pi3擘bai1擞sou3擢zhuo2擤xing3擦ca1攀pan1攉huo1攒zan3攘rang3攥zuan4攫jue2攮nang3支zhi1攴pu1攵pu1收shou1攸you1改gai3攻gong1放fang4政zheng4故gu4效xiao4敉mi3敌di2敏min3救jiu4敕chi4敖ao2教jiao4敛lian3敝bi4敞chang3敢gan3散san4敦dun1敫jiao3敬jing4数shu4敲qiao1整zheng3敷fu1文wen2斋zhai1斌bin1斐fei3斑ban1斓lan2斗dou4料liao4斛hu2斜xie2斟zhen1斡wo4斤jin1斥chi4斧fu3斩zhan3斫zhuo2断duan4斯si1新xin1方fang1於yu2施shi1旁pang2旃zhan1旄mao2旅lv3旆pei4旋xuan2旌jing1旎ni3族zu2旒liu2旖yi3旗qi2无wu2既ji4日ri4旦dan4旧jiu4旨zhi3早zao3旬xun2旭xu4旮ga1旯la2旰gan4旱han4时shi2旷kuang4旺wang4昀yun2昂ang2昃ze4昆kun1昊hao4昌chang1明ming2昏hun1易yi4昔xi1昕xin1昙tan2昝zan3星xing1映ying4春chun1昧mei4昨zuo2昭zhao1是shi4昱yu4昴mao3昵ni4昶chang3昼zhou4显xian3晁chao2晃huang3晋jin4晌shang3晏yan4晒shai4晓xiao3晔ye4晕yun1晖hui1晗han2晚wan3晟cheng2晡bu1晤wu4晦hui4晨chen2普pu3景jing3晰xi1晴qing2晶jing1晷gui3智zhi4晾liang4暂zan4暄xuan1暇xia2暌kui2暑shu3暖nuan3暗an4暝ming2暧ai4暨ji4暮mu4暴bao4暹xian1暾tun1曙shu3曛xun1曜yao4曝pu4曦xi1曩nang3曰yue1曲qu1曳ye4更geng4曷he2曹cao2曼man4曾ceng2替ti4最zui4月yue4有you3朊ruan3朋peng2服fu2朐qu2朔shuo4朕zhen4朗lang3望wang4朝chao2期qi1朦meng2木mu4未wei4末mo4本ben3札zha2术shu4朱zhu1朴pu3朵duo3机ji1朽xiu3杀sha1杂za2权quan2杆gan1杈cha1杉shan1杌wu4李li3杏xing4材cai2村cun1杓biao1杖zhang4杜du4杞qi3束shu4杠gang1条tiao2来lai2杨yang2杩ma4杪miao3杭hang2杯bei1杰jie2杲gao3杳yao3杵chu3杷pa2杼zhu4松song1板ban3极ji2构gou4枇pi2枉wang3枋fang1析xi1枕zhen3林lin2枘rui4枚mei2果guo3枝zhi1枞cong1枢shu1枣zao3枥li4枧jian3枨cheng2枪qiang1枫feng1枭xiao1枯ku1枰ping2枳zhi3枵xiao1架jia4枷jia1枸gou3柁duo4柃ling2柄bing3柏bai3某mou3柑gan1柒qi1染ran3柔rou2柘zhe4柙xia2柚you4柜gui4柝tuo4柞zha4柠ning2柢di3查cha2柩jiu4柬jian3柯ke1柰nai4柱zhu4柳liu3柴chai2柽cheng1柿shi4栀zhi1栅zha4标biao1栈zhan4栉zhi4栊long2栋dong4栌lu2栎li4栏lan2树shu4栓shuan1栖qi1栗li4栝gua1校xiao4栩xu3株zhu1栲kao3栳lao3样yang4核he2根gen1格ge2栽zai1栾luan2桀jie2桁heng2桂gui4桃tao2桄guang1桅wei2框kuang1案an4桉an1桊juan4桌zhuo1桎zhi4桐tong2桑sang1桓huan2桔ju2桕jiu4桠ya1桡rao2桢zhen1档dang4桤qi1桥qiao2桦hua4桧gui4桨jiang3桩zhuang1桫suo1桴fu2桶tong3桷jue2梁liang2梃ting3梅mei2梆bang1梏gu4梓zi3梗geng3梢shao1梦meng4梧wu2梨li2梭suo1梯ti1械xie4梳shu1梵fan4检jian3棂ling2棉mian2棋qi2棍gun4棒bang4棕zong1棘ji2棚peng2棠tang2棣di4森sen1棰chui2棱leng2棵ke1棹zhao4棺guan1棼fen2椁guo3椅yi3椋liang2植zhi2椎chui2椐ju1椒jiao1椟du2椠qian4椤luo2椭tuo3椰ye1椴duan4椹shen4椽chuan2椿chun1楂zha1楔xie1楗jian4楚chu3楝lian4楞leng2楠nan2楣mei2楦xuan4楫ji2楮chu3楱zou4楷kai3楸qiu1楹ying2楼lou2榀pin3概gai4榄lan3榆yu2榇chen4榈lv2榉ju3榍xie4榔lang2榕rong2榘ju3榛zhen1榜bang3榧fei3榨zha4榫sun3榭xie4榱cui1榴liu2榷que4榻ta4槁gao3槊shuo4槌chui2槎cha2槐huai2槔gao1槛kan3槟bin1槠zhu1槭qi1槲hu2槽cao2槿jin3樊fan2樗chu1樘tang2樟zhang1模mo2樨xi1横heng2樯qiang2樱ying1樵qiao2樽zun1樾yue4橄gan3橇qiao1橐tuo2橘ju2橙cheng2橛jue2橡xiang4橥zhu1橱chu2橹lu3橼yuan2檀tan2檄xi2檎qin2檐yan2檑lei2檗bo4檠qing2檩lin3檫cha2檬meng2欠qian4次ci4欢huan1欣xin1欤yu2欧ou1欲yu4欷xi1欹yi1欺qi1款kuan3歃sha4歆xin1歇xie1歉qian4歌ge1歙she4止zhi3正zheng4此ci3步bu4武wu3歧qi2歪wai1歹dai3死si3歼jian1殁mo4殂cu2殃yang1殄tian3殆dai4殇shang1殉xun4殊shu1残can2殍piao3殒yun3殓lian4殖zhi2殚dan1殛ji2殡bin4殪yi4殳shu1殴ou1段duan4殷yin1殿dian4毁hui3毂gu3毅yi4毋wu2母mu3每mei3毒du2毓yu4比bi3毕bi4毖bi4毗pi2毙bi4毛mao2毡zhan1毪mu2毫hao2毯tan3毳cui4毵san1毹shu1毽jian4氅chang3氆pu3氇lu5氍qu2氏shi4氐di1民min2氓mang2气qi4氕pie1氖nai3氘dao1氙xian1氚chuan1氛fen1氟fu2氡dong1氢qing1氤yin1氦hai4氧yang3氨an1氩ya4氪ke4氮dan4氯lv4氰qing2氲yun1水shui3氵shui5永yong3氽tun3汀ting1汁zhi1求qiu2汆cuan1汇hui4汉han4汊cha4汐xi1汔qi4汕shan4汗han4汛xun4汜si4汝ru3汞gong3江jiang1池chi2污wu1汤tang1汨mi4汩gu3汪wang1汰tai4汲ji2汴bian4汶wen4汹xiong1汽qi4汾fen2沁qin4沂yi2沃wo4沅yuan2沆hang4沈shen3沉chen2沌dun4沏qi1沐mu4沓da2沔mian3沙sha1沛pei4沟gou1没mei2沣feng1沤ou1沥li4沦lun2沧cang1沩wei2沪hu4沫mo4沭shu4沮ju3沱tuo2沲tuo2河he2沸fei4油you2治zhi4沼zhao3沽gu1沾zhan1沿yan2泄xie4泅qiu2泉quan2泊po1泌mi4泐le4泓hong2泔gan1法fa3泖mao3泗si4泛fan4泞ning4泠ling2泡pao4波bo1泣qi4泥ni2注zhu4泪lei4泫xuan4泮pan4泯min3泰tai4泱yang1泳yong3泵beng4泶xue2泷long2泸lu2泺luo4泻xie4泼po1泽ze2泾jing1洁jie2洄hui2洇yin1洋yang2洌lie4洎ji4洒sa3洗xi3洙zhu1洚jiang4洛luo4洞dong4津jin1洧wei3洪hong2洫xu4洮tao2洱er3洲zhou1洳ru4洵xun2洹huan2活huo2洼wa1洽qia4派pai4流liu2浃jia1浅qian3浆jiang1浇jiao1浈zhen1浊zhuo2测ce4浍hui4济ji4浏liu2浑hun2浒hu3浓nong2浔xun2浙zhe4浚jun4浜bang1浞zhuo2浠xi1浣huan4浦pu3浩hao4浪lang4浮fu2浯wu2浴yu4海hai3浸jin4浼mei3涂tu2涅nie4消xiao1涉she4涌yong3涎xian2涑su4涓juan1涔cen2涕ti4涛tao1涝lao4涞lai2涟lian2涠wei2涡wo1涣huan4涤di2润run4涧jian4涨zhang3涩se4涪fu2涫guan4涮shuan4涯ya2液ye4涵han2涸he2涿zhuo1淀dian4淄zi1淅xi1淆xiao2淇qi2淋lin2淌tang3淑shu1淖nao4淘tao2淙cong2淝fei2淞song1淠pi4淡dan4淤yu1淦gan4淫yin2淬cui4淮huai2深shen1淳chun2混hun4淹yan1添tian1淼miao3清qing1渊yuan1渌lu4渍zi4渎du2渐jian4渑mian3渔yu2渖shen3渗shen4渚zhu3渝yu2渠qu2渡du4渣zha1渤bo2渥wo4温wen1渫xie4渭wei4港gang3渲xuan4渴ke3游you2渺miao3湃pai4湄mei2湍tuan1湎mian3湓pen2湔jian1湖hu2湘xiang1湛zhan4湟huang2湫jiao3湮yan1湾wan1湿shi1溃kui4溅jian4溆xu4溉gai4溏tang2源yuan2溘ke4溜liu1溟ming2溢yi4溥pu3溧li4溪xi1溯su4溱qin2溲sou1溴xiu4溶rong2溷hun4溺ni4溻ta1溽ru4滁chu2滂pang1滇dian1滋zi1滏fu3滑hua2滓zi3滔tao1滕teng2滗bi4滚gun3滞zhi4滟yan4滠she4满man3滢ying2滤lv4滥lan4滦luan2滨bin1滩tan1滴di1滹hu1漂piao1漆qi1漉lu4漏lou4漓li2演yan3漕cao2漠mo4漤lan3漩xuan2漪yi1漫man4漭mang3漯luo4漱shu4漳zhang1漶huan4漾yang4潆ying2潇xiao1潋lian4潍wei2潘pan1潜qian2潞lu4潢huang2潦lao3潭tan2潮chao2潲shao4潴zhu1潸shan1潺chan2潼tong2澄cheng2澈che4澉gan3澌si1澍shu4澎peng1澜lan2澡zao3澧li3澳ao4澶chan2澹dan4激ji1濂lian2濉sui1濑lai4濒bin1濞bi4濠hao2濡ru2濮pu2濯zhuo2瀑pu4瀚han4瀛ying2瀣xie4瀵fen4瀹yue4灌guan4灏hao4灞ba4火huo3灬biao1灭mie4灯deng1灰hui1灵ling2灶zao4灸jiu3灼zhuo2灾zai1灿can4炀yang2炅jiong3炉lu2炊chui1炎yan2炒chao3炔gui4炕kang4炖dun4炙zhi4炜wei3炝qiang4炫xuan4炬ju4炭tan4炮pao4炯jiong3炱tai2炳bing3炷zhu4炸zha4点dian3炻shi2炼lian4炽chi4烀hu1烁shuo4烂lan4烃ting1烈lie4烊yang2烘hong1烙lao4烛zhu2烟yan1烤kao3烦fan2烧shao1烨ye4烩hui4烫tang4烬jin4热re4烯xi1烷wan2烹peng1烽feng1焉yan1焊han4焐wu4焓han2焕huan4焖men4焘dao4焙bei4焚fen2焦jiao1焯chao1焰yan4焱yan4然ran2煅duan4煊xuan1煌huang2煎jian1煜yu4煞sha1煤mei2煦xu4照zhao4煨wei1煮zhu3煲bao1煳hu2煸bian1煺tui4煽shan1熄xi1熊xiong2熏xun1熔rong2熘liu1熙xi1熟shu2熠yi4熨yun4熬ao2熳man4熵shang1熹xi1燃ran2燎liao2燔fan2燕yan4燠yu4燥zao4燧sui4燮xie4燹xian3爆bao4爝jue2爨cuan4爪zhao3爬pa2爰yuan2爱ai4爵jue2父fu4爷ye2爸ba4爹die1爻yao2爽shuang3爿pan2片pian4版ban3牌pai2牍du2牒die2牖you3牙ya2牛niu2牝pin4牟mou2牡mu3牢lao2牦mao2牧mu4物wu4牮jian4牯gu3牲sheng1牵qian1特te4牺xi1牾wu3牿gu4犀xi1犁li2犄ji1犊du2犋ju4犍jian1犏pian1犒kao4犟jiang4犬quan3犭quan3犯fan4犰qiu2犴an4状zhuang4犷guang3犸ma4犹you2狁yun3狂kuang2狃niu3狄di2狈bei4狍pao2狎xia2狐hu2狒fei4狗gou3狙ju1狞ning2狠hen3狡jiao3狨rong2狩shou4独du2狭xia2狮shi1狯kuai4狰zheng1狱yu4狲sun1狳yu2狴bi4狷juan4狸li2狺yin2狻suan1狼lang2猁li4猃xian3猊ni2猎lie4猓guo3猕mi2猖chang1猗yi1猛meng3猜cai1猝cu4猞she1猡luo2猢hu2猥wei3猩xing1猪zhu1猫mao1猬wei4献xian4猱nao2猴hou2猷you2猸mei2猹cha2猾hua2猿yuan2獍jing4獐zhang1獒ao2獗jue2獠liao2獬xie4獭ta3獯xun1獾huan1玄xuan2率lv4玉yu4王wang2玎ding1玑ji1玖jiu3玛ma3玟wen2玢bin1玩wan2玫mei2玮wei3环huan2现xian4玲ling2玳dai4玷dian4玺xi3玻bo1珀po4珂ke1珈jia1珉min2珊shan1珍zhen1珏jue2珐fa4珑long2珙gong3珞luo4珠zhu1珥er3珧yao2珩hang2班ban1珲hui1球qiu2琅lang2理li3琉liu2琊ya2琏lian3琐suo3琚ju1琛chen1琢zuo2琥hu3琦qi2琨kun1琪qi2琬wan3琮cong2琰yan3琳lin2琴qin2琵pi2琶pa2琼qiong2瑁mao4瑕xia2瑗yuan4瑙nao3瑚hu2瑛ying1瑜yu2瑞rui4瑟se4瑭tang2瑰gui1瑶yao2瑷ai4瑾jin3璀cui3璁cong1璃li2璇xuan2璋zhang1璎ying1璐lu4璜huang2璞pu2璧bi4璨can4璩qu2璺wen4瓒zan4瓜gua1瓞die2瓠hu4瓢piao2瓣ban4瓤rang2瓦wa3瓮weng4瓯ou1瓴ling2瓶ping2瓷ci2瓿bu4甄zhen1甍meng2甏beng4甑zeng4甓pi4甘gan1甙dai4甚shen4甜tian2生sheng1甥sheng1用yong4甩shuai3甫fu3甬yong3甭beng2甯ning2田tian2由you2甲jia3申shen1电dian4男nan2甸dian1町ting1画hua4甾zai1畀bi4畅chang4畈fan4畋tian2界jie4畎quan3畏wei4畔pan4留liu2畚ben3畛zhen3畜chu4略lve4畦qi2番fan1畲she1畴chou2畸ji1畹wan3畿ji1疃tuan3疆jiang1疋pi3疏shu1疑yi2疒ne4疔ding1疖jie1疗liao2疙ge1疚jiu4疝shan4疟nve4疠li4疡yang2疣you2疤ba1疥jie4疫yi4疬li4疮chuang1疯feng1疰zhu4疱pao4疲pi2疳gan1疴ke1疵ci1疸dan3疹zhen3疼teng2疽ju1疾ji2痂jia1痃xuan2痄zha4病bing4症zheng4痈yong1痉jing4痊quan2痍yi2痒yang3痔zhi4痕hen2痖ya3痘dou4痛tong4痞pi3痢li4痣zhi4痤cuo2痦wu4痧sha1痨lao2痪huan4痫xian2痰tan2痱fei4痴chi1痹bi4痼gu4痿wei3瘀yu1瘁cui4瘃zhu2瘅dan1瘊hou2瘌la4瘐yu3瘕jia3瘗yi4瘘lou4瘙sao4瘛chi4瘟wen1瘠ji2瘢ban1瘤liu2瘥chai4瘦shou4瘩da1瘪bie3瘫tan1瘭biao1瘰luo3瘳chou1瘴zhang4瘵zhai4瘸que2瘼mo4瘾yin3瘿ying3癀huang2癃long2癌ai2癍ban1癔yi4癖pi3癜dian4癞lai4癣xuan3癫dian1癯qu2癸gui3登deng1白bai2百bai3皂zao4的de5皆jie1皇huang2皈gui1皋gao1皎jiao3皑ai2皓hao4皖wan3皙xi1皤po2皮pi2皱zhou4皲jun1皴cun1皿min3盂yu2盅zhong1盆pen2盈ying2益yi4盍he2盎ang4盏zhan3盐yan2监jian1盒he2盔kui1盖gai4盗dao4盘pan2盛sheng4盟meng2盥guan4目mu4盯ding1盱xu1盲mang2直zhi2相xiang1盹dun3盼pan4盾dun4省sheng3眄mian3眇miao3眈dan1眉mei2看kan4眍kou1眙yi2眚sheng3真zhen1眠mian2眢yuan1眦zi4眨zha3眩xuan4眭sui1眯mi1眵chi1眶kuang4眷juan4眸mou2眺tiao4眼yan3着zhe5睁zheng1睃suo1睇di4睐lai4睑jian3睚ya2睛jing1睡shui4睢sui1督du1睥pi4睦mu4睨ni4睫jie2睬cai3睹du3睽kui2睾gao1睿rui4瞀mao4瞄miao2瞅chou3瞌ke1瞍sou3瞎xia1瞑ming2瞒man2瞟piao3瞠cheng1瞢meng2瞥pie1瞧qiao2瞩zhu3瞪deng4瞬shun4瞰kan4瞳tong2瞵lin2瞻zhan1瞽gu3瞿qu2矍jue2矗chu4矛mao2矜jin1矢shi3矣yi3知zhi1矧shen3矩ju3矫jiao3矬cuo2短duan3矮ai3石shi2矶ji1矸gan1矽xi4矾fan2矿kuang4砀dang4码ma3砂sha1砉huo4砌qi4砍kan3砑ya4砒pi1研yan2砖zhuan1砗che1砘dun4砚yan4砜feng1砝fa2砟zha3砣tuo2砥di3砦zhai4砧zhen1砩fu2砬la2砭bian1砰peng1破po4砷shen1砸za2砹ai4砺li4砻long2砼tong2砾li4础chu3硅gui1硇nao2硌ge4硎xing2硐dong4硒xi1硕shuo4硖xia2硗qiao1硝xiao1硪wo4硫liu2硬ying4硭mang2确que4硷jian3硼peng2碇ding4碉diao1碌lu4碍ai4碎sui4碑bei1碓dui4碗wan3碘dian3碚bei4碛qi4碜chen3碟die2碡du2碣jie2碥bian3碧bi4碰peng4碱jian3碲di4碳tan4碴cha2碹xuan4碾nian3磁ci2磅bang4磉sang3磊lei3磋cuo1磐pan2磔zhe2磕ke1磙gun3磨mo2磬qing4磲qu2磴deng4磷lin2磺huang2礁jiao1礅dun1礓jiang1礞meng2礤ca3礴bo2示shi4礻shi4礼li3社she4祀si4祁qi2祆xian1祈qi2祉zhi3祓fu2祖zu3祗zhi1祚zuo4祛qu1祜hu4祝zhu4神shen2祟sui4祠ci2祢mi2祥xiang2祧tiao1票piao4祭ji4祯zhen1祷dao3祸huo4祺qi2禀bing3禁jin4禄lu4禅chan2禊xi4福fu2禚zhuo2禧xi3禳rang2禹yu3禺yu2离li2禽qin2禾he2秀xiu4私si1秃tu1秆gan3秉bing3秋qiu1种zhong3科ke1秒miao3秕bi3秘mi4租zu1秣mo4秤cheng4秦qin2秧yang1秩zhi4秫shu2秭zi3积ji1称cheng1秸jie1移yi2秽hui4稀xi1稂lang2稃fu1稆lv3程cheng2稍shao1税shui4稔ren3稗bai4稚zhi4稞ke1稠chou2稣su1稳wen3稷ji4稹zhen3稻dao4稼jia4稽ji1稿gao3穆mu4穑se4穗sui4穰rang2穴xue2究jiu1穷qiong2穸xi1穹qiong2空kong1穿chuan1窀zhun1突tu1窃qie4窄zhai3窆bian3窈yao3窍qiao4窑yao2窒zhi4窕tiao3窖jiao4窗chuang1窘jiong3窜cuan4窝wo1窟ku1窠ke1窥kui1窦dou4窨xun1窬yu2窭ju4窳yu3窿long2立li4竖shu4站zhan4竞jing4竟jing4章zhang1竣jun4童tong2竦song3竭jie2端duan1竹zhu2竺zhu2竽yu2竿gan1笃du3笄ji1笆ba1笈ji2笊zhao4笋sun3笏hu4笑xiao4笔bi3笕jian3笙sheng1笛di2笞chi1笠li4笤tiao2笥si4符fu2笨ben4笪da2笫zi3第di4笮ze2笱gou3笳jia1笸po3笺jian1笼long2笾bian1筅xian3筇qiong2等deng3筋jin1筌quan2筏fa2筐kuang1筑zhu4筒tong3答da2策ce4筘kou4筚bi4筛shai1筝zheng1筠yun2筢pa2筮shi4筱xiao3筲shao1筵yan2筷kuai4筹chou2筻gang4签qian1简jian3箅bi4箍gu1箐qing4箔bo2箕ji1算suan4箜kong1箝qian2管guan3箢yuan1箦ze2箧qie4箨tuo4箩luo2箪dan1箫xiao1箬ruo4箭jian4箱xiang1箴zhen1箸zhu4篁huang2篆zhuan4篇pian1篌hou2篑kui4篓lou3篙gao1篚fei3篝gou1篡cuan4篥li4篦bi4篪chi2篮lan2篱li2篷peng2篼dou1篾mie4簇cu4簋gui3簌su4簏lu4簖duan4簟dian4簦deng1簧huang2簪zan1簸bo3簿bu4籀zhou4籁lai4籍ji2米mi3籴di2类lei4籼xian1籽zi3粉fen3粑ba1粒li4粕po4粗cu1粘zhan1粜tiao4粝li4粞xi1粟su4粢zi1粤yue4粥zhou1粪fen4粮liang2粱liang2粲can4粳jing1粹cui4粼lin2粽zong4精jing1糁san3糅rou2糇hou2糈xu3糊hu2糌zan1糍ci2糕gao1糖tang2糗qiu3糙cao1糜mi2糟zao1糠kang1糨jiang4糯nuo4糸mi4系xi4紊wen3素su4索suo3紧jin3紫zi3累lei4絮xu4絷zhi2綦qi2綮qi3縻mi2繁fan2繇yao2纂zuan3纛dao4纟si1纠jiu1纡yu1红hong2纣zhou4纤xian1纥ge1约yue1级ji2纨wan2纩kuang4纪ji4纫ren4纬wei3纭yun2纯chun2纰pi1纱sha1纲gang1纳na4纵zong4纶lun2纷fen1纸zhi3纹wen2纺fang3纽niu3纾shu1线xian4绀gan4绁xie4绂fu2练lian4组zu3绅shen1细xi4织zhi1终zhong1绉zhou4绊ban4绋fu2绌chu4绍shao4绎yi4经jing1绐dai4绑bang3绒rong2结jie2绔ku4绕rao4绗hang2绘hui4给gei3绚xuan4绛jiang4络luo4绝jue2绞jiao3统tong3绠geng3绡xiao1绢juan4绣xiu4绥sui2绦tao1继ji4绨ti2绩ji4绪xu4绫ling2续xu4绮qi3绯fei1绰chuo4绱shang4绲gun3绳sheng2维wei2绵mian2绶shou4绷beng1绸chou2绺liu3绻quan3综zong1绽zhan4绾wan3绿lv4缀zhui4缁zi1缂ke4缃xiang1缄jian1缅mian3缆lan3缇ti2缈miao3缉ji1缋hui4缌si1缍duo3缎duan4缏bian4缑gou1缒zhui4缓huan3缔di4缕lv3编bian1缗min2缘yuan2缙jin4缚fu4缛ru4缜zhen3缝feng4缟gao3缠chan2缡li2缢yi4缣jian1缤bin1缥piao1缦man4缧lei2缨ying1缩suo1缪mou2缫sao1缬xie2缭liao2缮shan4缯zeng1缰jiang1缱qian3缲qiao1缳huan2缴jiao3缵zuan3缶fou3缸gang1缺que1罂ying1罄qing4罅xia4罐guan4网wang3罔wang3罕han3罗luo2罘fu2罚fa2罟gu3罡gang1罢ba4罨yan3罩zhao4罪zui4置zhi4罱lan3署shu3罴pi2罹li2罾zeng1羁ji1羊yang2羌qiang1美mei3羔gao1羚ling2羝di1羞xiu1羟qiang3羡xian4群qun2羧suo1羯jie2羰tang1羲xi1羸lei2羹geng1羼chan4羽yu3羿yi4翁weng1翅chi4翊yi4翌yi4翎ling2翔xiang2翕xi1翘qiao4翟di2翠cui4翡fei3翥zhu4翦jian3翩pian1翮he2翰han4翱ao2翳yi4翻fan1翼yi4耀yao4老lao3考kao3耄mao4者zhe3耆qi2耋die2而er2耍shua3耐nai4耒lei3耔zi3耕geng1耖chao4耗hao4耘yun2耙ba4耜si4耠huo1耢lao4耥tang1耦ou3耧lou2耨nou4耩jiang3耪pang3耱mo4耳er3耵ding1耶ye2耷da1耸song3耻chi3耽dan1耿geng3聂nie4聃dan1聆ling2聊liao2聋long2职zhi2聍ning2聒gua1联lian2聘pin4聚ju4聩kui4聪cong1聱ao2聿yu4肀yu4肃su4肄yi4肆si4肇zhao4肉rou4肋le1肌ji1肓huang1肖xiao4肘zhou3肚du4肛gang1肜rong2肝gan1肟wo4肠chang2股gu3肢zhi1肤fu1肥fei2肩jian1肪fang2肫zhun1肭na4肮ang1肯ken3肱gong1育yu4肴yao2肷qian3肺fei4肼jing3肽tai4肾shen4肿zhong3胀zhang4胁xie2胂shen4胃wei4胄zhou4胆dan3背bei4胍gua1胎tai1胖pang4胗zhen1胙zuo4胚pei1胛jia3胜sheng4胝zhi1胞bao1胡hu2胤yin4胥xu1胧long2胨dong4胩ka3胪lu2胫jing4胬nu3胭yan1胯kua4胰yi2胱guang1胲hai3胳ge1胴dong4胶jiao1胸xiong1胺an4胼pian2能neng2脂zhi1脆cui4脉mai4脊ji2脍kuai4脎sa4脏zang4脐qi2脑nao3脒mi3脓nong2脔luan2脖bo2脘wan3脚jiao3脞cuo3脬pao1脯pu2脱tuo1脲niao4脶luo2脸lian3脾pi2腆tian3腈jing1腊la4腋ye4腌yan1腐fu3腑fu3腓fei2腔qiang1腕wan4腙zong1腚ding4腠cou4腥xing1腧shu4腩nan3腭e4腮sai1腰yao1腱jian4腴yu2腹fu4腺xian4腻ni4腼mian3腽wa4腾teng2腿tui3膀bang3膂lv3膈ge2膊bo2膏gao1膑bin4膘biao1膛tang2膜mo2膝xi1膣zhi4膦lin4膨peng2膪chuai4膳shan4膺ying1膻shan1臀tun2臁lian2臂bi4臃yong1臆yi4臊sao1臌gu3臣chen2臧zang1自zi4臬nie4臭chou4至zhi4致zhi4臻zhen1臼jiu4臾yu2舀yao3舁yu2舂chong1舄xi4舅jiu4舆yu2舌she2舍she3舐shi4舒shu1舔tian3舛chuan3舜shun4舞wu3舟zhou1舡chuan2舢shan1舣yi3舨ban3航hang2舫fang3般ban1舭bi3舯zhong1舰jian4舱cang1舳zhu2舴ze2舵duo4舶bo2舷xian2舸ge3船chuan2舻lu2舾xi1艄shao1艇ting3艉wei3艋meng3艏shou3艘sou1艚cao2艟chong1艨meng2艮gen3良liang2艰jian1色se4艳yan4艴fu2艹cao3艺yi4艽jiao1艾ai4艿nai3节jie2芄wan2芈mi3芊qian1芋yu4芍shao2芎qiong1芏du4芑qi3芒mang2芗xiang1芘pi2芙fu2芜wu2芝zhi1芟shan1芡qian4芤kou1芥jie4芦lu2芨ji1芩qin2芪qi2芫yan2芬fen1芭ba1芮rui4芯xin1芰ji4花hua1芳fang1芴wu4芷zhi3芸yun2芹qin2芽ya2芾fei4苁cong1苄bian4苇wei3苈li4苊e4苋xian4苌chang2苍cang1苎zhu4苏su1苑yuan4苒ran3苓ling2苔tai2苕shao2苗miao2苘qing3苛ke1苜mu4苞bao1苟gou3苠min2苡yi3苣ju4苤pie3若ruo4苦ku3苫shan1苯ben3英ying1苴ju1苷gan1苹ping2苻fu2茁zhuo2茂mao4范fan4茄jia1茅mao2茆mao2茇ba2茈ci2茉mo4茌chi2茎jing1茏long2茑niao3茔ying2茕qiong2茗ming2茚yin4茛gen4茜qian4茧jian3茨ci2茫mang2茬cha2茭jiao1茯fu2茱zhu1茳jiang1茴hui2茵yin1茶cha2茸rong1茹ru2茺chong1茼tong2荀xun2荃quan2荆jing1荇xing4草cao3荏ren3荐jian4荑ti2荒huang1荔li4荚jia2荛rao2荜bi4荞qiao2荟hui4荠ji4荡dang4荣rong2荤hun1荥xing2荦luo4荧ying2荨xun2荩jin4荪sun1荫yin1荬mai3荭hong2荮zhou4药yao4荷he2荸bi2荻di2荼tu2荽sui1莅li4莆pu2莉li4莎sha1莒ju3莓mei2莘shen1莛ting2莜you2莞guan3莠you3莨lang4莩fu2莪e2莫mo4莰kan3莱lai2莲lian2莳shi2莴wo1莶xian1获huo4莸you2莹ying2莺ying1莼chun2莽mang3菀wan3菁jing1菅jian1菇gu1菊ju2菌jun1菏he2菔fu2菖chang1菘song1菜cai4菝ba2菟tu2菠bo1菡han4菥xi1菩pu2菪dang4菰gu1菱ling2菲fei1菸yan1菹ju1菽shu1萁qi2萃cui4萄tao2萆bi4萋qi1萌meng2萍ping2萎wei1萏dan4萑huan2萘nai4萜tie1萝luo2萤ying2营ying2萦ying2萧xiao1萨sa4萱xuan1萸yu2萼e4落luo4葆bao3葑feng1著zhu4葙xiang1葚ren4葛ge2葜qia1葡pu2董dong3葩pa1葫hu2葬zang4葭jia1葱cong1葳wei1葵kui2葶ting2葸xi3葺qi4蒂di4蒇chan3蒈kai3蒉kui4蒋jiang3蒌lou2蒎pai4蒗lang4蒙meng2蒜suan4蒡bang4蒯kuai3蒲pu2蒴shuo4蒸zheng1蒹jian1蒺ji2蒽en1蒿hao1蓁zhen1蓄xu4蓉rong2蓊weng3蓍shi1蓐ru4蓑suo1蓓bei4蓖bi4蓝lan2蓟ji4蓠li2蓣yu4蓥ying2蓦mo4蓬peng2蓰xi3蓼liao3蓿xu5蔌su4蔑mie4蔓man4蔗zhe4蔚wei4蔟cu4蔡cai4蔫nian1蔬shu1蔷qiang2蔸dou1蔹lian3蔺lin4蔻kou4蔼ai3蔽bi4蕃fan1蕈xun4蕉jiao1蕊rui3蕖qu2蕙hui4蕞zui4蕤rui2蕨jue2蕲qi2蕴yun4蕹weng4蕺ji2蕻hong2蕾lei3薄bao2薅hao1薇wei1薏yi4薛xue1薜bi4薤xie4薨hong1薪xin1薮sou3薯shu3薰xun1薷ru2薹tai2藁gao3藉ji2藏cang2藐miao3藓xian3藕ou3藜li2藤teng2藩fan1藻zao3藿huo4蘅heng2蘑mo2蘖nie4蘧qu2蘩fan2蘸zhan4蘼mi2虍hu1虎hu3虏lu3虐nve4虑lv4虔qian2虚xu1虞yu2虢guo2虫chong2虬qiu2虮ji3虱shi1虹hong2虺hui1虻meng2虼ge4虽sui1虾xia1虿chai4蚀shi2蚁yi3蚂ma3蚊wen2蚋rui4蚌bang4蚍pi2蚓yin3蚕can2蚜ya2蚝hao2蚣gong1蚤zao3蚧jie4蚨fu2蚩chi1蚪dou3蚬xian3蚯qiu1蚰you2蚱zha4蚴you4蚵he2蚶han1蚺ran2蛀zhu4蛄gu1蛆qu1蛇she2蛉ling2蛊gu3蛋dan4蛎li4蛏cheng1蛐qu1蛑mou2蛔hui2蛘yang2蛙wa1蛛zhu1蛞kuo4蛟jiao1蛤ha2蛩qiong2蛭zhi4蛮man2蛰zhe2蛱jia2蛲nao2蛳si1蛴qi2蛸shao1蛹yong3蛾e2蜀shu3蜂feng1蜃shen4蜇zhe1蜈wu2蜉fu2蜊li2蜍chu2蜒yan2蜓ting2蜕tui4蜗wo1蜘zhi1蜚fei1蜜mi4蜞qi2蜡la4蜢meng3蜣qiang1蜥xi1蜩tiao2蜮yu4蜱pi2蜴yi4蜷quan2蜻qing1蜾guo3蜿wan1蝇ying2蝈guo1蝉chan2蝌ke1蝎xie1蝓yu2蝗huang2蝙bian1蝠fu2蝣you2蝤qiu2蝥mao2蝮fu4蝰kui2蝴hu2蝶die2蝻nan3蝼lou2蝽chun1蝾rong2螂lang2螃pang2螅xi1螈yuan2螋sou1融rong2螓qin2螗tang2螟ming2螨man3螫shi4螬cao2螭chi1螯ao2螳tang2螵piao1螺luo2螽zhong1蟀shuai4蟆ma2蟊mao2蟋xi1蟑zhang1蟒mang3蟓xiang4蟛peng2蟠pan2蟥huang2蟪hui4蟮shan4蟹xie4蟾chan2蠃luo3蠊lian2蠓meng3蠕ru2蠖huo4蠛mie4蠡li2蠢chun3蠲juan1蠹du4蠼qu2血xue4衄nv4衅xin4行xing2衍yan3衔xian2街jie1衙ya2衡heng2衢qu2衣yi1衤yi1补bu3表biao3衩cha3衫shan1衬chen4衮gun3衰shuai1衲na4衷zhong1衽ren4衾qin1衿jin1袁yuan2袂mei4袄ao3袅niao3袈jia1袋dai4袍pao2袒tan3袖xiu4袜wa4袢pan4袤mao4被bei4袭xi2袱fu2袷jia2袼ge1裁cai2裂lie4装zhuang1裆dang1裉ken4裎cheng2裒pou2裔yi4裕yu4裘qiu2裙qun2裟sha1裢lian2裣lian3裤ku4裥jian3裨bi4裰duo1裱biao3裳shang5裴pei2裸luo3裹guo3裼ti4裾ju1褂gua4褊bian3褐he4褒bao1褓bao3褙bei4褚chu3褛lv3褡da1褥ru4褪tui4褫chi3褰qian1褴lan2褶zhe3襁qiang3襄xiang1襞bi4襟jin1襦ru2襻pan4西xi1要yao4覃tan2覆fu4见jian4观guan1规gui1觅mi4视shi4觇chan1览lan3觉jue2觊ji4觋xi2觌di2觎yu2觏gou4觐jin4觑qu4角jiao3觖jue2觚gu1觜zi1觞shang1解jie3觥gong1触chu4觫su4觯zhi4觳hu2言yan2訇hong1訾zi1詈li4詹zhan1誉yu4誊teng2誓shi4謇jian3謦qing3警jing3譬pi4讠yan2计ji4订ding4讣fu4认ren4讥ji1讦jie2讧hong4讨tao3让rang4讪shan4讫qi4训xun4议yi4讯xun4记ji4讲jiang3讳hui4讴ou1讵ju4讶ya4讷ne4许xu3讹e2论lun4讼song4讽feng3设she4访fang3诀jue2证zheng4诂gu3诃he1评ping2诅zu3识shi2诈zha4诉su4诊zhen3诋di3诌zhou1词ci2诎qu1诏zhao4译yi4诒yi2诓kuang1诔lei3试shi4诖gua4诗shi1诘ji2诙hui1诚cheng2诛zhu1诜shen1话hua4诞dan4诟gou4诠quan2诡gui3询xun2诣yi4诤zheng4该gai1详xiang2诧cha4诨hun4诩xu3诫jie4诬wu1语yu3诮qiao4误wu4诰gao4诱you4诲hui4诳kuang2说shuo1诵song4诶ei2请qing3诸zhu1诹zou1诺nuo4读du2诼zhuo2诽fei3课ke4诿wei3谀yu2谁shui2谂shen3调diao4谄chan3谅liang4谆zhun1谇sui4谈tan2谊yi4谋mou2谌chen2谍die2谎huang3谏jian4谐xie2谑xue4谒ye4谓wei4谔e4谕yu4谖xuan1谗chan2谘zi1谙an1谚yan4谛di4谜mi2谝pian2谟mo2谠dang3谡su4谢xie4谣yao2谤bang4谥shi4谦qian1谧mi4谨jin3谩man2谪zhe2谫jian3谬miu4谭tan2谮zen4谯qiao2谰lan2谱pu3谲jue2谳yan4谴qian3谵zhan1谶chen4谷gu3豁huo1豆dou4豇jiang1豉shi4豌wan1豕shi3豚tun2象xiang4豢huan4豪hao2豫yu4豳bin1豸zhi4豹bao4豺chai2貂diao1貅xiu1貉hao2貊mo4貌mao4貔pi2貘mo4贝bei4贞zhen1负fu4贡gong4财cai2责ze2贤xian2败bai4账zhang4货huo4质zhi4贩fan4贪tan1贫pin2贬bian3购gou4贮zhu4贯guan4贰er4贱jian4贲ben1贳shi4贴tie1贵gui4贶kuang4贷dai4贸mao4费fei4贺he4贻yi2贼zei2贽zhi4贾jia3贿hui4赀zi1赁lin4赂lu4赃zang1资zi1赅gai1赆jin4赇qiu2赈zhen4赉lai4赊she1赋fu4赌du3赍ji1赎shu2赏shang3赐ci4赓geng1赔pei2赕dan3赖lai4赘zhui4赙fu4赚zhuan4赛sai4赜ze2赝yan4赞zan4赠zeng4赡shan4赢ying2赣gan4赤chi4赦she4赧nan3赫he4赭zhe3走zou3赳jiu1赴fu4赵zhao4赶gan3起qi3趁chen4趄ju1超chao1越yue4趋qu1趑zi1趔lie4趟tang4趣qu4趱zan3足zu2趴pa1趵bao4趸dun3趺fu1趼jian3趾zhi3趿ta1跃yue4跄qiang1跆tai2跋ba2跌die1跎tuo2跏jia1跑pao3跖zhi2跗fu1跚shan1跛bo3距ju4跞li4跟gen1跣xian3跤jiao1跨kua4跪gui4跫qiong2跬kui3路lu4跳tiao4践jian4跷qiao1跸bi4跹xian1跺duo4跻ji1跽ji4踅xue2踉liang2踊yong3踌chou2踏ta4踔chuo1踝huai2踞ju4踟chi2踢ti1踣bo2踩cai3踪zong1踬zhi4踮dian3踯zhi2踱duo2踵zhong3踹chuai4踺jian4踽ju3蹀die2蹁pian2蹂rou2蹄ti2蹇jian3蹈dao3蹉cuo1蹊qi1蹋ta4蹑nie4蹒pan2蹙cu4蹦beng4蹩bie2蹬deng1蹭ceng4蹯fan2蹰chu2蹲dun1蹴cu4蹶jue2蹼pu3蹿cuan1躁zao4躅zhu2躇chu2躏lin4躐lie4躔chan2躜zuan1躞xie4身shen1躬gong1躯qu1躲duo3躺tang3軎wei4车che1轧ya4轨gui3轩xuan1轫ren4转zhuan3轭e4轮lun2软ruan3轰hong1轱gu1轲ke1轳lu2轴zhou2轵zhi3轶yi4轷hu1轸zhen3轹li4轺yao2轻qing1轼shi4载zai4轾zhi4轿jiao4辁quan2辂lu4较jiao4辄zhe2辅fu3辆liang4辇nian3辈bei4辉hui1辊gun3辋wang3辍chuo4辎zi1辏cou4辐fu2辑ji2输shu1辔pei4辕yuan2辖xia2辗nian3辘lu4辙zhe2辚lin2辛xin1辜gu1辞ci2辟pi4辣la4辨bian4辩bian4辫bian4辰chen2辱ru3辶chuo4边bian1辽liao2达da2迁qian1迂yu1迄qi4迅xun4过guo4迈mai4迎ying2运yun4近jin4迓ya4返fan3迕wu4还hai2这zhe4进jin4远yuan3违wei2连lian2迟chi2迢tiao2迤yi2迥jiong3迦jia1迨dai4迩er3迪di2迫po4迭die2迮ze2述shu4迳jing4迷mi2迸beng4迹ji4追zhui1退tui4送song4适shi4逃tao2逄pang2逅hou4逆ni4选xuan3逊xun4逋bu1逍xiao1透tou4逐zhu2逑qiu2递di4途tu2逖ti4逗dou4通tong1逛guang4逝shi4逞cheng3速su4造zao4逡qun1逢feng2逦li3逭huan4逮dai3逯lu4逵kui2逶wei1逸yi4逻luo2逼bi1逾yu2遁dun4遂sui4遄chuan2遇yu4遍bian4遏e4遐xia2遑huang2遒qiu2道dao4遗yi2遘gou4遛liu2遢ta4遣qian3遥yao2遨ao2遭zao1遮zhe1遴lin2遵zun1遽ju4避bi4邀yao1邂xie4邃sui4邈miao3邋la1邑yi4邓deng4邕yong1邗han2邙mang2邛qiong2邝kuang4邡fang1邢xing2那na4邦bang1邪xie2邬wu1邮you2邯han2邰tai2邱qiu1邳pi1邴bing3邵shao4邶bei4邸di3邹zou1邺ye4邻lin2邾zhu1郁yu4郄qie4郅zhi4郇huan2郊jiao1郎lang2郏jia2郐kuai4郑zheng4郓yun4郗xi1郛fu2郜gao4郝hao3郡jun4郢ying3郦li4郧yun2部bu4郫pi2郭guo1郯tan2郴chen1郸dan1都dou1郾yan3鄂e4鄄juan4鄙bi3鄞yin2鄢yan1鄣zhang1鄯shan4鄱po2鄹zou1酃ling2酆feng1酉you3酊ding1酋qiu2酌zhuo2配pei4酎zhou4酏yi3酐gan1酒jiu3酗xu4酚fen1酝yun4酞tai4酡tuo2酢cu4酣han1酤gu1酥su1酩ming3酪lao4酬chou2酮tong2酯zhi3酰xian1酱jiang4酲cheng2酴tu2酵jiao4酶mei2酷ku4酸suan1酹lei4酽yan4酾shai1酿niang4醅pei1醇chun2醉zui4醋cu4醌kun1醍ti2醐hu2醑xu3醒xing3醚mi2醛quan2醢hai3醣tang2醪lao2醭bu2醮jiao4醯xi1醴li3醵ju4醺xun1采cai3釉you4释shi4里li3重zhong4野ye3量liang4金jin1釜fu3鉴jian4銎qiong2銮luan2鋈wu4錾zan4鍪mou2鎏liu2鏊ao4鏖ao2鐾bei4鑫xin1钅jin1钆ga2钇yi3针zhen1钉ding1钊zhao1钋po1钌liao3钍tu3钎qian1钏chuan4钐shan1钒fan2钓diao4钔men2钕nv3钗chai1钙gai4钚bu4钛tai4钜ju4钝dun4钞chao1钟zhong1钠na4钡bei4钢gang1钣ban3钤qian2钥yao4钦qin1钧jun1钨wu1钩gou1钪kang4钫fang1钬huo3钭tou3钮niu3钯ba3钰yu4钱qian2钲zheng1钳qian2钴gu3钵bo1钶ke1钷po3钸bu1钹bo2钺yue4钻zuan1钼mu4钽tan3钾jia3钿dian4铀you2铁tie3铂bo2铃ling2铄shuo4铅qian1铆mao3铈shi4铉xuan4铊ta1铋bi4铌ni2铍pi1铎duo2铐kao4铑lao3铒er3铕you3铖cheng2铗jia2铘ye2铙nao2铛dang1铜tong2铝lv3铞diao4铟yin1铠kai3铡zha2铢zhu1铣xi3铤ding4铥diu1铧hua2铨quan2铩sha1铪ha1铫diao4铬ge4铭ming2铮zheng1铯se4铰jiao3铱yi1铲chan3铳chong4铴tang1铵an3银yin2铷ru2铸zhu4铹lao2铺pu4铼lai2铽te4链lian4铿keng1销xiao1锁suo3锂li3锃zeng4锄chu2锅guo1锆gao4锇e2锈xiu4锉cuo4锊lve4锋feng1锌xin1锍liu3锎kai1锏jian3锐rui4锑ti1锒lang2锓qin3锔ju1锕a1锖qiang1锗zhe3锘nuo4错cuo4锚mao2锛ben1锝de2锞ke4锟kun1锡xi1锢gu4锣luo2锤chui2锥zhui1锦jin3锨xian1锩juan3锪huo1锫pei2锬tan2锭ding4键jian4锯ju4锰meng3锱zi1锲qie4锴kai3锵qiang1锶si1锷e4锸cha1锹qiao1锺zhong1锻duan4锼sou1锾huan2锿ai1镀du4镁mei3镂lou4镄fei4镅mei2镆mo4镇zhen4镉ge2镊nie4镌juan1镍nie4镎na2镏liu2镐gao3镑bang4镒yi4镓jia1镔bin1镖biao1镗tang1镘man4镙luo2镛yong1镜jing4镝di1镞zu2镟xuan4镡chan2镢jue2镣liao4镤pu2镥lu3镦dui4镧lan2镨pu3镩cuan1镪qiang1镫deng4镬huo4镭lei2镯zhuo2镰lian2镱yi4镲cha3镳biao1镶xiang1长zhang3门men2闩shuan1闪shan3闫yan2闭bi4问wen4闯chuang3闰run4闱wei2闲xian2闳hong2间jian1闵min3闶kang1闷men4闸zha2闹nao4闺gui1闻wen2闼ta4闽min3闾lv2阀fa2阁ge2阂he2阃kun3阄jiu1阅yue4阆lang2阈yu4阉yan1阊chang1阋xi4阌wen2阍hun1阎yan2阏e4阐chan3阑lan2阒qu4阔kuo4阕que4阖he2阗tian2阙que1阚han3阜fu4阝fu4队dui4阡qian1阢wu4阪ban3阮ruan3阱jing3防fang2阳yang2阴yin1阵zhen4阶jie1阻zu3阼zuo4阽dian4阿a1陀tuo2陂bei1附fu4际ji4陆lu4陇long3陈chen2陉xing2陋lou4陌mo4降jiang4限xian4陔gai1陕shan3陛bi4陟zhi4陡dou3院yuan4除chu2陧nie4陨yun3险xian3陪pei2陬zou1陲chui2陴pi2陵ling2陶tao2陷xian4隅yu2隆long2隈wei1隋sui2隍huang2随sui2隐yin3隔ge2隗kui2隘ai4隙xi4障zhang4隧sui4隰xi2隳hui1隶li4隹zhui1隼sun3隽juan4难nan2雀que4雁yan4雄xiong2雅ya3集ji2雇gu4雉zhi4雌ci2雍yong1雎ju1雏chu2雒luo4雕diao1雠chou2雨yu3雩yu2雪xue3雯wen2雳li4零ling2雷lei2雹bao2雾wu4需xu1霁ji4霄xiao1霆ting2震zhen4霈pei4霉mei2霍huo4霎sha4霏fei1霓ni2霖lin2霜shuang1霞xia2霪yin2霭ai3霰xian4露lu4霸ba4霹pi1霾mai2青qing1靓jing4靖jing4静jing4靛dian4非fei1靠kao4靡mi2面mian4靥ye4革ge2靳jin4靴xue1靶ba3靼da2鞅yang1鞋xie2鞍an1鞑da2鞒qiao2鞔man2鞘qiao4鞠ju1鞣rou2鞫ju1鞭bian1鞯jian1鞲gou1鞴bei4韦wei2韧ren4韩han2韪wei3韫yun4韬tao1韭jiu3音yin1韵yun4韶shao2页ye4顶ding3顷qing3顸han1项xiang4顺shun4须xu1顼xu1顽wan2顾gu4顿dun4颀qi2颁ban1颂song4颃hang2预yu4颅lu2领ling3颇po3颈jing3颉jie2颊jia2颌he2颍ying3颏ke1颐yi2频pin2颓tui2颔han4颖ying3颗ke1题ti2颚e4颛zhuan1颜yan2额e2颞nie4颟man1颠dian1颡sang3颢hao4颤chan4颥ru2颦pin2颧quan2风feng1飑biao1飒sa4飓ju4飕sou1飘piao1飙biao1飚biao1飞fei1食shi2飧sun1飨xiang3餍yan4餐can1餮tie4饔yong1饕tao1饣shi2饥ji1饧tang2饨tun2饩xi4饪ren4饫yu4饬chi4饭fan4饮yin3饯jian4饰shi4饱bao3饲si4饴yi2饵er3饶rao2饷xiang3饺jiao3饼bing3饽bo1饿e4馀yu2馁nei3馄hun2馅xian4馆guan3馇cha1馈kui4馊sou1馋chan2馍mo2馏liu2馐xiu1馑jin3馒man2馓san3馔zhuan4馕nang2首shou3馗kui2馘guo2香xiang1馥fu4馨xin1马ma3驭yu4驮tuo2驯xun4驰chi2驱qu1驳bo2驴lv2驵zang3驶shi3驷si4驸fu4驹ju1驺zou1驻zhu4驼tuo2驽nu2驾jia4驿yi4骀dai4骁xiao1骂ma4骄jiao1骅hua2骆luo4骇hai4骈pian2骊li2骋cheng3验yan4骏jun4骐qi2骑qi2骒ke4骓zhui1骖can1骗pian4骘zhi4骚sao1骛wu4骜ao4骝liu2骞qian1骟shan4骠biao1骡luo2骢cong1骣chan3骤zhou4骥ji4骧xiang1骨gu3骰tou2骱jie4骶di3骷ku1骸hai2骺hou2骼ge2髀bi4髁ke1髂qia4髅lou2髋kuan1髌bin4髑du2髓sui3高gao1髟biao1髡kun1髦mao2髫tiao2髭zi1髯ran2髹xiu1髻ji4鬃zong1鬈quan2鬏jiu1鬓bin4鬟huan2鬣lie4鬯chang4鬲ge2鬻yu4鬼gui3魁kui2魂hun2魃ba2魄po4魅mei4魇yan3魈xiao1魉liang3魍wang3魏wei4魑chi1魔mo2鱼yu2鱿you2鲁lu3鲂fang2鲅ba4鲆ping2鲇nian2鲈lu2鲋fu4鲍bao4鲎hou4鲐tai2鲑gui1鲒jie2鲔wei3鲕er2鲚ji4鲛jiao1鲜xian1鲞xiang3鲟xun2鲠geng3鲡li2鲢lian2鲣jian1鲤li3鲥shi2鲦tiao2鲧gun3鲨sha1鲩huan4鲫ji4鲭qing1鲮ling2鲰zou1鲱fei1鲲kun1鲳chang1鲴gu4鲵ni2鲶nian2鲷diao1鲸jing1鲺shi1鲻zi1鲼fen4鲽die2鳃sai1鳄e4鳅qiu1鳆fu4鳇huang2鳊bian1鳋sao1鳌ao2鳍qi2鳎ta3鳏guan1鳐yao2鳓le4鳔biao4鳕xue3鳖bie1鳗man2鳘min3鳙yong1鳜gui4鳝shan4鳞lin2鳟zun1鳢li3鸟niao3鸠jiu1鸡ji1鸢yuan1鸣ming2鸥ou1鸦ya1鸨bao3鸩zhen4鸪gu1鸫dong1鸬lu2鸭ya1鸯yang1鸱chi1鸲qu2鸳yuan1鸵tuo2鸶si1鸷zhi4鸸er2鸹gua1鸺xiu1鸽ge1鸾luan2鸿hong2鹁bo2鹂li2鹃juan1鹄gu3鹅e2鹆yu4鹇xian2鹈ti2鹉wu3鹊que4鹋miao2鹌an1鹎bei1鹏peng2鹑chun2鹕hu2鹗e4鹘gu3鹚ci2鹛mei2鹜wu4鹞yao4鹣jian1鹤he4鹦ying1鹧zhe4鹨liu4鹩liao2鹪jiao1鹫jiu4鹬yu4鹭lu4鹰ying1鹱hu4鹳guan4鹾cuo2鹿lu4麂ji3麇jun1麈zhu3麋mi2麒qi2麓lu4麝she4麟lin2麦mai4麴qu1麸fu1麻ma2麽mo2麾hui1黄huang2黉hong2黍shu3黎li2黏nian2黑hei1黔qian2默mo4黛dai4黜chu4黝you3黟yi1黠xia2黢qu1黥qing2黧li2黩du2黪can3黯an4黹zhi3黻fu2黼fu3黾min3鼋yuan2鼍tuo2鼎ding3鼐nai4鼓gu3鼗tao2鼙pi2鼠shu3鼢fen2鼬you4鼯wu2鼷xi1鼹yan3鼻bi2鼽qiu2鼾han1齄zha1齐qi2齑ji1齿chi3龀chen4龃ju3龄ling2龅bao1龆tiao2龇zi1龈ken3龉yu3龊chuo4龋qu3龌wo4龙long2龚gong1龛kan1龟gui1龠yue4","pyP":{"这个":"zhe4 ge5","成为":"cheng2 wei2","认为":"ren4 wei2","作为":"zuo4 wei2","部分":"bu4 fen4","要求":"yao1 qiu2","长江":"chang2 jiang1","觉得":"jue2 de5","那个":"na4 ge5","称为":"cheng1 wei2","为主":"wei2 zhu3","了解":"liao3 jie3","甚么":"shen2 me5","处理":"chu3 li3","几乎":"ji1 hu1","似乎":"si4 hu1","目的":"mu4 di4","行为":"xing2 wei2","应用":"ying4 yong4","长期":"chang2 qi1","调整":"tiao2 zheng3","重新":"chong2 xin1","分为":"fen1 wei2","行业":"hang2 ye4","银行":"yin2 hang2","反应":"fan3 ying4","参与":"can1 yu4","充分":"chong1 fen4","一只":"yi1 zhi1","若干":"ruo4 gan1","音乐":"yin1 yue4","以为":"yi3 wei2","处于":"chu3 yu2","分子":"fen4 zi3","意思":"yi4 si5","弟子":"di4 zi3","适应":"shi4 ying4","女子":"nv3 zi3","一场":"yi1 chang2","适当":"shi4 dang4","类似":"lei4 si4","高兴":"gao1 xing4","不了":"bu4 liao3","长安":"chang2 an1","相应":"xiang1 ying4","显得":"xian3 de5","大部分":"da4 bu4 fen4","记载":"ji4 zai3","妻子":"qi1 zi3","率领":"shuai4 ling3","首都":"shou3 du1","改为":"gai3 wei2","不禁":"bu4 jin1","功夫":"gong1 fu5","成分":"cheng2 fen4","答应":"da1 ying4","协调":"xie2 tiao2","少年":"shao4 nian2","兴趣":"xing4 qu4","太监":"tai4 jian4","更新":"geng1 xin1","喝道":"he4 dao4","重庆":"chong2 qing4","重建":"chong2 jian4","使得":"shi3 de5","累计":"lei3 ji4","给予":"ji3 yu3","行情":"hang2 qing2","相似":"xiang1 si4","极为":"ji2 wei2","不由得":"bu4 you2 de5","值得":"zhi2 de5","一会儿":"yi1 hui4 er5","冠军":"guan4 jun1","头发":"tou2 fa4","投降":"tou2 xiang2","种植":"zhong4 zhi2","仔细":"zi3 xi4","将领":"jiang4 ling3","更为":"geng4 wei2","积累":"ji1 lei3","成都":"cheng2 du1","地处":"di4 chu3","少女":"shao4 nv3","长沙":"chang2 sha1","商量":"shang1 liang2","调节":"tiao2 jie2","供应":"gong1 ying4","挑战":"tiao3 zhan4","西藏":"xi1 zang4","佛教":"fo2 jiao4","测量":"ce4 liang2","记得":"ji4 de5","当真":"dang4 zhen1","将士":"jiang4 shi4","差别":"cha1 bie2","较为":"jiao4 wei2","照片":"zhao4 pian1","婆婆":"po2 po5","差异":"cha1 yi4","懂得":"dong3 de5","模样":"mu2 yang4","的确":"di2 que4","大都":"da4 du1","效应":"xiao4 ying4","鱼肚":"yu2 du3","长剑":"chang2 jian4","干涉":"gan1 she4","为首":"wei2 shou3","便宜":"pian2 yi5","更名":"geng1 ming2","石头":"shi2 tou5","知识分子":"zhi1 shi2 fen4 zi3","为止":"wei2 zhi3","漂亮":"piao4 liang4","藏族":"zang4 zu2","哪个":"na3 ge5","角色":"jue2 se4","干净":"gan1 jing4","当作":"dang4 zuo4","子女":"zi3 nv3","人为":"ren2 wei2","重复":"chong2 fu4","胡同":"hu2 tong4","差距":"cha1 ju4","蒙古族":"meng3 gu3 zu2","大将":"da4 jiang4","肚子":"du3 zi5","打倒":"da3 dao3","睡觉":"shui4 jiao4","少林":"shao4 lin2","丫头":"ya1 tou5","父子":"fu4 zi3","弟弟":"di4 di5","当天":"dang4 tian1","干扰":"gan1 rao3","长城":"chang2 cheng2","誉为":"yu4 wei2","家伙":"jia1 huo5","长度":"chang2 du4","华山":"hua4 shan1","勉强":"mian3 qiang3","会计":"kuai4 ji4","目的地":"mu4 di4 di4","过分":"guo4 fen4","济南":"ji3 nan2","燕京":"yan1 jing1","少将":"shao4 jiang4","逮捕":"dai4 bu3","中毒":"zhong4 du2","晓得":"xiao3 de5","变更":"bian4 geng1","认得":"ren4 de5","念头":"nian4 tou5","挣扎":"zheng1 zha2","三藏":"san1 zang4","丞相":"cheng2 xiang4","黄陂":"huang2 pi2","乡长":"xiang1 chang2","寻思":"xin2 si1","干脆":"gan1 cui4","应付":"ying4 fu4","夺得":"duo2 de5","干燥":"gan1 zao4","呼吁":"hu1 yu4","戏曲":"xi4 qu3","处罚":"chu3 fa2","长方形":"chang2 fang1 xing2","柏林":"bo2 lin2","身分":"shen1 fen4","着手":"zhuo2 shou3","泊位":"bo2 wei4","延长":"yan2 chang2","擅长":"shan4 chang2","青少年":"qing1 shao4 nian2","干旱":"gan1 han4","少林寺":"shao4 lin2 si4","供奉":"gong4 feng4","供给":"gong1 ji3","响应":"xiang3 ying4","漫长":"man4 chang2","乐器":"yue4 qi4","间接":"jian4 jie1","船只":"chuan2 zhi1","娘子":"niang2 zi3","子弹":"zi3 dan4","弹性":"tan2 xing4","这会儿":"zhe4 hui4 er5","落下":"la4 xia4","对应":"dui4 ying4","处置":"chu3 zhi4","歌曲":"ge1 qu3","着重":"zhuo2 zhong4","着急":"zhao2 ji2","诸葛亮":"zhu1 ge3 liang4","强迫":"qiang3 po4","首相":"shou3 xiang4","睡着":"shui4 zhao2","子孙":"zi3 sun1","监利":"jian4 li4","调控":"tiao2 kong4","重重":"chong2 chong2","免得":"mian3 de5","灾难":"zai1 nan4","所得":"suo3 de5","度假":"du4 jia4","不尽":"bu4 jin4","真相":"zhen1 xiang4","相貌":"xiang4 mao4","处分":"chu3 fen4","干预":"gan1 yu4","势头":"shi4 tou5","子弟":"zi3 di4","为期":"wei2 qi1","工夫":"gong1 fu5","伯伯":"bo2 bo5","笼罩":"long3 zhao4","成吉思汗":"cheng2 ji2 si1 han2","与会":"yu4 hui4","率先":"shuai4 xian1","厦门":"xia4 men2","都督":"du1 du1","宰相":"zai3 xiang4","对称":"dui4 chen4","重组":"chong2 zu3","相公":"xiang4 gong1","空白":"kong4 bai2","衡量":"heng2 liang2","宿舍":"su4 she4","水分":"shui3 fen4","迁都":"qian1 du1","仆人":"pu2 ren2","舌头":"she2 tou5","琢磨":"zhuo2 mo2","巴勒斯坦":"ba1 le4 si1 tan3","没收":"mo4 shou1","判处":"pan4 chu3","散文":"san3 wen2","处境":"chu3 jing4","都城":"du1 cheng2","尽力":"jin4 li4","供养":"gong4 yang3","应聘":"ying4 pin4","畜牧业":"xu4 mu4 ye4","长征":"chang2 zheng1","建都":"jian4 du1","拳头":"quan2 tou5","骨头":"gu3 tou5","君子":"jun1 zi3","宁可":"ning4 ke3","更换":"geng1 huan4","薄弱":"bo2 ruo4","还原":"huan2 yuan2","尽数":"jin4 shu4","重修":"chong2 xiu1","了不起":"liao3 bu4 qi3","长篇小说":"chang2 pian1 xiao3 shuo1","同行":"tong2 hang2","长远":"chang2 yuan3","爱好":"ai4 hao4","馒头":"man2 tou5","散发":"san4 fa4","来得及":"lai2 de5 ji2","流血":"liu2 xie3","强劲":"qiang2 jing4","长子":"zhang3 zi3","头儿":"tou2 er5","恰当":"qia4 dang4","折腾":"zhe1 teng5","相处":"xiang1 chu3","差额选举":"cha1 e2 xuan3 ju3","统率":"tong3 shuai4","长春":"chang2 chun1","朝阳":"zhao1 yang2","中将":"zhong1 jiang4","长久":"chang2 jiu3","命中":"ming4 zhong4","转为":"zhuan3 wei2","近似":"jin4 si4","名将":"ming2 jiang4","木头":"mu4 tou5","动弹":"dong4 tan2","地壳":"di4 qiao4","少爷":"shao4 ye2","难民":"nan4 min2","补给":"bu3 ji3","尾巴":"wei3 ba5","来得":"lai2 de5","好奇":"hao4 qi2","当做":"dang4 zuo4","沉着":"chen2 zhuo2","哑巴":"ya3 ba5","罗刹":"luo2 cha4","调解":"tiao2 jie3","上将":"shang4 jiang4","恶心":"e3 xin1","担子":"dan4 zi5","主角":"zhu3 jue2","行列":"hang2 lie4","都市":"du1 shi4","运转":"yun4 zhuan4","王子":"wang2 zi3","范蠡":"fan4 li3","正月":"zheng1 yue4","当成":"dang4 cheng2","都察院":"du1 cha2 yuan4","长治久安":"chang2 zhi4 jiu3 an1","尽头":"jin4 tou2","古都":"gu3 du1","咽喉":"yan1 hou2","当晚":"dang4 wan3","重阳":"chong2 yang2","双重":"shuang1 chong2","波长":"bo1 chang2","吐蕃":"tu3 bo1","不当":"bu4 dang4","乐队":"yue4 dui4","亮相":"liang4 xiang4","杉木":"sha1 mu4","舍得":"she3 de5","击中":"ji1 zhong4","摇晃":"yao2 huang4","调和":"tiao2 he2","朝鲜族":"chao2 xian3 zu2","无处":"wu2 chu3","摔倒":"shuai1 dao3","假期":"jia4 qi1","分量":"fen4 liang4","形似":"xing2 si4","呕吐":"ou3 tu4","提防":"di1 fang2","查处":"cha2 chu3","量子":"liang4 zi3","弹劾":"tan2 he2","空调":"kong1 tiao2","里头":"li3 tou5","应急":"ying4 ji2","重申":"chong2 shen1","枕头":"zhen3 tou5","禁不住":"jin1 bu2 zhu4","一模一样":"yi1 mu2 yi1 yang4","倒霉":"dao3 mei2","苦难":"ku3 nan4","归还":"gui1 huan2","长江三峡":"chang2 jiang1 san1 xia2","危难":"wei1 nan4","畜牧":"xu4 mu4","点着":"dian3 zhao2","甚为":"shen4 wei2","小将":"xiao3 jiang4","处死":"chu3 si3","着眼":"zhuo2 yan3","失调":"shi1 tiao2","厌恶":"yan4 wu4","跪倒":"gui4 dao3","鼓乐":"gu3 yue4","会计师":"kuai4 ji4 shi1","出血":"chu1 xie3","秘鲁":"bi4 lu3","自尽":"zi4 jin4","哽咽":"geng3 ye4","外头":"wai4 tou5","孢子":"bao1 zi3","傀儡":"kui3 lei3","星宿":"xing1 xiu4","宁愿":"ning4 yuan4","回应":"hui2 ying4","钦差":"qin1 chai1","为数":"wei2 shu4","勾当":"gou4 dang4","间谍":"jian4 die2","调剂":"tiao2 ji4","长叹":"chang2 tan4","埋怨":"man2 yuan4","长河":"chang2 he2","受不了":"shou4 bu4 liao3","结实":"jie1 shi2","耕种":"geng1 zhong4","干干净净":"gan1 gan1 jing4 jing4","淹没":"yan1 mo4","柏拉图":"bo2 la1 tu2","调制":"tiao2 zhi4","自给":"zi4 ji3","周长":"zhou1 chang2","烹调":"peng1 tiao2","晃动":"huang4 dong4","感应":"gan3 ying4","武将":"wu3 jiang4","原子弹":"yuan2 zi3 dan4","石子":"shi2 zi3","泄露":"xie4 lou4","切割":"qie1 ge1","波罗的海":"bo1 luo2 di4 hai3","脊椎动物":"ji3 zhui1 dong4 wu4","等离子体":"deng3 li2 zi3 ti3","高分子":"gao1 fen1 zi3","间隔":"jian4 ge2","令狐":"ling2 hu2","长假":"chang2 jia4","为害":"wei2 hai4","细长":"xi4 chang2","偿还":"chang2 huan2","应试":"ying4 shi4","特长":"te4 chang2","长袍":"chang2 pao2","疙瘩":"ge1 da5","原子核":"yuan2 zi3 he2","燕山":"yan1 shan1","堵塞":"du3 se4","夺冠":"duo2 guan4","长短":"chang2 duan3","下调":"xia4 tiao2","耶稣":"ye1 su1","电荷":"dian4 he4","复辟":"fu4 bi4","看守":"kan1 shou3","活儿":"huo2 er5","试卷":"shi4 juan4","切断":"qie1 duan4","指头":"zhi3 tou5","为生":"wei2 sheng1","倒下":"dao3 xia4","畜生":"chu4 sheng5","应变":"ying4 bian4","迫击炮":"pai3 ji1 pao4","钻石":"zuan4 shi2","长途":"chang2 tu2","考卷":"kao3 juan4","切除":"qie1 chu2","着力":"zhuo2 li4","着想":"zhuo2 xiang3","有意思":"you3 yi4 si5","喧哗":"xuan1 hua2","尽情":"jin4 qing2","投奔":"tou2 ben4","筋斗":"jin1 dou3","兴致":"xing4 zhi4","少妇":"shao4 fu4","颠倒":"dian1 dao3","分行":"fen1 hang2","上行":"shang4 hang2","学子":"xue2 zi3","更改":"geng1 gai3","笼络":"long3 luo4","长廊":"chang2 lang2","妥当":"tuo3 dang4","载荷":"zai4 he4","为难":"wei2 nan2","着陆":"zhuo2 lu4","几只":"ji3 zhi1","干吗":"gan4 ma2","总得":"zong3 dei3","曝光":"bao4 guang1","白发":"bai2 fa4","劲儿":"jin4 er5","曲调":"qu3 diao4","行长":"hang2 zhang3","相机":"xiang4 ji1","压倒":"ya1 dao3","叫化":"jiao4 hua1","角逐":"jue2 zhu2","老头儿":"lao3 tou5 er5","青藏高原":"qing1 zang4 gao1 yuan2","反弹":"fan3 tan2","出差":"chu1 chai1","家当":"jia1 dang4","组分":"zu3 fen4","误差":"wu4 cha1","佛像":"fo2 xiang4","传记":"zhuan4 ji4","铺设":"pu1 she4","长虹":"chang2 hong2","斗拱":"dou3 gong3","杆菌":"gan3 jun1","五更":"wu3 geng1","一通":"yi2 tong4","会儿":"hui4 er5","央行":"yang1 hang2","重返":"chong2 fan3","罐头":"guan4 tou5","差额":"cha1 e2","露面":"lou4 mian4","长篇":"chang2 pian1","上当":"shang4 dang4","洋行":"yang2 hang2","作坊":"zuo1 fang5","好似":"hao3 si4","照相":"zhao4 xiang4","哎呀":"ai1 ya1","粘土":"nian2 tu3","跌倒":"die1 dao3","看中":"kan4 zhong4","佛塔":"fo2 ta3","辗转":"zhan3 zhuan3","辟邪":"bi4 xie2","挣脱":"zheng4 tuo1","空隙":"kong4 xi4","更迭":"geng1 die2","偏差":"pian1 cha1","免不了":"mian3 bu4 liao3","干系":"gan1 xi4","农行":"nong2 hang2","应邀":"ying4 yao1","空地":"kong4 di4","子弟兵":"zi3 di4 bing1","散射":"san3 she4","长于":"chang2 yu2","阿弥陀佛":"e1 mi2 tuo2 fo2","挣钱":"zheng4 qian2","创伤":"chuang1 shang1","海参":"hai3 shen1","重叠":"chong2 die2","一卷":"yi1 juan4","中行":"zhong1 hang2","人参":"ren2 shen1","老将":"lao3 jiang4","调味":"tiao2 wei4","踉跄":"liang4 qiang4","重现":"chong2 xian4","间断":"jian4 duan4","化学反应":"hua4 xue2 fan3 ying4","长矛":"chang2 mao2","附着":"fu4 zhuo2","都统":"du1 tong3","老佛爷":"lao3 fo2 ye2","主将":"zhu3 jiang4","假日":"jia4 ri4","为政":"wei2 zheng4","乐曲":"yue4 qu3","负荷":"fu4 he4","情不自禁":"qing2 bu4 zi4 jin1","处方":"chu3 fang1","悄声":"qiao3 sheng1","悄然":"qiao3 ran2","曲子":"qu3 zi5","代为":"dai4 wei2","挑衅":"tiao3 xin4","了结":"liao3 jie2","倒地":"dao3 di4","停泊":"ting2 bo2","打中":"da3 zhong4","登场":"deng1 chang2","好奇心":"hao4 qi2 xin1","酒吧":"jiu3 ba1","所作所为":"suo3 zuo4 suo3 wei2","作曲":"zuo4 qu3","懒得":"lan3 de5","狭长":"xia2 chang2","衣着":"yi1 zhuo2","要塞":"yao4 sai4","详尽":"xiang2 jin4","部将":"bu4 jiang4","杠杆":"gang4 gan3","茶几":"cha2 ji1","停当":"ting2 dang4","奴仆":"nu2 pu2","出没":"chu1 mo4","间隙":"jian4 xi4","鲜有":"xian3 you3","呜咽":"wu1 ye4","重担":"zhong4 dan4","包扎":"bao1 za1","宫阙":"gong1 que4","应酬":"ying4 chou2","毋宁":"wu2 ning4","膀胱":"pang2 guang1","重演":"chong2 yan3","前头":"qian2 tou5","非得":"fei1 dei3","后头":"hou4 tou5","喀什":"ka1 shi2","门将":"men2 jiang4","迷迷糊糊":"mi2 mi2 hu1 hu1","挨打":"ai2 da3","不以为然":"bu4 yi3 wei2 ran2","喝彩":"he4 cai3","暖和":"nuan3 huo5","活佛":"huo2 fo2","子叶":"zi3 ye4","更深":"geng1 shen1","京都":"jing1 du1","累积":"lei3 ji1","原子能":"yuan2 zi3 neng2","倒塌":"dao3 ta1","丧事":"sang1 shi4","倔强":"jue2 jiang4","宝藏":"bao3 zang4","教书":"jiao1 shu1","纤夫":"qian4 fu1","佛罗伦萨":"fo2 luo2 lun2 sa4","卷宗":"juan4 zong1","更替":"geng1 ti4","背包":"bei1 bao1","三部曲":"san1 bu4 qu3","加勒比海":"jia1 le4 bi3 hai3","帖子":"tie3 zi5","少不了":"shao4 bu4 liao3","松散":"song1 san3","呼喝":"hu1 he4","肮脏":"ang1 zang1","可恶":"ke3 wu4","自转":"zi4 zhuan4","反省":"fan3 xing3","坦率":"tan3 shuai4","全军覆没":"quan2 jun1 fu4 mo4","荷枪实弹":"he4 qiang1 shi2 dan4","苏打":"su1 da2","兴高采烈":"xing4 gao1 cai3 lie4","佛经":"fo2 jing1","本分":"ben3 fen4","落得":"luo4 de5","鄙薄":"bi3 bo2","长寿":"chang2 shou4","交响曲":"jiao1 xiang3 qu3","单薄":"dan1 bo2","发难":"fa1 nan4","相间":"xiang1 jian4","分子式":"fen1 zi3 shi4","贞观":"zhen1 guan4","附和":"fu4 he4","呼应":"hu1 ying4","倒闭":"dao3 bi4","未了":"wei4 liao3","照相机":"zhao4 xiang4 ji1","太行山":"tai4 hang2 shan1","有所作为":"you3 suo3 zuo4 wei2","转载":"zhuan3 zai3","互为":"hu4 wei2","别扭":"bie4 niu3","哇哇":"wa1 wa1","思量":"si1 liang2","标的":"biao1 di4","喝采":"he4 cai3","殆尽":"dai4 jin4","还给":"huan2 gei3","阅卷":"yue4 juan4","无尽":"wu2 jin4","无能为力":"wu2 neng2 wei2 li4","自给自足":"zi4 ji3 zi4 zu2","调皮":"tiao2 pi2","北斗":"bei3 dou3","氧吧":"yang3 ba1","论语":"lun2 yu3","融为一体":"rong2 wei2 yi1 ti3","佛山":"fo2 shan1","商贾":"shang1 gu3","曲艺":"qu3 yi4","布鲁塞尔":"bu4 lu3 sai4 er3","分外":"fen4 wai4","干贝":"gan1 bei4","弄堂":"long4 tang2","和平共处":"he2 ping2 gong4 chu3","长衫":"chang2 shan1","乐舞":"yue4 wu3","毛发":"mao2 fa4","自力更生":"zi4 li4 geng1 sheng1","差遣":"chai1 qian3","干粮":"gan1 liang2","曲目":"qu3 mu4","背负":"bei1 fu4","质朴":"zhi4 piao2","转速":"zhuan4 su4","济南市":"ji3 nan2 shi4","声乐":"sheng1 yue4","左传":"zuo3 zhuan4","照应":"zhao4 ying4","乌拉圭":"wu1 la5 gui1","命中率":"ming4 zhong4 lv4","逃难":"tao2 nan4","为所欲为":"wei2 suo3 yu4 wei2","惩处":"cheng2 chu3","肋骨":"lei4 gu3","鸭绿江":"ya1 lu4 jiang1","长相":"zhang3 xiang4","公差":"gong1 chai1","成行":"cheng2 hang2","行当":"hang2 dang1","称得上":"cheng1 de5 shang4","顺应":"shun4 ying4","处以":"chu3 yi3","省得":"sheng3 de5","晕倒":"yun1 dao3","重围":"chong2 wei2","量子力学":"liang4 zi3 li4 xue2","劲风":"jing4 feng1","贝勒":"bei4 le4","阻塞":"zu3 se4","协奏曲":"xie2 zou4 qu3","长诗":"chang2 shi1","避难":"bi4 nan4","姥姥":"lao3 lao5","迷糊":"mi2 hu1","重创":"zhong4 chuang1","几率":"ji1 lv4","弹簧":"tan2 huang2","差错":"cha1 cuo4","暑假":"shu3 jia4","背脊":"bei4 ji3","不见得":"bu2 jian4 de5","压根儿":"ya4 gen1 er2","参差":"cen1 ci1","一肚子":"yi1 du3 zi5","对得起":"dui4 de5 qi3","相称":"xiang1 chen4","红晕":"hong2 yun4","喜好":"xi3 hao4","三重":"san1 chong2","列传":"lie4 zhuan4","劲敌":"jing4 di2","蛤蟆":"ha2 ma5","不相干":"bu4 xiang1 gan1","请假":"qing3 jia4","不一会儿":"bu4 yi1 hui4 er5","佛法":"fo2 fa3","沉没":"chen2 mo4","高丽":"gao1 li2","休假":"xiu1 jia4","无为":"wu2 wei2","过长":"guo4 chang2","哥儿俩":"ge1 er5 lia3","了得":"liao3 de5","审时度势":"shen3 shi2 duo2 shi4","变相":"bian4 xiang4","排行榜":"pai2 hang2 bang3","自个儿":"zi4 ge3 er2","那会儿":"na4 hui4 er5","亲家":"qing4 jia5","尽心":"jin4 xin1","相干":"xiang1 gan1","长处":"chang2 chu4","喝问":"he4 wen4","行家":"hang2 jia5","还击":"huan2 ji1","交还":"jiao1 huan2","着眼于":"zhuo2 yan3 yu2","单于":"chan2 yu2","将令":"jiang4 ling4","空缺":"kong4 que1","绿林":"lu4 lin2","佛祖":"fo2 zu3","伸长":"shen1 chang2","执着":"zhi2 zhuo2","粘液":"nian2 ye4","责难":"ze2 nan4","轻薄":"qing1 bo2","闭塞":"bi4 se4","长白山":"chang2 bai2 shan1","脊背":"ji3 bei4","长长":"chang2 chang2","占卜":"zhan1 bu3","得当":"de2 dang4","成都市":"cheng2 du1 shi4","扫帚":"sao4 zhou3","排行":"pai2 hang2","擂台":"lei4 tai2","遇难":"yu4 nan4","龟兹":"qiu1 ci2","外传":"wai4 zhuan4","定都":"ding4 du1","耗尽":"hao4 jin4","般若":"bo1 re3","礼乐":"li3 yue4","裁缝":"cai2 feng2","长足":"chang2 zu2","核反应":"he2 fan3 ying4","兴致勃勃":"xing4 zhi4 bo2 bo2","散乱":"san3 luan4","一刹那":"yi1 cha4 na4","倒腾":"dao3 teng2","咱家":"za2 jia1","房舍":"fang2 she4","报应":"bao4 ying4","爪哇":"zhao3 wa1","长发":"chang2 fa4","长生":"chang2 sheng1","伽利略":"jia1 li4 lve4","嚷嚷":"rang1 rang5","揣摩":"chuai3 mo2","省悟":"xing3 wu4","连累":"lian2 lei3","节假日":"jie2 jia4 ri4","弹射":"tan2 she4","同归于尽":"tong2 gui1 yu2 jin4","丈量":"zhang4 liang2","供职":"gong4 zhi2","患难":"huan4 nan4","长年":"chang2 nian2","老婆婆":"lao3 po2 po5","克什米尔":"ke4 shi2 mi3 er3","佛门":"fo2 men2","差役":"chai1 yi4","乐团":"yue4 tuan2","少儿":"shao4 er2","干尸":"gan1 shi1","朝霞":"zhao1 xia2","身长":"shen1 chang2","养分":"yang3 fen4","应考":"ying4 kao3","退还":"tui4 huan2","长乐":"chang2 le4","饼干":"bing3 gan1","蒙古语":"meng3 gu3 yu3","建行":"jian4 hang2","没完没了":"mei2 wan2 mei2 liao3","乐府":"yue4 fu3","古朴":"gu3 piao2","不为人知":"bu4 wei2 ren2 zhi1","差使":"chai1 shi3","倾倒":"qing1 dao3","匀称":"yun2 chen4","磨难":"mo2 nan4","吞没":"tun1 mo4","长石":"chang2 shi2","兴冲冲":"xing4 chong1 chong1","一朝":"yi1 zhao1","干涸":"gan1 he2","反应堆":"fan3 ying4 dui1","结结巴巴":"jie1 jie1 ba1 ba1","上头":"shang4 tou5","散居":"san3 ju1","豁然":"huo4 ran2","估量":"gu1 liang2","大难":"da4 nan4","失当":"shi1 dang4","放假":"fang4 jia4","风靡":"feng1 mi3","分子量":"fen1 zi3 liang4","应运而生":"ying4 yun4 er2 sheng1","中弹":"zhong4 dan4","妄为":"wang4 wei2","起哄":"qi3 hong4","专长":"zhuan1 chang2","劝降":"quan4 xiang2","末了":"mo4 liao3","校正":"jiao4 zheng4","相声":"xiang4 sheng1","塞外":"sai4 wai4","给与":"ji3 yu3","解法":"xie4 fa3","想得到":"xiang3 de5 dao4","嗜好":"shi4 hao4","将校":"jiang4 xiao4","都尉":"du1 wei4","尽忠":"jin4 zhong1","朴刀":"po1 dao1","没落":"mo4 luo4","皱眉头":"zhou4 mei2 tou5","漏斗":"lou4 dou3","片子":"pian1 zi5","舰只":"jian4 zhi1","切削":"qie1 xiao1","讨价还价":"tao3 jia4 huan2 jia4","勒索":"le4 suo3","应对":"ying4 dui4","昆曲":"kun1 qu3","种菜":"zhong4 cai4","亏得":"kui1 de5","校舍":"xiao4 she4","死难":"si3 nan4","种地":"zhong4 di4","稀薄":"xi1 bo2","策应":"ce4 ying4","翘首":"qiao2 shou3","间歇":"jian4 xie1","大不了":"da4 bu4 liao3","拜佛":"bai4 fo2","国子监":"guo2 zi3 jian4","有朝一日":"you3 zhao1 yi1 ri4","处决":"chu3 jue2","应答":"ying4 da2","案卷":"an4 juan4","表率":"biao3 shuai4","了不得":"liao3 bu4 de2","老大难":"lao3 da4 nan4","各行各业":"ge4 hang2 ge4 ye4","调试":"tiao2 shi4","都江堰":"du1 jiang1 yan4","招降":"zhao1 xiang2","斗篷":"dou3 peng2","瑜伽":"yu2 jia1","称职":"chen4 zhi2","九重":"jiu3 chong2","水浒传":"shui3 hu3 zhuan4","倒数":"dao4 shu3","冠名":"guan4 ming2","将官":"jiang4 guan1","酷似":"ku4 si4","看守所":"kan1 shou3 suo3","归降":"gui1 xiang2","锄头":"chu2 tou5","合二为一":"he2 er4 wei2 yi1","上卷":"shang4 juan4","屏息":"bing3 xi1","重逢":"chong2 feng2","器乐":"qi4 yue4","妃子":"fei1 zi3","脖颈":"bo2 geng3","弹琴":"tan2 qin2","少不得":"shao4 bu4 de2","处事":"chu3 shi4","幸得":"xing4 de5","轻率":"qing1 shuai4","长工":"chang2 gong1","中奖":"zhong4 jiang3","槟榔":"bing1 lang2","血淋淋":"xie3 lin2 lin2","游说":"you2 shui4","调侃":"tiao2 kan3","长啸":"chang2 xiao4","一目了然":"yi1 mu4 liao3 ran2","献血":"xian4 xie3","看管":"kan1 guan3","累累":"lei3 lei3","调停":"tiao2 ting2","风头":"feng1 tou5","中长期":"zhong1 chang2 qi1","竭尽全力":"jie2 jin4 quan2 li4","恐吓":"kong3 he4","扁担":"bian3 dan4","给养":"ji3 yang3","不怀好意":"bu4 huai2 hao4 yi4","铺天盖地":"pu1 tian1 gai4 di4","伺机":"si4 ji1","恰似":"qia4 si4","特长生":"te4 chang2 sheng1","发型":"fa4 xing2","微薄":"wei1 bo2","汹涌澎湃":"xiong1 yong3 peng2 pai4","食物中毒":"shi2 wu4 zhong4 du2","勾勒":"gou1 le4","即兴":"ji2 xing4","攒动":"cuan2 dong4","油炸":"you2 zha2","简朴":"jian3 piao2","乐章":"yue4 zhang1","浅薄":"qian3 bo2","着装":"zhuo2 zhuang1","间或":"jian4 huo4","顺差":"shun4 cha1","佛寺":"fo2 si4","台州":"tai1 zhou1","吐血":"tu4 xie3","应战":"ying4 zhan4","相位":"xiang4 wei4","转子":"zhuan4 zi3","少奶奶":"shao4 nai3 nai5","意味深长":"yi4 wei4 shen1 chang2","直截了当":"zhi2 jie2 liao3 dang4","了事":"liao3 shi4","劲旅":"jing4 lv3","咔嚓":"ka1 cha1","拜倒":"bai4 dao3","蒙古人种":"meng3 gu3 ren2 zhong3","钦差大臣":"qin1 chai1 da4 chen2","转悠":"zhuan4 you1","好战":"hao4 zhan4","当铺":"dang4 pu4","爪子":"zhua3 zi5","那不勒斯":"na4 bu4 le4 si1","随机应变":"sui2 ji1 ying4 bian4","女将":"nv3 jiang4","豁达":"huo4 da2","金发":"jin1 fa4","更年期":"geng1 nian2 qi1","伎俩":"ji4 liang3","划船":"hua2 chuan2","挑拨":"tiao3 bo1","诸葛":"zhu1 ge3","专横跋扈":"zhuan1 heng4 ba2 hu4","少校":"shao4 xiao4","沉甸甸":"chen2 dian4 dian4","刻薄":"ke4 bo2","念佛":"nian4 fo2","憎恶":"zeng1 wu4","用处":"yong4 chu3","着落":"zhuo2 luo4","要挟":"yao1 xie2","调理":"tiao2 li3","长枪":"chang2 qiang1","马尾":"ma3 yi3","一家子":"yi1 jia1 zi3","媳妇儿":"xi2 fu4 er5","供不应求":"gong1 bu4 ying4 qiu2","宁为玉碎":"ning4 wei2 yu4 sui4","精兵强将":"jing1 bing1 qiang2 jiang4","佛陀":"fo2 tuo2","执著":"zhi2 zhuo2","模具":"mu2 ju4","还手":"huan2 shou3","喝令":"he4 ling4","对称性":"dui4 chen4 xing4","争得":"zheng1 de5","违拗":"wei2 ao4","公转":"gong1 zhuan4","吸着":"xi1 zhuo2","田舍":"tian2 she4","症结":"zheng1 jie2","不切实际":"bu4 qie1 shi2 ji4","内应":"nei4 ying4","妞儿":"niu1 er5","校勘":"jiao4 kan1","淋漓尽致":"lin2 li2 jin4 zhi4","源远流长":"yuan2 yuan3 liu2 chang2","倒把":"dao3 ba3","剥皮":"bao1 pi2","应从":"ying4 cong2","弥勒":"mi2 le4","有空":"you3 kong4","画卷":"hua4 juan4","不为瓦全":"bu4 wei2 wa3 quan2","蛮横无理":"man2 heng4 wu2 li3","扫兴":"sao3 xing4","舞曲":"wu3 qu3","重提":"chong2 ti2","铺盖":"pu1 gai4","小丫头":"xiao3 ya1 tou5","得心应手":"de2 xin1 ying4 shou3","差价":"cha1 jia4","强人":"qiang3 ren2","怔住":"zheng4 zhu4","江都":"jiang1 du1","仆役":"pu2 yi4","切入":"qie1 ru4","战将":"zhan4 jiang4","调教":"tiao2 jiao4","习以为常":"xi2 yi3 wei2 chang2","处世":"chu3 shi4","年少":"nian2 shao4","应征":"ying4 zheng1","执拗":"zhi2 niu4","胡作非为":"hu2 zuo4 fei1 wei2","中风":"zhong4 feng1","应承":"ying4 cheng2","转轴":"zhuan4 zhou2","不以为意":"bu4 yi3 wei2 yi4","凶相毕露":"xiong1 xiang4 bi4 lu4","核反应堆":"he2 fan3 ying4 dui1","公仆":"gong1 pu2","没入":"mo4 ru4","老少":"lao3 shao4","闷热":"men1 re4","佛珠":"fo2 zhu1","将帅":"jiang4 shuai4","窝囊":"wo1 nang1","长沙市":"chang2 sha1 shi4","分毫不差":"fen1 hao2 bu4 cha1","扬长而去":"yang2 chang2 er2 qu4","切片":"qie1 pian4","可汗":"ke4 han2","差事":"chai1 shi4","并州":"bing1 zhou1","漂泊":"piao1 bo2","切磋":"qie1 cuo1","处女":"chu3 nv3","押解":"ya1 jie4","日头":"ri4 tou5","道观":"dao4 guan4","勒令":"le4 ling4","空闲":"kong4 xian2","主仆":"zhu3 pu2","佛学":"fo2 xue2","好色":"hao4 se4","曲牌":"qu3 pai2","疏勒":"shu1 le4","不足为奇":"bu4 zu2 wei2 qi2","教给":"jiao1 gei3","行会":"hang2 hui4","豁免":"huo4 mian3","长崎":"chang2 qi2","今朝":"jin1 zhao1","何曾":"he2 zeng1","将才":"jiang4 cai2","怒喝":"nu4 he4","种田":"zhong4 tian2","笼统":"long3 tong3","边塞":"bian1 sai4","男女老少":"nan2 nv3 lao3 shao4","插曲":"cha1 qu3","朝夕":"zhao1 xi1","转行":"zhuan3 hang2","轰隆":"hong1 long1","重合":"chong2 he2","长线":"chang2 xian4","零散":"ling2 san3","数落":"shu3 luo4","煞白":"sha4 bai2","铤而走险":"ting3 er2 zou3 xian3","中标":"zhong4 biao1","佣金":"yong4 jin1","拉长":"la1 chang2","甲壳":"jia3 qiao4","纯朴":"chun2 piao2","调档":"tiao2 dang4","重温":"chong2 wen1","伸舌头":"shen1 she2 tou5","度假村":"du4 jia4 cun1","撇嘴":"pie3 zui3","炮制":"pao2 zhi4","返还":"fan3 huan2","了如指掌":"liao3 ru2 zhi3 zhang3","卷土重来":"juan3 tu3 chong2 lai2","栽种":"zai1 zhong4","自传":"zi4 zhuan4","面相":"mian4 xiang4","交响乐":"jiao1 xiang3 yue4","好意思":"hao3 yi4 si5","刹那":"cha4 na4","受难":"shou4 nan4","殷红":"yan1 hong2","词曲":"ci2 qu3","吐谷浑":"tu3 yu4 hun2","热处理":"re4 chu3 li3","分子结构":"fen1 zi3 jie2 gou4","固着":"gu4 zhuo2","强求":"qiang3 qiu2","本相":"ben3 xiang4","草率":"cao3 shuai4","要约":"yao1 yue1","调价":"tiao2 jia4","长街":"chang2 jie1","骄横":"jiao1 heng4","深恶痛绝":"shen1 wu4 tong4 jue2","兴头":"xing4 tou5","宁肯":"ning4 ken3","着色":"zhuo2 se4","茄子":"qie2 zi5","小家伙":"xiao3 jia1 huo5","没意思":"mei2 yi4 si5","管弦乐":"guan3 xian2 yue4","正人君子":"zheng4 ren2 jun1 zi3","拘泥":"ju1 ni4","改行":"gai3 hang2","脊椎":"ji3 zhui1","万里长城":"wan4 li3 chang2 cheng2","仆妇":"pu2 fu4","劫难":"jie2 nan4","发髻":"fa4 ji4","呢绒":"ni2 rong2","巷道":"hang4 dao4","拖累":"tuo1 lei3","猛将":"meng3 jiang4","千钧一发":"qian1 jun1 yi1 fa4","抽空":"chou1 kong4","空儿":"kong4 er2","塔什干":"ta3 shi2 gan4","奏鸣曲":"zou4 ming2 qu3","高高兴兴":"gao1 gao1 xing4 xing4","刊载":"kan1 zai3","好客":"hao4 ke4","小曲":"xiao3 qu3","慰藉":"wei4 jie4","长毛":"chang2 mao2","干草":"gan1 cao3","序曲":"xu4 qu3","烟斗":"yan1 dou3","番茄":"fan1 qie2","糊弄":"hu4 nong4","调养":"tiao2 yang3","调匀":"tiao2 yun2","道行":"dao4 heng2","靠得住":"kao4 de5 zhu4","自以为是":"zi4 yi3 wei2 shi4","释迦牟尼":"shi4 jia1 mu4 ni2","仓卒":"cang1 cu4","分叉":"fen1 cha4","宝应":"bao3 ying4","干支":"gan1 zhi1","干爹":"gan1 die1","瘦长":"shou4 chang2","相片":"xiang4 pian1","闷气":"men1 qi4","不了了之":"bu4 liao3 liao3 zhi1","混为一谈":"hun4 wei2 yi1 tan2","内行":"nei4 hang2","答卷":"da2 juan4","长夜":"chang2 ye4","一干二净":"yi1 gan1 er4 jing4","修长":"xiu1 chang2","受降":"shou4 xiang2","将门":"jiang4 men2","屏住":"bing3 zhu4","揭帖":"jie1 tie3","染坊":"ran3 fang2","胳臂":"ge1 bei5","到此为止":"dao4 ci3 wei2 zhi3","佛家":"fo2 jia1","倒戈":"dao3 ge1","模板":"mu2 ban3","犯不着":"fan4 bu4 zhao2","长春市":"chang2 chun1 shi4","应有尽有":"ying1 you3 jin4 you3","长途电话":"chang2 tu2 dian4 hua4","为伍":"wei2 wu3","卜辞":"bu3 ci2","回纥":"hui2 he2","配给":"pei4 ji3","黑发":"hei1 fa4","摇头晃脑":"yao2 tou2 huang4 nao3","划算":"hua2 suan4","哄笑":"hong1 xiao4","栽倒":"zai1 dao3","累赘":"lei2 zhui4","跟头":"gen1 tou5","眉头一皱":"mei2 tou5 yi2 zhou4","哗变":"hua2 bian4","旅舍":"lv3 she4","缝制":"feng2 zhi4","难处":"nan2 chu3","缝纫机":"feng2 ren4 ji1","似笑非笑":"si4 xiao4 fei1 xiao4","奇数":"ji1 shu4","干将":"gan4 jiang4","着意":"zhuo2 yi4","秀发":"xiu4 fa4","蛮横":"man2 heng4","雕琢":"diao1 zhuo2","处心积虑":"chu3 xin1 ji1 lv4","踉踉跄跄":"liang4 liang4 qiang4 qiang4","专横":"zhuan1 heng4","奏乐":"zou4 yue4","湮没":"yan1 mo4","牙龈":"ya2 yin2","生还":"sheng1 huan2","直率":"zhi2 shuai4","看护":"kan1 hu4","短发":"duan3 fa4","调戏":"tiao2 xi4","还清":"huan2 qing1","一溜烟":"yi1 liu4 yan1","哗啦啦":"hua1 la1 la1","毛茸茸":"mao2 rong2 rong2","一分为二":"yi1 fen1 wei2 er4","信以为真":"xin4 yi3 wei2 zhen1","半夜三更":"ban4 ye4 san1 geng1","空格":"kong4 ge2","斗胆":"dou3 dan3","铺垫":"pu1 dian4","二十八宿":"er4 shi2 ba1 xiu4","变态反应":"bian4 tai4 fan3 ying4","尽心竭力":"jin4 xin1 jie2 li4","筋疲力尽":"jin1 pi2 li4 jin4","下卷":"xia4 juan4","哗啦":"hua1 la1","散漫":"san3 man4","朝日":"zhao1 ri4","良将":"liang2 jiang4","长袖":"chang2 xiu4","大少爷":"da4 shao4 ye2","小女子":"xiao3 nv3 zi3","数以万计":"shu3 yi3 wan4 ji4","转来转去":"zhuan4 lai2 zhuan4 qu4","埋没":"mai2 mo4","粘稠":"nian2 chou2","累及":"lei3 ji2","脱发":"tuo1 fa4","舌苔":"she2 tai1","薄雾":"bo2 wu4","送还":"song4 huan2","抗干扰":"kang4 gan1 rao3","没奈何":"mo4 nai4 he2","长生不老":"chang2 sheng1 bu4 lao3","切口":"qie1 kou3","只身":"zhi1 shen1","枯萎":"ku1 wei3","栓塞":"shuan1 se4","配角":"pei4 jue2","乱哄哄":"luan4 hong1 hong1","佛教徒":"fo2 jiao4 tu2","惠更斯":"hui4 geng1 si1","一网打尽":"yi1 wang3 da3 jin4","相依为命":"xiang1 yi1 wei2 ming4","语重心长":"yu3 zhong4 xin1 chang2","农舍":"nong2 she4","创口":"chuang1 kou3","哈达":"ha3 da2","懒散":"lan3 san3","铺平":"pu1 ping2","预应力":"yu4 ying4 li4","屈指可数":"qu1 zhi3 ke3 shu3","乐师":"yue4 shi1","何干":"he2 gan1","填空":"tian2 kong4","女仆":"nv3 pu2","考量":"kao3 liang2","貌似":"mao4 si4","迤逦":"yi3 li3","参差不齐":"cen1 ci1 bu4 qi2","有的放矢":"you3 di4 fang4 shi3","神出鬼没":"shen2 chu1 gui3 mo4","搪塞":"tang2 se4","淡薄":"dan4 bo2","诱降":"you4 xiang2","长兴":"chang2 xing1","叽哩咕噜":"ji1 li3 gu1 lu1","乐工":"yue4 gong1","干咳":"gan1 ke2","瞧得起":"qiao2 de5 qi3","三长两短":"san1 chang2 liang3 duan3","合而为一":"he2 er2 wei2 yi1","倒头":"dao3 tou2","划过":"hua2 guo4","哪吒":"ne2 zha1","商行":"shang1 hang2","囤积":"tun2 ji1","散曲":"san3 qu3","更正":"geng1 zheng4","着火":"zhao2 huo3","空子":"kong4 zi5","给付":"ji3 fu4","谩骂":"man4 ma4","纪传体":"ji4 zhuan4 ti3","哭丧着脸":"ku1 sang1 zhe5 lian3","调兵遣将":"diao4 bing1 qian3 jiang4","丧葬":"sang1 zang4","刁难":"diao1 nan4","哗然":"hua2 ran2","安分":"an1 fen4","行规":"hang2 gui1","连载":"lian2 zai3","历尽":"li4 jin4","拉倒":"la1 dao3","柞蚕":"zuo4 can2","校订":"jiao4 ding4","蚌埠市":"beng4 bu4 shi4","一年半载":"yi1 nian2 ban4 zai3","转危为安":"zhuan3 wei1 wei2 an1","了然":"liao3 ran2","出处":"chu1 chu3","口供":"kou3 gong4","外行":"wai4 hang2","弹词":"tan2 ci2","经卷":"jing1 juan4","邻舍":"lin2 she4","哥们儿":"ge1 men5 er5","千载难逢":"qian1 zai3 nan2 feng2","典当":"dian3 dang4","寒假":"han2 jia4","理发":"li3 fa4","给水":"ji3 shui3","量度":"liang2 du4","须发":"xu1 fa4","东倒西歪":"dong1 dao3 xi1 wai1","电磁感应":"dian4 ci2 gan3 ying4","刻划":"ke4 hua2","卷轴":"juan4 zhou2","哄抢":"hong1 qiang3","干杯":"gan1 bei1","长驱":"chang2 qu1","蒙古包":"meng3 gu3 bao1","汇丰银行":"hui4 feng1 yin2 hang2","装模作样":"zhuang1 mu2 zuo4 yang4","见义勇为":"jian4 yi4 yong3 wei2","兆头":"zhao4 tou5","工行":"gong1 hang2","干枯":"gan1 ku1","烘干":"hong1 gan1","短长":"duan3 chang2","称量":"cheng1 liang2","素朴":"su4 piao2","还乡":"huan2 xiang1","阿房宫":"e1 pang2 gong1","叹为观止":"tan4 wei2 guan1 zhi3","相差无几":"xiang1 cha1 wu2 ji3","中暑":"zhong4 shu3","受累":"shou4 lei3","夫子":"fu1 zi3","寺观":"si4 guan4","撩拨":"liao2 bo1","济宁":"ji3 ning2","督率":"du1 shuai4","竭尽":"jie2 jin4","难为情":"nan2 wei2 qing2","子孙后代":"zi3 sun1 hou4 dai4","下处":"xia4 chu3","亲子":"qin1 zi3","仆从":"pu2 cong2","好恶":"hao4 wu4","封禅":"feng1 shan4","抹布":"ma1 bu4","长鸣":"chang2 ming2","似是而非":"si4 shi4 er2 fei1","心事重重":"xin1 shi4 chong2 chong2","什物":"shi2 wu4","佛爷":"fo2 ye2","六安":"lu4 an1","准头":"zhun3 tou5","吗啡":"ma3 fei1","校对":"jiao4 dui4","番禺":"pan1 yu2","离间":"li2 jian4","蚌埠":"beng4 bu4","测量学":"ce4 liang2 xue2","都柏林":"dou1 bo2 lin2","纷至沓来":"fen1 zhi4 ta4 lai2","鲜为人知":"xian3 wei2 ren2 zhi1","干柴":"gan1 chai2","当月":"dang4 yue4","盐分":"yan2 fen4","薄荷":"bo4 he2","虎将":"hu3 jiang4","褪色":"tui4 shai3","小王子":"xiao3 wang2 zi3","无所作为":"wu2 suo3 zuo4 wei2","害臊":"hai4 sao4","独处":"du2 chu3","礼佛":"li3 fo2","空位":"kong4 wei4","铺路":"pu1 lu4","长跑":"chang2 pao3","白云观":"bai2 yun2 guan4","败家子":"bai4 jia1 zi3","为非作歹":"wei2 fei1 zuo4 dai3","从长计议":"cong2 chang2 ji4 yi4","煞有介事":"sha4 you3 jie4 shi4","弦乐":"xian2 yue4","来头":"lai2 tou5","闲散":"xian2 san3","老夫子":"lao3 fu1 zi3","丹参":"dan1 shen1","助兴":"zhu4 xing4","发卡":"fa4 qia3","拮据":"jie2 ju1","查查":"zha1 zha1","生发":"sheng1 fa4","相国":"xiang4 guo2","行伍":"hang2 wu3","重播":"chong2 bo1","降服":"xiang2 fu2","独个儿":"du2 ge4 er5","冲压":"chong4 ya1","厚薄":"hou4 bo2","威吓":"wei1 he4","少尉":"shao4 wei4","应验":"ying4 yan4","核子":"he2 zi3","殉难":"xun4 nan4","缝合":"feng2 he2","苍劲":"cang1 jing4","长流":"chang2 liu2","呜呜咽咽":"wu1 wu1 ye4 ye4","感激不尽":"gan3 ji1 bu4 jin4","排山倒海":"pai2 shan1 dao3 hai3","呼号":"hu1 hao2","外相":"wai4 xiang4","扳倒":"ban1 dao3","斗笠":"dou3 li4","曲谱":"qu3 pu3","绊倒":"ban4 dao3","着眼点":"zhuo2 yan3 dian3","凶神恶煞":"xiong1 shen2 e4 sha4","勉为其难":"mian3 wei2 qi2 nan2","更新换代":"geng1 xin1 huan4 dai4","倒换":"dao3 huan4","子囊":"zi3 nang2","强横":"qiang2 heng4","挑担":"tiao1 dan4","着迷":"zhao2 mi2","穷尽":"qiong2 jin4","调频":"tiao2 pin2","还俗":"huan2 su2","过得去":"guo4 de5 qu4","干净利落":"gan1 jing4 li4 luo4","披头散发":"pi1 tou2 san4 fa4","分内":"fen4 nei4","卧倒":"wo4 dao3","合子":"he2 zi3","国难":"guo2 nan4","尽职":"jin4 zhi2","挑明":"tiao3 ming2","挨骂":"ai2 ma4","掂量":"dian1 liang2","更衣":"geng1 yi1","着数":"zhao1 shu4","软和":"ruan3 huo5","还贷":"huan2 dai4","降顺":"xiang2 shun4","大肠杆菌":"da4 chang2 gan3 jun1","尽如人意":"jin4 ru2 ren2 yi4","气势磅礴":"qi4 shi4 pang2 bo2","尽兴":"jin4 xing4","败将":"bai4 jiang4","钻机":"zuan4 ji1","骠骑":"piao4 qi2","一边倒":"yi1 bian1 dao3","里应外合":"li3 ying4 wai4 he2","长途跋涉":"chang2 tu2 ba2 she4","倒台":"dao3 tai2","啜泣":"chuo4 qi4","挨饿":"ai2 e4","掺和":"chan1 huo5","没空":"mei2 kong4","漯河":"ta4 he2","簸箕":"bo4 ji1","结扎":"jie2 za1","茅舍":"mao2 she4","荷载":"he4 zai4","调料":"tiao2 liao4","长空":"chang2 kong1","一朝一夕":"yi1 zhao1 yi1 xi1","不着边际":"bu4 zhuo2 bian1 ji4","大模大样":"da4 mu2 da4 yang4","颠三倒四":"dian1 san1 dao3 si4","处身":"chu3 shen1","横蛮":"heng4 man2","淡泊":"dan4 bo2","深长":"shen1 chang2","眼见得":"yan3 jian4 de5","一走了之":"yi1 zou3 liao3 zhi1","长此以往":"chang2 ci3 yi3 wang3","光栅":"guang1 shan1","杂沓":"za2 ta4","校点":"jiao4 dian3","潦草":"liao2 cao3","似曾相识":"si4 ceng2 xiang1 shi2","字里行间":"zi4 li3 hang2 jian1","左右为难":"zuo3 you4 wei2 nan2","哄传":"hong1 chuan2","应手":"ying4 shou3","曾孙":"zeng1 sun1","月氏":"yue4 zhi1","校注":"jiao4 zhu4","淤塞":"yu1 se4","经传":"jing1 zhuan4","马扎":"ma3 zha2","正电荷":"zheng4 dian4 he4","花岗石":"hua1 gang1 shi2","软着陆":"ruan3 zhuo2 lu4","含含糊糊":"han2 han2 hu1 hu1","恰如其分":"qia4 ru2 qi2 fen4","数一数二":"shu3 yi1 shu3 er4","破涕为笑":"po4 ti4 wei2 xiao4","佛堂":"fo2 tang2","关卡":"guan1 qia3","古刹":"gu3 cha4","名分":"ming2 fen4","名帖":"ming2 tie3","好斗":"hao4 dou4","揣测":"chuai3 ce4","摔打":"shuai1 da2","武行":"wu3 hang2","窥伺":"kui1 si4","腰椎":"yao1 zhui1","蚂蚱":"ma4 zha4","趔趄":"lie4 qie4","躺倒":"tang3 dao3","逃奔":"tao2 ben4","长波":"chang2 bo1","颤栗":"zhan4 li4","伪君子":"wei3 jun1 zi3","出风头":"chu1 feng1 tou5","处方药":"chu3 fang1 yao4","大藏经":"da4 zang4 jing1","大都会":"da4 du1 hui4","钢琴曲":"gang1 qin2 qu3","长颈鹿":"chang2 jing3 lu4","千差万别":"qian1 cha1 wan4 bie2","原始积累":"yuan2 shi3 ji1 lei3","深更半夜":"shen1 geng1 ban4 ye4","赶尽杀绝":"gan3 jin4 sha1 jue2","交行":"jiao1 hang2","兴味":"xing4 wei4","分得":"fen1 de5","婀娜":"e1 nuo2","散装":"san3 zhuang1","调笑":"tiao2 xiao4","采邑":"cai4 yi4","长谈":"chang2 tan2","坏分子":"huai4 fen4 zi3","好家伙":"hao3 jia1 huo5","死对头":"si3 dui4 tou5","朝夕相处":"zhao1 xi1 xiang1 chu3","中长":"zhong1 chang2","乐音":"yue4 yin1","充塞":"chong1 se4","冗长":"rong3 chang2","处治":"chu3 zhi4","恫吓":"dong4 he4","组曲":"zu3 qu3","行头":"xing2 tou5","化为乌有":"hua4 wei2 wu1 you3","安分守己":"an1 fen4 shou3 ji3","据为己有":"ju4 wei2 ji3 you3","数不胜数":"shu3 bu4 sheng4 shu3","神魂颠倒":"shen2 hun2 dian1 dao3","豁然开朗":"huo4 ran2 kai1 lang3","丧服":"sang1 fu2","干涩":"gan1 se4","民乐":"min2 yue4","相中":"xiang1 zhong4","长条":"chang2 tiao2","骁将":"xiao1 jiang4","拍卖行":"pai1 mai4 hang2","养尊处优":"yang3 zun1 chu3 you1","天旋地转":"tian1 xuan2 di4 zhuan4","左邻右舍":"zuo3 lin2 you4 she4","包干":"bao1 gan1","哇啦":"wa1 la1","朝气":"zhao1 qi4","缝补":"feng2 bu3","财会":"cai2 kuai4","团团转":"tuan2 tuan2 zhuan4","大堡礁":"da4 pu4 jiao1","一针见血":"yi1 zhen1 jian4 xie3","山穷水尽":"shan1 qiong2 shui3 jin4","晕头转向":"yun1 tou2 zhuan4 xiang4","风尘仆仆":"feng1 chen2 pu2 pu2","塞北":"sai4 bei3","孱弱":"chan2 ruo4","挑逗":"tiao3 dou4","撩开":"liao2 kai1","校场":"jiao4 chang3","桔梗":"jie2 geng3","腰杆":"yao1 gan3","识相":"shi2 xiang4","语塞":"yu3 se4","车行":"che1 hang2","辱没":"ru3 mo4","露脸":"lou4 lian3","劳什子":"lao2 shi2 zi5","摇滚乐":"yao2 gun3 yue4","不可估量":"bu4 ke3 gu1 liang2","诸子百家":"zhu1 zi3 bai3 jia1","乐歌":"yue4 ge1","倒卖":"dao3 mai4","倒毙":"dao3 bi4","拓片":"ta4 pian4","挑动":"tiao3 dong4","海难":"hai3 nan4","看门":"kan1 men2","不省人事":"bu4 xing3 ren2 shi4","宁死不屈":"ning4 si3 bu4 qu1","扬长避短":"yang2 chang2 bi4 duan3","长驱直入":"chang2 qu1 zhi2 ru4","准将":"zhun3 jiang4","搅和":"jiao3 huo5","摩挲":"ma1 sa1","磨坊":"mo4 fang2","落难":"luo4 nan4","遒劲":"qiu2 jing4","重启":"chong2 qi3","尽力而为":"jin4 li4 er2 wei2","尽善尽美":"jin4 shan4 jin4 mei3","成都平原":"cheng2 du1 ping2 yuan2","长篇大论":"chang2 pian1 da4 lun4","乱发":"luan4 fa4","大藏":"da4 zang4","打颤":"da3 zhan4","树杈":"shu4 cha4","苗头":"miao2 tou5","铁杆":"tie3 gan3","一刀切":"yi1 dao1 qie1","适应症":"shi4 ying4 zheng4","如花似玉":"ru2 hua1 si4 yu4","绞尽脑汁":"jiao3 jin4 nao3 zhi1","连锁反应":"lian2 suo3 fan3 ying4","劲射":"jing4 she4","华佗":"hua4 tuo2","将相":"jiang4 xiang4","差分":"cha1 fen1","招行":"zhao1 hang2","枪杆":"qiang1 gan3","点将":"dian3 jiang4","箱笼":"xiang1 long3","缝纫":"feng2 ren4","长龙":"chang2 long2","露头":"lou4 tou2","三连冠":"san1 lian2 guan4","调味品":"tiao2 wei4 pin3","闹哄哄":"nao4 hong1 hong1","胆大妄为":"dan3 da4 wang4 wei2","说来话长":"shuo1 lai2 hua4 chang2","正旦":"zheng1 dan4","潮差":"chao2 cha1","看家":"kan1 jia1","终了":"zhong1 liao3","结巴":"jie1 ba5","调情":"tiao2 qing2","鬓发":"bin4 fa4","二人转":"er4 ren2 zhuan4","够意思":"gou4 yi4 si5","尽心尽力":"jin4 xin1 jin4 li4","异曲同工":"yi4 qu3 tong2 gong1","扭亏为盈":"niu3 kui1 wei2 ying2","排忧解难":"pai2 you1 jie3 nan4","喀嚓":"ka1 cha1","好动":"hao4 dong4","差池":"cha1 chi2","杠子":"gang4 zi5","漂白":"piao3 bai2","男仆":"nan2 pu2","翻倒":"fan1 dao3","调处":"tiao2 chu3","间作":"jian4 zuo4","节骨眼":"jie1 gu3 yan3","取长补短":"qu3 chang2 bu3 duan3","各有所长":"ge4 you3 suo3 chang2","劈柴":"pi3 chai2","屏气":"bing3 qi4","干果":"gan1 guo3","弹力":"tan2 li4","斗室":"dou3 shi4","的哥":"di1 ge1","苦处":"ku3 chu3","转炉":"zhuan4 lu2","一言为定":"yi1 yan2 wei2 ding4","先入为主":"xian1 ru4 wei2 zhu3","哄堂大笑":"hong1 tang2 da4 xiao4","精疲力尽":"jing1 pi2 li4 jin4","共处":"gong4 chu3","出塞":"chu1 sai4","唱和":"chang4 he4","奔丧":"ben1 sang1","差值":"cha1 zhi2","弹子":"dan4 zi3","校验":"jiao4 yan4","登载":"deng1 zai3","磨盘":"mo4 pan2","粘结":"nian2 jie2","萎靡":"wei3 mi3","调治":"tiao2 zhi4","左撇子":"zuo3 pie3 zi5","干巴巴":"gan1 ba1 ba1","刀耕火种":"dao1 geng1 huo3 zhong4","化险为夷":"hua4 xian3 wei2 yi2","无穷无尽":"wu2 qiong2 wu2 jin4","百发百中":"bai3 fa1 bai3 zhong4","天干":"tian1 gan1","披散":"pi1 san3","更始":"geng1 shi3","遭难":"zao1 nan4","阿斗":"a1 dou3","非分":"fei1 fen4","一骨碌":"yi1 gu1 lu4","一了百了":"yi1 liao3 bai3 liao3","似懂非懂":"si4 dong3 fei1 dong3","反败为胜":"fan3 bai4 wei2 sheng4","重见天日":"chong2 jian4 tian1 ri4","鞠躬尽瘁":"ju1 gong1 jin4 cui4","佛事":"fo2 shi4","供桌":"gong4 zhuo1"}};
+</script>
+<script>
+// >>>DTP-PURE-BEGIN
+var DTP_CODE128_PATTERNS = ["212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213", "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132", "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211", "212123", "212321", "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313", "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331", "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111", "314111", "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214", "112412", "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111", "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141", "214121", "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141", "114131", "311141", "411131", "211412", "211214", "211232"];
+var DTP_CODE128_STOP = "2331112";
+var DTP_CODE39_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%";
+var DTP_CODE39_PATTERNS = ["nnnwwnwnn", "wnnwnnnnw", "nnwwnnnnw", "wnwwnnnnn", "nnnwwnnnw", "wnnwwnnnn", "nnwwwnnnn", "nnnwnnwnw", "wnnwnnwnn", "nnwwnnwnn", "wnnnnwnnw", "nnwnnwnnw", "wnwnnwnnn", "nnnnwwnnw", "wnnnwwnnn", "nnwnwwnnn", "nnnnnwwnw", "wnnnnwwnn", "nnwnnwwnn", "nnnnwwwnn", "wnnnnnnww", "nnwnnnnww", "wnwnnnnwn", "nnnnwnnww", "wnnnwnnwn", "nnwnwnnwn", "nnnnnnwww", "wnnnnnwwn", "nnwnnnwwn", "nnnnwnwwn", "wwnnnnnnw", "nwwnnnnnw", "wwwnnnnnn", "nwnnwnnnw", "wwnnwnnnn", "nwwnwnnnn", "nwnnnnwnw", "wwnnnnwnn", "nwwnnnwnn", "nwnwnwnnn", "nwnwnnnwn", "nwnnnwnwn", "nnnwnwnwn"];
+var DTP_CODE39_EDGE = "nwnnwnwnn";
+var DTP_EAN_L = ["0001101", "0011001", "0010011", "0111101", "0100011", "0110001", "0101111", "0111011", "0110111", "0001011"];
+var DTP_EAN_G = ["0100111", "0110011", "0011011", "0100001", "0011101", "0111001", "0000101", "0010001", "0001001", "0010111"];
+var DTP_EAN_R = ["1110010", "1100110", "1101100", "1000010", "1011100", "1001110", "1010000", "1000100", "1001000", "1110100"];
+var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL"];
+
+    /* ============ 新增纯逻辑工具库（无 DOM 依赖，由各面板调用） ============ */
+
+    // ---- HTML 实体编码（纯编码部分；解码复用 decodeHtmlEntities） ----
+    function htmlEntityEncodeText(text, mode) {
+        var named = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        var out = '', escaped = 0, total = 0;
+        Array.from(String(text)).forEach(function(ch) {
+            total++;
+            var cp = ch.codePointAt(0);
+            if (mode === 'all') {
+                if (ch === '\n' || ch === '\r' || ch === '\t') { out += ch; return; }
+                out += '&#' + cp + ';'; escaped++;
+                return;
+            }
+            if (Object.prototype.hasOwnProperty.call(named, ch)) { out += named[ch]; escaped++; return; }
+            if (mode === 'specials') { out += ch; return; }
+            if (cp > 0x7F) { out += '&#' + cp + ';'; escaped++; return; }
+            out += ch;
+        });
+        return { out: out, escaped: escaped, total: total };
+    }
+
+    // ---- Unicode 转义 / 解析 ----
+    function unicodeEscapeText(text, mode) {
+        var out = '', escaped = 0, total = 0;
+        Array.from(String(text)).forEach(function(ch) {
+            total++;
+            var cp = ch.codePointAt(0);
+            if (ch === '\n' || ch === '\r' || ch === '\t') { out += ch; return; }
+            if (mode !== 'all' && cp <= 0x7F) { out += ch; return; }
+            out += cp <= 0xFFFF ? '\\u' + cp.toString(16).padStart(4, '0') : '\\u{' + cp.toString(16) + '}';
+            escaped++;
+        });
+        return { out: out, escaped: escaped, total: total };
+    }
+    function unicodeUnescapeText(text) {
+        var decoded = 0;
+        var out = String(text).replace(/\\u\{([0-9a-fA-F]{1,6})\}/g, function(_, h) {
+            var cp = parseInt(h, 16);
+            if (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) throw new Error('无效码点 \\u{' + h + '}');
+            decoded++; return String.fromCodePoint(cp);
+        }).replace(/\\u([0-9a-fA-F]{4})/g, function(_, h) {
+            decoded++; return String.fromCharCode(parseInt(h, 16));
+        }).replace(/\\x([0-9a-fA-F]{2})/g, function(_, h) {
+            decoded++; return String.fromCharCode(parseInt(h, 16));
+        });
+        return { out: out, decoded: decoded };
+    }
+
+    // ---- 任意进制转换（2–64）：0-9 A-Z a-z + /（37 进制及以上区分大小写） ----
+    var DTP_BASE64_DIGITS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/';
+    function dtpBaseDigitValue(ch, base) {
+        if (ch >= '0' && ch <= '9') return ch.charCodeAt(0) - 48;
+        if (base <= 36) {
+            var c = ch.toUpperCase();
+            return (c >= 'A' && c <= 'Z') ? c.charCodeAt(0) - 55 : -1;
+        }
+        return DTP_BASE64_DIGITS.indexOf(ch);
+    }
+    function baseConvertString(input, fromBase, toBase) {
+        fromBase = parseInt(fromBase, 10); toBase = parseInt(toBase, 10);
+        if (!(fromBase >= 2 && fromBase <= 64) || !(toBase >= 2 && toBase <= 64)) throw new Error('进制必须在 2–64 之间');
+        var s = String(input).trim().replace(/[\s_,，]/g, '');
+        if (!s) throw new Error('请输入数字');
+        var neg = false;
+        if (s.charAt(0) === '-' || (s.charAt(0) === '+' && fromBase <= 62)) { neg = s.charAt(0) === '-'; s = s.slice(1); }
+        var low = s.toLowerCase();
+        if (fromBase === 16 && low.indexOf('0x') === 0) s = s.slice(2);
+        else if (fromBase === 2 && low.indexOf('0b') === 0) s = s.slice(2);
+        else if (fromBase === 8 && low.indexOf('0o') === 0) s = s.slice(2);
+        if (!s) throw new Error('请输入数字');
+        var n = 0n, B = BigInt(fromBase);
+        for (var i = 0; i < s.length; i++) {
+            var v = dtpBaseDigitValue(s.charAt(i), fromBase);
+            if (v < 0 || v >= fromBase) throw new Error('字符 “' + s.charAt(i) + '” 不是合法的 ' + fromBase + ' 进制数字（第 ' + (i + 1) + ' 位）');
+            n = n * B + BigInt(v);
+        }
+        if (n === 0n) neg = false;
+        var out = '';
+        if (n === 0n) out = '0';
+        else if (toBase <= 36) {
+            var lower = '0123456789abcdefghijklmnopqrstuvwxyz', BB = BigInt(toBase);
+            while (n > 0n) { out = lower.charAt(Number(n % BB)) + out; n /= BB; }
+        } else {
+            var B2 = BigInt(toBase);
+            while (n > 0n) { out = DTP_BASE64_DIGITS.charAt(Number(n % B2)) + out; n /= B2; }
+        }
+        return (neg ? '-' : '') + out;
+    }
+
+    // ---- 人民币大写（规则依据央行《正确填写票据和结算凭证的基本规定》） ----
+    var DTP_RMB_DIGITS = '零壹贰叁肆伍陆柒捌玖';
+    var DTP_RMB_UNITS = ['', '拾', '佰', '仟'];
+    var DTP_RMB_GROUPS = ['', '万', '亿', '万亿'];
+    function rmbSection(s4) {
+        var out = '', pending = false, started = false;
+        for (var i = 0; i < s4.length; i++) {
+            var d = s4.charCodeAt(i) - 48;
+            var pos = s4.length - 1 - i;
+            if (d === 0) { if (started) pending = true; }
+            else {
+                if (pending) { out += '零'; pending = false; }
+                out += DTP_RMB_DIGITS.charAt(d) + DTP_RMB_UNITS[pos];
+                started = true;
+            }
+        }
+        return out;
+    }
+    function rmbUppercase(amount, opts) {
+        opts = opts || {};
+        var zheng = opts.zheng ? '正' : '整';
+        var s = String(amount == null ? '' : amount).trim().replace(/[,\s，]/g, '').replace(/[¥￥]/g, '');
+        if (!s) throw new Error('请输入金额数字');
+        if (s.charAt(0) === '-') throw new Error('金额不能为负数');
+        if (!/^\d+(?:\.\d{1,2})?$/.test(s)) throw new Error('格式无效：请输入不超过两位小数的非负数字');
+        var dot = s.indexOf('.');
+        var intPart = (dot >= 0 ? s.slice(0, dot) : s).replace(/^0+(?=\d)/, '');
+        var dec = dot >= 0 ? s.slice(dot + 1) : '';
+        if (intPart.length > 16) throw new Error('超出支持范围（整数部分最多 16 位）');
+        var jiao = dec.length > 0 ? dec.charCodeAt(0) - 48 : 0;
+        var fen = dec.length > 1 ? dec.charCodeAt(1) - 48 : 0;
+        var groups = [], tmp = intPart;
+        while (tmp.length > 4) { groups.unshift(tmp.slice(-4)); tmp = tmp.slice(0, -4); }
+        groups.unshift(tmp);
+        var nG = groups.length, intWords = '';
+        for (var k = 0; k < nG; k++) {
+            var gstr = groups[k];
+            var gval = parseInt(gstr, 10);
+            if (gval === 0) continue;
+            if (intWords && gval < 1000 && !/零$/.test(intWords)) intWords += '零';
+            intWords += rmbSection(gstr) + DTP_RMB_GROUPS[nG - 1 - k];
+        }
+        var result;
+        if (!intWords && jiao === 0 && fen === 0) result = '零元' + zheng;
+        else {
+            result = (intWords || '零') + '元';
+            if (jiao === 0 && fen === 0) result += zheng;
+            else if (jiao === 0) result += '零' + DTP_RMB_DIGITS.charAt(fen) + '分';
+            else {
+                if (intWords && /0$/.test(intPart)) result += '零';
+                result += DTP_RMB_DIGITS.charAt(jiao) + '角';
+                if (fen) result += DTP_RMB_DIGITS.charAt(fen) + '分';
+                else if (opts.jiaoZheng) result += zheng;
+            }
+        }
+        if (opts.prefix) result = '人民币' + result;
+        return result;
+    }
+
+    // ---- 条形码：Code 128（自动 B/C 子集、含校验位）/ Code 39 / EAN-13 ----
+    function dtpExpandWidths(widthStr) {
+        var out = '', bar = true;
+        for (var i = 0; i < widthStr.length; i++) {
+            var w = widthStr.charCodeAt(i) - 48;
+            out += (bar ? '1' : '0').repeat(w);
+            bar = !bar;
+        }
+        return out;
+    }
+    function dtpExpandCode39(pattern) {
+        var out = '', bar = true;
+        for (var i = 0; i < pattern.length; i++) {
+            var w = pattern.charAt(i) === 'w' ? 3 : 1;
+            out += (bar ? '1' : '0').repeat(w);
+            bar = !bar;
+        }
+        return out;
+    }
+    function code128Encode(text) {
+        var s = String(text);
+        if (!s) throw new Error('请输入条码内容');
+        if (s.length > 100) throw new Error('内容过长（最多 100 个字符）');
+        var codes = [];
+        if (/^\d+$/.test(s) && s.length % 2 === 0) {
+            codes.push(105); // START C
+            for (var i = 0; i < s.length; i += 2) codes.push(parseInt(s.substr(i, 2), 10));
+        } else {
+            codes.push(104); // START B
+            for (var j = 0; j < s.length; j++) {
+                var cc = s.charCodeAt(j);
+                if (cc < 32 || cc > 126) throw new Error('Code 128 仅支持可打印 ASCII 字符（32–126），“' + s.charAt(j) + '” 不可编码');
+                codes.push(cc - 32);
+            }
+        }
+        var sum = codes[0];
+        for (var k = 1; k < codes.length; k++) sum += codes[k] * k;
+        var mods = '';
+        for (var m = 0; m < codes.length; m++) mods += dtpExpandWidths(DTP_CODE128_PATTERNS[codes[m]]);
+        mods += dtpExpandWidths(DTP_CODE128_PATTERNS[sum % 103]);
+        mods += dtpExpandWidths(DTP_CODE128_STOP);
+        return { modules: mods, text: s, kind: 'Code 128', quietLeft: 10, quietRight: 10 };
+    }
+    function code39Encode(text) {
+        var s = String(text).toUpperCase();
+        if (!s) throw new Error('请输入条码内容');
+        if (s.length > 60) throw new Error('内容过长（最多 60 个字符）');
+        var seq = [DTP_CODE39_EDGE];
+        for (var i = 0; i < s.length; i++) {
+            var idx = DTP_CODE39_CHARS.indexOf(s.charAt(i));
+            if (idx < 0) throw new Error('字符 “' + s.charAt(i) + '” 不受 Code 39 支持（可用：0–9、A–Z、- . 空格 $ / + %）');
+            seq.push(DTP_CODE39_PATTERNS[idx]);
+        }
+        seq.push(DTP_CODE39_EDGE);
+        var mods = seq.map(dtpExpandCode39).join('0');
+        return { modules: mods, text: s, kind: 'Code 39', quietLeft: 10, quietRight: 10 };
+    }
+    function ean13Checksum(first12) {
+        var sum = 0;
+        for (var i = 0; i < 12; i++) sum += (first12.charCodeAt(i) - 48) * (i % 2 === 0 ? 1 : 3);
+        return (10 - (sum % 10)) % 10;
+    }
+    function ean13Encode(text) {
+        var digits = String(text).replace(/[\s-]/g, '');
+        if (!/^\d+$/.test(digits)) throw new Error('EAN-13 仅支持数字（可含空格 / 短横线）');
+        if (digits.length === 12) digits += ean13Checksum(digits);
+        else if (digits.length === 13) {
+            var want = ean13Checksum(digits.slice(0, 12));
+            if (digits.charCodeAt(12) - 48 !== want) throw new Error('校验位不匹配：第 13 位应为 ' + want + '（或只输入前 12 位自动补全）');
+        } else throw new Error('需要 12 或 13 位数字（当前 ' + digits.length + ' 位）');
+        var mods = '101', parity = DTP_EAN_PARITY[digits.charCodeAt(0) - 48];
+        for (var i = 1; i <= 6; i++) mods += (parity.charAt(i - 1) === 'L' ? DTP_EAN_L : DTP_EAN_G)[digits.charCodeAt(i) - 48];
+        mods += '01010';
+        for (var j = 7; j <= 12; j++) mods += DTP_EAN_R[digits.charCodeAt(j) - 48];
+        mods += '101';
+        return { modules: mods, text: digits, kind: 'EAN-13', quietLeft: 11, quietRight: 7 };
+    }
+
+    // ---- 中文转换：简繁互转 / 拼音（数据见 window.ZH_CONV_DATA） ----
+    var dtpZhMaps = null;
+    function zhBuildMaps() {
+        if (dtpZhMaps) return dtpZhMaps;
+        var D = (typeof window !== 'undefined' && window.ZH_CONV_DATA) || null;
+        if (!D) throw new Error('中文转换数据未加载（window.ZH_CONV_DATA 缺失）');
+        var m = { s2t: {}, t2s: {}, py: {}, s2tP: D.s2tP || {}, t2sP: D.t2sP || {}, pyP: D.pyP || {} };
+        var i;
+        for (i = 0; i + 1 < D.s2t.length; i += 2) m.s2t[D.s2t.charAt(i)] = D.s2t.charAt(i + 1);
+        for (i = 0; i + 1 < D.t2s.length; i += 2) m.t2s[D.t2s.charAt(i)] = D.t2s.charAt(i + 1);
+        var py = D.py;
+        i = 0;
+        while (i < py.length) {
+            var ch = py.charAt(i); i++;
+            var start = i;
+            while (i < py.length && /[a-zêü]/.test(py.charAt(i))) i++;
+            var letters = py.slice(start, i);
+            var tone = 5, d = py.charAt(i);
+            if (d >= '0' && d <= '5') { tone = d.charCodeAt(0) - 48; i++; }
+            m.py[ch] = { l: letters, t: tone };
+        }
+        var keyLens = function(obj) {
+            var max = 0, keys = Object.keys(obj);
+            for (var x = 0; x < keys.length; x++) if (keys[x].length > max) max = keys[x].length;
+            return max;
+        };
+        m.s2tPMax = keyLens(m.s2tP);
+        m.t2sPMax = keyLens(m.t2sP);
+        m.pyPMax = keyLens(m.pyP);
+        dtpZhMaps = m;
+        return m;
+    }
+    function zhConvertText(text, dir) {
+        var maps = zhBuildMaps();
+        var conv = dir === 't2s' ? maps.t2s : maps.s2t;
+        var phrases = dir === 't2s' ? maps.t2sP : maps.s2tP;
+        var maxLen = dir === 't2s' ? maps.t2sPMax : maps.s2tPMax;
+        var s = String(text);
+        if (s.length > 500000) throw new Error('输入过长（最多 500,000 字符）');
+        var out = [], i = 0;
+        while (i < s.length) {
+            var hit = false;
+            var limit = Math.min(maxLen, s.length - i);
+            for (var L = limit; L >= 2; L--) {
+                var cand = s.substr(i, L);
+                if (phrases[cand] !== undefined) { out.push(phrases[cand]); i += L; hit = true; break; }
+            }
+            if (hit) continue;
+            var c = s.charAt(i);
+            out.push(conv[c] !== undefined ? conv[c] : c);
+            i++;
+        }
+        return out.join('');
+    }
+    function pinyinToneMark(letters, tone) {
+        var s = letters.replace(/v/g, 'ü');
+        if (!(tone >= 1 && tone <= 4)) return s;
+        var idx = -1, order = ['a', 'o', 'e'];
+        for (var i = 0; i < order.length; i++) { var p = s.indexOf(order[i]); if (p >= 0) { idx = p; break; } }
+        if (idx < 0) { for (var j = s.length - 1; j >= 0; j--) { if ('iuü'.indexOf(s.charAt(j)) >= 0) { idx = j; break; } } }
+        if (idx < 0) return s;
+        var marks = { 'a': 'āáǎà', 'o': 'ōóǒò', 'e': 'ēéěè', 'i': 'īíǐì', 'u': 'ūúǔù', 'ü': 'ǖǘǚǜ' };
+        return s.slice(0, idx) + marks[s.charAt(idx)].charAt(tone - 1) + s.slice(idx + 1);
+    }
+    function pinyinInitial(letters) {
+        return letters.charAt(0);
+    }
+    function zhTextToPinyin(text, opts) {
+        opts = opts || {};
+        var maps = zhBuildMaps();
+        var s = String(text);
+        if (s.length > 500000) throw new Error('输入过长（最多 500,000 字符）');
+        var tokens = [], i = 0, maxLen = maps.pyPMax;
+        while (i < s.length) {
+            var hit = false;
+            var limit = Math.min(maxLen, s.length - i);
+            for (var L = limit; L >= 2; L--) {
+                var cand = s.substr(i, L);
+                var ph = maps.pyP[cand];
+                if (ph) {
+                    var syls = ph.split(' ');
+                    for (var pi = 0; pi < cand.length; pi++) {
+                        var mm = /^([a-zvêü]+)([0-5]?)$/.exec(syls[pi] || '');
+                        tokens.push({ ch: cand.charAt(pi), letters: mm ? mm[1] : (syls[pi] || ''), tone: mm && mm[2] ? mm[2].charCodeAt(0) - 48 : 5 });
+                    }
+                    i += L; hit = true; break;
+                }
+            }
+            if (hit) continue;
+            var c = s.charAt(i);
+            var single = maps.py[c];
+            if (single) { tokens.push({ ch: c, letters: single.l, tone: single.t }); i++; continue; }
+            var start = i; i++;
+            while (i < s.length && maps.py[s.charAt(i)] === undefined) i++;
+            tokens.push({ raw: s.slice(start, i) });
+        }
+        if (opts.sandhi) {
+            for (var ti = 0; ti < tokens.length; ti++) {
+                var t = tokens[ti];
+                if (t.raw !== undefined || (t.ch !== '一' && t.ch !== '不')) continue;
+                var nxt = null;
+                for (var tj = ti + 1; tj < tokens.length; tj++) { if (tokens[tj].raw === undefined) { nxt = tokens[tj]; break; } }
+                if (!nxt) continue;
+                var nt = nxt.tone;
+                if (t.ch === '不') t.tone = (nt === 4) ? 2 : 4;
+                else t.tone = (nt === 4) ? 2 : (nt >= 1 && nt <= 3) ? 4 : 1;
+            }
+        }
+        var sepChar = opts.sep === 'apostrophe' ? "'" : opts.sep === 'none' ? '' : ' ';
+        var out = '', lastWasPy = false;
+        tokens.forEach(function(t) {
+            if (t.raw !== undefined) {
+                if (out && sepChar && /[A-Za-z0-9]$/.test(out) && /^[A-Za-z0-9]/.test(t.raw)) out += ' ';
+                out += t.raw;
+                lastWasPy = false;
+                return;
+            }
+            var piece;
+            if (opts.style === 'initials') piece = pinyinInitial(t.letters);
+            else if (opts.style === 'tone') piece = pinyinToneMark(t.letters, t.tone);
+            else if (opts.style === 'toneNum') piece = t.letters + (t.tone >= 1 && t.tone <= 5 ? String(t.tone) : '');
+            else piece = t.letters.replace(/v/g, 'ü');
+            if (out && sepChar) {
+                if (lastWasPy) out += sepChar;
+                else if (opts.sep === 'space' && /[A-Za-z0-9]$/.test(out)) out += ' ';
+            }
+            out += piece;
+            lastWasPy = true;
+        });
+        return out;
+    }
+
+    // ---- 其他小工具 ----
+    function dtpFmtBytes(n) {
+        if (!Number.isFinite(n) || n < 0) return '—';
+        if (n < 1024) return n + ' B';
+        var u = ['KB', 'MB', 'GB'], i = -1, v = n;
+        do { v /= 1024; i++; } while (v >= 1024 && i < u.length - 1);
+        return (Math.round(v * 10) / 10) + ' ' + u[i];
+    }
+// <<<DTP-PURE-END
+</script>
 
 <script>
 (function() {
@@ -1293,34 +1832,48 @@ timeout"></textarea></div>
     };
     getById('htmlEntityEnc').onclick = function() {
         var v = getById('htmlEntityInput').value;
-        var entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-        var encoded = v.replace(/[&<>"']/g, function(c){ return entities[c]; });
-        encoded = Array.from(encoded).map(function(c){ var cp = c.codePointAt(0); return cp > 0x7F ? '&#' + cp + ';' : c; }).join('');
-        getById('htmlEntityOutput').value = encoded;
+        var status = getById('htmlEntityStatus');
+        if (!v) { getById('htmlEntityOutput').value = ''; status.textContent = ''; return; }
+        var r = htmlEntityEncodeText(v, getById('htmlEntityMode').value);
+        getById('htmlEntityOutput').value = r.out;
+        status.textContent = r.escaped === 0
+            ? '输入中没有需要转义的字符（当前范围内保持不变；可在上方切换到「全部字符」逐字符转义）'
+            : '✓ 已转义 ' + r.escaped + ' / ' + r.total + ' 个字符';
     };
     getById('htmlEntityDec').onclick = function() {
-        getById('htmlEntityOutput').value = decodeHtmlEntities(getById('htmlEntityInput').value);
+        var v = getById('htmlEntityInput').value;
+        var status = getById('htmlEntityStatus');
+        if (!v) { getById('htmlEntityOutput').value = ''; status.textContent = ''; return; }
+        var decoded = decodeHtmlEntities(v);
+        getById('htmlEntityOutput').value = decoded;
+        var count = (v.match(/&(?:#[xX]?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]{1,31});/g) || []).length;
+        status.textContent = count ? '✓ 已解码 ' + count + ' 个实体' : '未发现 HTML 实体（输出与输入相同；实体需以 & 开头、以 ; 结尾）';
     };
+    getById('htmlEntityMode').addEventListener('change', function() { if (getById('htmlEntityInput').value) getById('htmlEntityEnc').click(); });
     getById('uniEnc').onclick = function() {
-        var input = getById('uniInput').value;
-        var result = '';
-        for (var i = 0; i < input.length; i++) {
-            var ch = input.charAt(i);
-            var cp = input.codePointAt(i);
-            if (cp > 0xFFFF) { result += '\\u{' + cp.toString(16) + '}'; i++; }
-            else if (cp > 0x7F) result += '\\u' + cp.toString(16).padStart(4, '0');
-            else result += ch;
-        }
-        getById('uniOutput').value = result;
+        var v = getById('uniInput').value;
+        var status = getById('uniStatus');
+        if (!v) { getById('uniOutput').value = ''; status.textContent = ''; return; }
+        var r = unicodeEscapeText(v, getById('uniEncodeMode').value);
+        getById('uniOutput').value = r.out;
+        status.textContent = r.escaped === 0
+            ? '输入全部是 ASCII 字符（当前范围内保持不变；可切换到「全部字符」逐字符转义）'
+            : '✓ 已转义 ' + r.escaped + ' / ' + r.total + ' 个字符';
     };
     getById('uniDec').onclick = function() {
-        var input = getById('uniInput').value;
+        var v = getById('uniInput').value;
+        var status = getById('uniStatus');
+        if (!v) { getById('uniOutput').value = ''; status.textContent = ''; return; }
         try {
-            var decoded = input.replace(/\\u\{([0-9a-fA-F]+)\}/g, function(_, h){ return String.fromCodePoint(parseInt(h,16)); });
-            decoded = decoded.replace(/\\u([0-9a-fA-F]{4})/g, function(_, h){ return String.fromCharCode(parseInt(h,16)); });
-            getById('uniOutput').value = decoded;
-        } catch(e) { getById('uniOutput').value = ''; alert('解析失败'); }
+            var r = unicodeUnescapeText(v);
+            getById('uniOutput').value = r.out;
+            status.textContent = r.decoded ? '✓ 已解析 ' + r.decoded + ' 处转义序列' : '未发现 \\uXXXX / \\u{...} / \\xNN 转义序列（输出与输入相同）';
+        } catch(e) {
+            getById('uniOutput').value = '';
+            status.textContent = '解析失败：' + e.message;
+        }
     };
+    getById('uniEncodeMode').addEventListener('change', function() { if (getById('uniInput').value) getById('uniEnc').click(); });
     getById('hexEnc').onclick = function() {
         getById('hexOutput').value = hexEncode(getById('hexInput').value);
     };
@@ -1845,33 +2398,42 @@ timeout"></textarea></div>
         };
     }
 
-    getById('numConvert').onclick = function() {
-        var input = getById('numInput').value.trim();
-        var from = parseInt(getById('numFromBase').value, 10);
+    // ============ 任意进制转换（2–64） ============
+    var NUM_QUICK_BASES = [{ id: 'numBin', base: 2 }, { id: 'numOct', base: 8 }, { id: 'numDec', base: 10 }, { id: 'numHex', base: 16 }, { id: 'numB64', base: 64 }];
+    (function populateNumBases() {
+        var from = getById('numFromBase'), to = getById('numToBase');
+        if (!from || !to) return;
+        var names = { 2: '二进制', 8: '八进制', 10: '十进制', 16: '十六进制', 32: '三十二进制', 64: '64 进制' };
+        for (var b = 2; b <= 64; b++) {
+            [from, to].forEach(function(sel) {
+                var opt = document.createElement('option');
+                opt.value = String(b);
+                opt.textContent = b + ' 进制' + (names[b] ? '（' + names[b] + '）' : '');
+                sel.appendChild(opt);
+            });
+        }
+        from.value = '10'; to.value = '16';
+    })();
+    function runNumConvert() {
         var feedback = getById('numFeedback');
         try {
-            if (!input) throw new Error('请输入数字');
-            if (![2, 8, 10, 16].includes(from)) throw new Error('不支持的进制');
-            var negative = input.charAt(0) === '-';
-            var unsigned = /^[+-]/.test(input) ? input.slice(1) : input;
-            var prefix = {2:/^0b/i, 8:/^0o/i, 16:/^0x/i};
-            if (prefix[from]) unsigned = unsigned.replace(prefix[from], '');
-            var patterns = {2:/^[01]+$/, 8:/^[0-7]+$/, 10:/^\d+$/, 16:/^[0-9a-f]+$/i};
-            if (!patterns[from].test(unsigned)) throw new Error('输入内容与所选进制不匹配');
-            var num = from === 10 ? BigInt(unsigned) : BigInt((from === 16 ? '0x' : from === 8 ? '0o' : '0b') + unsigned);
-            if (negative) num = -num;
-            var sign = num < 0n ? '-' : '';
-            var abs = num < 0n ? -num : num;
-            getById('numDec').textContent = sign + abs.toString(10);
-            getById('numHex').textContent = sign + '0x' + abs.toString(16);
-            getById('numOct').textContent = sign + '0o' + abs.toString(8);
-            getById('numBin').textContent = sign + '0b' + abs.toString(2);
-            feedback.textContent = '';
+            var input = getById('numInput').value;
+            if (!input.trim()) throw new Error('请输入数字');
+            var from = parseInt(getById('numFromBase').value, 10);
+            var to = parseInt(getById('numToBase').value, 10);
+            var main = baseConvertString(input, from, to);
+            var prefix = (getById('numPrefix').checked && main.charAt(0) !== '-' && { 2: '0b', 8: '0o', 16: '0x' }[to]) || '';
+            setToolText('numOut', prefix + main);
+            NUM_QUICK_BASES.forEach(function(item) { setToolText(item.id, baseConvertString(input, from, item.base)); });
+            feedback.textContent = '✓ 已将 ' + from + ' 进制转换为 ' + to + ' 进制（BigInt 任意精度）';
         } catch(e) {
-            getById('numDec').textContent = getById('numHex').textContent = getById('numOct').textContent = getById('numBin').textContent = '—';
-            feedback.textContent = '错误: ' + e.message;
+            setToolText('numOut', '—');
+            NUM_QUICK_BASES.forEach(function(item) { setToolText(item.id, '—'); });
+            feedback.textContent = '错误：' + e.message;
         }
-    };
+    }
+    getById('numConvert').onclick = runNumConvert;
+    getById('numInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') runNumConvert(); });
 
     // ============ CSV / JSON 转换 ============
     function parseCsv(text,delimiter){
@@ -2397,6 +2959,274 @@ timeout"></textarea></div>
     function rot47(s){return s.replace(/[!-~]/g,function(c){return String.fromCharCode(33+((c.charCodeAt(0)-33+47)%94));});}
     getById('rot13Run').onclick=function(){getById('rotOutput').value=rot13(getById('rotInput').value);};getById('rot47Run').onclick=function(){getById('rotOutput').value=rot47(getById('rotInput').value);};
 
+    // ============ 文件 / 图片 ⇋ Base64 ============
+    getById('fileB64Encode').onclick = function() {
+        var file = (getById('fileB64Input').files || [])[0];
+        var out = getById('fileB64Output'), status = getById('fileB64Status'), prev = getById('fileB64PreviewBox');
+        prev.style.display = 'none'; prev.replaceChildren();
+        if (!file) { out.value = ''; status.textContent = '请先选择文件'; return; }
+        if (file.size > 30 * 1024 * 1024) { out.value = ''; status.textContent = '文件过大（' + dtpFmtBytes(file.size) + '），上限为 30 MiB'; return; }
+        status.textContent = '正在读取 ' + (file.name || '文件') + ' …';
+        var reader = new FileReader();
+        reader.onerror = function() { status.textContent = '读取文件失败'; };
+        reader.onload = function() {
+            var dataUrl = String(reader.result || '');
+            var comma = dataUrl.indexOf(',');
+            var b64 = comma >= 0 ? dataUrl.slice(comma + 1) : '';
+            out.value = getById('fileB64Format').value === 'dataurl' ? dataUrl : b64;
+            if (getById('fileB64Preview').checked && /^image\//.test(file.type)) {
+                var img = document.createElement('img');
+                img.src = dataUrl; img.alt = '图片预览';
+                prev.appendChild(img); prev.style.display = 'flex';
+            }
+            status.textContent = '✓ ' + (file.name || '文件') + ' · ' + dtpFmtBytes(file.size) + ' · ' + (file.type || '未知类型') + ' → 输出 ' + dtpFmtBytes(out.value.length);
+        };
+        reader.readAsDataURL(file);
+    };
+    getById('fileB64Decode').onclick = function() {
+        var status = getById('fileB64DecodeStatus');
+        var raw = getById('fileB64DecodeInput').value.trim();
+        if (!raw) { status.textContent = '请先粘贴 Base64 或 Data URL'; return; }
+        var mime = '', b64 = raw;
+        var m = /^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(raw);
+        if (m) { mime = m[1] || ''; b64 = m[3]; }
+        b64 = b64.replace(/\s+/g, '');
+        if (!b64 || !/^[A-Za-z0-9+/]*={0,2}$/.test(b64) || b64.length % 4 === 1) { status.textContent = '不是有效的 Base64 内容'; return; }
+        try {
+            var blob = dataUrlToBlob('data:' + (mime || 'application/octet-stream') + ';base64,' + b64);
+            if (blob.size === 0) throw new Error('解码结果为空');
+            var name = getById('fileB64FileName').value.trim();
+            if (!name) {
+                var extMap = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/x-icon': 'ico', 'image/bmp': 'bmp', 'application/pdf': 'pdf', 'application/json': 'json', 'application/zip': 'zip', 'text/plain': 'txt', 'text/html': 'html', 'text/css': 'css', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'video/mp4': 'mp4', 'font/woff2': 'woff2' };
+                name = 'decoded-file' + (extMap[mime] ? '.' + extMap[mime] : '');
+            }
+            downloadBlob(name, blob, mime || 'application/octet-stream');
+            status.textContent = '✓ 已生成并开始下载：' + name + '（' + dtpFmtBytes(blob.size) + (mime ? '，' + mime : '') + '）';
+        } catch(e) { status.textContent = '解析失败：' + (e && e.message ? e.message : '内容可能已损坏'); }
+    };
+
+    // ============ 条形码生成（Code 128 / Code 39 / EAN-13） ============
+    var barcodeLastOk = false;
+    function renderBarcode() {
+        var wrap = getById('barcodeWrap'), status = getById('barcodeStatus');
+        var type = getById('barcodeType').value;
+        var result;
+        try {
+            var text = getById('barcodeText').value.trim();
+            if (!text) throw new Error('请输入条码内容');
+            result = type === 'ean13' ? ean13Encode(text) : type === 'code39' ? code39Encode(text) : code128Encode(text);
+        } catch(e) {
+            barcodeLastOk = false;
+            status.textContent = '生成失败：' + e.message;
+            return;
+        }
+        var scale = parseInt(getById('barcodeScale').value, 10) || 2;
+        var barH = parseInt(getById('barcodeHeight').value, 10) || 100;
+        var showText = getById('barcodeShowText').checked;
+        var quietL = result.quietLeft * scale, quietR = result.quietRight * scale;
+        var padding = 10, textH = showText ? 26 : 0;
+        var width = quietL + result.modules.length * scale + quietR + padding * 2;
+        var height = padding * 2 + barH + textH;
+        var canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = '#111111';
+        var x = padding + quietL;
+        for (var i = 0; i < result.modules.length; i++) {
+            if (result.modules.charAt(i) === '1') ctx.fillRect(x, padding, scale, barH);
+            x += scale;
+        }
+        if (showText) {
+            ctx.fillStyle = '#111111';
+            ctx.textBaseline = 'middle';
+            ctx.font = '13px Consolas, Menlo, monospace';
+            var ty = padding + barH + textH / 2;
+            if (result.kind === 'EAN-13') {
+                var sx = padding + quietL;
+                ctx.textAlign = 'center';
+                ctx.fillText(result.text.charAt(0), padding + quietL * 0.5, ty);
+                ctx.fillText(result.text.slice(1, 7), sx + 24 * scale, ty);
+                ctx.fillText(result.text.slice(7), sx + 71 * scale, ty);
+            } else {
+                ctx.textAlign = 'center';
+                ctx.fillText(result.text, padding + quietL + (result.modules.length * scale) / 2, ty);
+            }
+        }
+        wrap.replaceChildren(canvas);
+        barcodeLastOk = true;
+        status.textContent = '✓ ' + result.kind + ' 生成成功：' + (result.kind === 'EAN-13' ? result.text.length + ' 位数字' : result.text.length + ' 个字符') + ' · ' + result.modules.length + ' 模块';
+    }
+    getById('barcodeGenerate').onclick = renderBarcode;
+    getById('barcodeDownload').onclick = function() {
+        if (!barcodeLastOk) { getById('barcodeStatus').textContent = '请先生成条形码'; return; }
+        var canvas = getById('barcodeWrap').querySelector('canvas');
+        if (!canvas) { getById('barcodeStatus').textContent = '请先生成条形码'; return; }
+        downloadBlob('barcode-' + getById('barcodeType').value + '.png', dataUrlToBlob(canvas.toDataURL('image/png')), 'image/png');
+    };
+    getById('barcodeType').addEventListener('change', function() {
+        var hints = {
+            code128: 'Code 128：支持全部可打印 ASCII；纯数字且位数为偶数时自动使用更紧凑的 C 子集。',
+            code39: 'Code 39：支持 0–9、A–Z 与大写符号 - . 空格 $ / + %（小写会自动转为大写）。',
+            ean13: 'EAN-13：输入 12 位数字自动计算校验位，或输入 13 位进行校验验证。'
+        };
+        getById('barcodeStatus').textContent = hints[this.value] || '';
+    });
+
+    // ============ 简繁 / 拼音转换 ============
+    function updateZhConvUI() {
+        var pinyin = getById('zhConvMode').value === 'pinyin';
+        getById('zhConvStyleWrap').style.display = pinyin ? '' : 'none';
+        getById('zhConvSepWrap').style.display = pinyin ? '' : 'none';
+        getById('zhConvSandhiWrap').style.display = pinyin ? '' : 'none';
+    }
+    getById('zhConvMode').addEventListener('change', updateZhConvUI);
+    updateZhConvUI();
+    getById('zhConvRun').onclick = function() {
+        var status = getById('zhConvStatus');
+        var input = getById('zhConvInput').value;
+        if (!input) { getById('zhConvOutput').value = ''; status.textContent = ''; return; }
+        try {
+            var mode = getById('zhConvMode').value;
+            var out;
+            if (mode === 'pinyin') {
+                out = zhTextToPinyin(input, {
+                    style: getById('zhConvPinyinStyle').value,
+                    sep: getById('zhConvSep').value,
+                    sandhi: getById('zhConvSandhi').checked
+                });
+                status.textContent = '✓ 拼音转换完成：' + Array.from(input).length + ' 个字符';
+            } else {
+                out = zhConvertText(input, mode);
+                status.textContent = '✓ 已' + (mode === 's2t' ? '转为繁体' : '转为简体') + '：' + Array.from(input).length + ' 个字符';
+            }
+            getById('zhConvOutput').value = out;
+        } catch(e) {
+            getById('zhConvOutput').value = '';
+            status.textContent = '转换失败：' + e.message;
+        }
+    };
+    getById('zhConvClear').onclick = function() { getById('zhConvInput').value = ''; getById('zhConvOutput').value = ''; getById('zhConvStatus').textContent = ''; };
+
+    // ============ 人民币大写 ============
+    function runRmbConvert(showError) {
+        var out = getById('rmbOutput'), info = getById('rmbInfo');
+        try {
+            var raw = getById('rmbInput').value;
+            var result = rmbUppercase(raw, {
+                prefix: getById('rmbPrefix').checked,
+                jiaoZheng: getById('rmbJiaoZheng').checked,
+                zheng: getById('rmbZheng').checked
+            });
+            out.textContent = result;
+            out.style.color = '';
+            info.textContent = '数字：' + raw.trim();
+        } catch(e) {
+            out.textContent = showError ? '转换失败：' + e.message : '—';
+            info.textContent = '';
+        }
+    }
+    getById('rmbConvert').onclick = function() { runRmbConvert(true); };
+    getById('rmbInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') runRmbConvert(true); });
+    ['rmbPrefix', 'rmbJiaoZheng', 'rmbZheng'].forEach(function(id) { getById(id).addEventListener('change', function() { runRmbConvert(false); }); });
+
+    // ============ 反应力测试（经典变绿点击） ============
+    var DTP_REACTION_ROUNDS = 5;
+    var reactionState = { phase: 'idle', round: 0, times: [], falseStarts: 0, timer: null, greenAt: 0 };
+    function reactionStagePaint(main, sub, bg) {
+        var stage = getById('reactionStage');
+        stage.style.background = bg;
+        stage.querySelector('.main').textContent = main;
+        stage.querySelector('.sub').textContent = sub;
+    }
+    function reactionRoundText() { return '第 ' + Math.min(reactionState.round + 1, DTP_REACTION_ROUNDS) + ' / ' + DTP_REACTION_ROUNDS + ' 轮'; }
+    function reactionRenderRounds() {
+        var host = getById('reactionRounds');
+        if (!reactionState.times.length) {
+            host.textContent = reactionState.falseStarts ? '抢跑 ' + reactionState.falseStarts + ' 次；完成第一轮后显示各轮反应时间。' : '完成第一轮后显示各轮反应时间。';
+            return;
+        }
+        var best = Math.min.apply(null, reactionState.times);
+        var bestIndex = reactionState.times.indexOf(best);
+        host.textContent = reactionState.times.map(function(t, i) {
+            return '第 ' + (i + 1) + ' 轮：' + t + ' ms' + (i === bestIndex ? '  ⚡ 本轮最快' : '');
+        }).join('\n') + (reactionState.falseStarts ? '\n抢跑次数：' + reactionState.falseStarts : '');
+    }
+    function reactionRenderSummary() {
+        var host = getById('reactionSummary');
+        if (reactionState.times.length < DTP_REACTION_ROUNDS) { host.textContent = '完成 5 轮后自动给出平均反应时间、评级与训练建议。'; return; }
+        var times = reactionState.times;
+        var avg = Math.round(times.reduce(function(a, b) { return a + b; }, 0) / times.length);
+        var best = Math.min.apply(null, times), worst = Math.max.apply(null, times);
+        var grade, tips;
+        if (avg < 200) { grade = 'S 级 · 闪电反应'; tips = '顶级反应速度！适合节奏类电竞与球类项目。保持充足睡眠与规律运动即可，无需额外训练。'; }
+        else if (avg < 250) { grade = 'A 级 · 优秀'; tips = '优于一般水平（成年人视觉—手部反应平均约 250 ms）。可用 Aim Lab 等训练软件或羽毛球、乒乓球进一步打磨。'; }
+        else if (avg < 300) { grade = 'B 级 · 良好'; tips = '属于正常偏好水平。建议：每天 30 分钟有氧运动、保证 7 小时以上睡眠，每天做 3 组本测试即可稳步提升。'; }
+        else if (avg < 400) { grade = 'C 级 · 一般'; tips = '可能受疲劳、分心或设备延迟影响。先休息 5 分钟再测一次；使用有线鼠标、关闭多余后台程序与标签页，避免在困倦时测试。'; }
+        else { grade = 'D 级 · 需要休息'; tips = '当前状态明显偏慢：优先考虑睡眠不足、久坐疲劳或注意力分散。休息后重测；若长期如此，建议增加运动并减少连续屏幕时间。'; }
+        var stable = (worst - best) <= Math.max(40, avg * 0.25);
+        host.textContent = '平均反应时间：' + avg + ' ms\n最快：' + best + ' ms · 最慢：' + worst + ' ms · 稳定性：' + (stable ? '较稳定' : '波动较大') + (reactionState.falseStarts ? ' · 抢跑 ' + reactionState.falseStarts + ' 次' : '') + '\n\n评级：' + grade + '\n建议：' + tips;
+    }
+    function reactionStartRound() {
+        var s = reactionState;
+        s.phase = 'waiting';
+        reactionStagePaint('等待变绿…', reactionRoundText() + ' · 现在不要点击', '#c0392b');
+        getById('reactionHint').textContent = '红色阶段点击 = 抢跑，本轮会重新开始。';
+        s.timer = setTimeout(function() {
+            if (s.phase !== 'waiting') return;
+            s.phase = 'green';
+            s.greenAt = performance.now();
+            reactionStagePaint('点击！', reactionRoundText(), '#1e9e4a');
+            getById('reactionHint').textContent = '绿色出现，尽快点击！';
+            s.timer = setTimeout(function() {
+                if (s.phase !== 'green') return;
+                s.phase = 'timeout';
+                reactionStagePaint('太慢了…', '点击重试本轮（不计入成绩）', '#b45309');
+                getById('reactionHint').textContent = '超过 3 秒未点击，本轮重新开始。';
+            }, 3000);
+        }, 1200 + Math.random() * 2300);
+    }
+    getById('reactionStage').addEventListener('pointerdown', function(e) {
+        e.preventDefault();
+        var s = reactionState;
+        if (s.phase === 'idle' || s.phase === 'done') {
+            clearTimeout(s.timer);
+            reactionState = { phase: 'idle', round: 0, times: [], falseStarts: 0, timer: null, greenAt: 0 };
+            reactionRenderRounds(); reactionRenderSummary();
+            reactionStartRound();
+        } else if (s.phase === 'waiting') {
+            clearTimeout(s.timer);
+            s.falseStarts++;
+            s.phase = 'false';
+            reactionStagePaint('太早了！', '变绿之前点击无效 · 点击重新开始本轮', '#8a5a00');
+            getById('reactionHint').textContent = '别着急，等绿色出现后再点击。';
+            reactionRenderRounds();
+        } else if (s.phase === 'false' || s.phase === 'timeout') {
+            reactionStartRound();
+        } else if (s.phase === 'green') {
+            var t = Math.round(performance.now() - s.greenAt);
+            clearTimeout(s.timer);
+            s.times.push(t);
+            s.round++;
+            reactionRenderRounds();
+            if (s.round >= DTP_REACTION_ROUNDS) {
+                s.phase = 'done';
+                reactionStagePaint('测试完成！', '点击重新开始', '#2f2f33');
+                reactionRenderSummary();
+                getById('reactionHint').textContent = '想再测一次？点击上方区域即可重新开始。';
+            } else {
+                reactionStartRound();
+            }
+        }
+    });
+    getById('reactionReset').onclick = function() {
+        clearTimeout(reactionState.timer);
+        reactionState = { phase: 'idle', round: 0, times: [], falseStarts: 0, timer: null, greenAt: 0 };
+        reactionStagePaint('点击开始', '共 5 轮 · 绿色出现后尽快点击', '#2f2f33');
+        reactionRenderRounds(); reactionRenderSummary();
+        getById('reactionHint').textContent = '开始前先做个深呼吸，保持自然坐姿；用鼠标点击（或触屏轻点）即可。';
+    };
+
     // ============ 全局搜索、收藏与最近使用（只保存工具 ID，不保存输入内容） ============
     var TOOL_FAV_KEY='devtoolbox:favorites:v1', TOOL_RECENT_KEY='devtoolbox:recent:v1';
     function readStoredArray(key){try{var v=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(v)?v.filter(function(x){return typeof x==='string';}):[];}catch(e){return [];}}
@@ -2408,7 +3238,7 @@ timeout"></textarea></div>
         var topPanels=primaryButtons.map(function(btn){return {id:'panel-'+btn.dataset.tab,title:btn.textContent.trim(),key:btn.dataset.tab};});
         Array.from(document.querySelectorAll('[data-sub]')).forEach(function(btn){
             var owner=topPanels.find(function(p){var panel=getById(p.id);return panel&&panel.contains(btn);});if(!owner)return;
-            registry.push({key:'sub:'+owner.key+':'+btn.dataset.sub,title:btn.textContent.trim(),path:owner.title+' › '+btn.textContent.trim(),kind:'sub',button:btn,primary:owner.key,sub:btn.dataset.sub});
+            registry.push({key:'sub:'+owner.key+':'+btn.dataset.sub,title:btn.textContent.trim(),path:owner.title+' › '+btn.textContent.trim(),kind:'sub',button:btn,primary:owner.key,sub:btn.dataset.sub,keywords:btn.dataset.keywords||''});
         });return registry;
     }
     var toolRegistry=collectToolRegistry();
@@ -2420,8 +3250,8 @@ timeout"></textarea></div>
     function updateQuickLists(){var fav=getById('favoriteToolsList'),rec=getById('recentToolsList');fav.replaceChildren();rec.replaceChildren();var validFav=toolFavorites.filter(function(k){return !!toolByKey(k);});toolFavorites=validFav;writeStoredArray(TOOL_FAV_KEY,toolFavorites);var validRec=toolRecents.filter(function(k){return !!toolByKey(k);});toolRecents=validRec;writeStoredArray(TOOL_RECENT_KEY,toolRecents);if(!validFav.length){var a=document.createElement('span');a.className='note';a.textContent='尚未收藏工具';fav.appendChild(a);}else validFav.forEach(function(k){addQuickChip(fav,k,true);});if(!validRec.length){var r=document.createElement('span');r.className='note';r.textContent='使用工具后会显示在这里';rec.appendChild(r);}else validRec.slice(0,8).forEach(function(k){addQuickChip(rec,k,false);});}
     function refreshFavoriteButton(){var key=getCurrentToolKey(),b=getById('favoriteCurrentTool'),t=key&&toolByKey(key),fav=key&&toolFavorites.includes(key);b.textContent=fav?'★ 已收藏当前':'☆ 收藏当前';b.title=t?'当前：'+t.path:'收藏当前工具';}
     function toggleFavorite(key){if(!key)return;if(toolFavorites.includes(key))toolFavorites=toolFavorites.filter(function(x){return x!==key;});else toolFavorites.unshift(key);toolFavorites=toolFavorites.slice(0,50);writeStoredArray(TOOL_FAV_KEY,toolFavorites);updateQuickLists();refreshFavoriteButton();renderToolSearch(getById('globalToolSearch').value);}
-    function renderToolSearch(query){var host=getById('globalSearchResults');host.replaceChildren();var q=String(query||'').trim().toLowerCase();if(!q){host.style.display='none';return;}var matches=toolRegistry.filter(function(t){return (t.path+' '+t.title+' '+t.key).toLowerCase().includes(q);}).slice(0,40);host.style.display='block';if(!matches.length){var empty=document.createElement('div');empty.className='search-result';empty.textContent='没有找到匹配的工具';host.appendChild(empty);return;}matches.forEach(function(t){var row=document.createElement('div');row.className='search-result';row.setAttribute('role','option');var open=document.createElement('button');open.type='button';open.style.flex='1';open.style.textAlign='left';open.style.background='transparent';open.style.border='0';open.style.color='inherit';open.style.cursor='pointer';open.textContent=t.path;open.addEventListener('click',function(){navigateTool(t.key);recordToolUse(t.key);});var star=document.createElement('button');star.type='button';star.className='btn small';star.textContent=toolFavorites.includes(t.key)?'★':'☆';star.title='收藏 / 取消收藏';star.addEventListener('click',function(e){e.stopPropagation();toggleFavorite(t.key);});row.appendChild(open);row.appendChild(star);host.appendChild(row);});}
-    getById('globalToolSearch').addEventListener('input',function(){renderToolSearch(this.value);});getById('globalToolSearch').addEventListener('keydown',function(e){if(e.key==='Escape'){this.value='';renderToolSearch('');this.blur();}else if(e.key==='Enter'){var t=toolRegistry.find(function(x){return (x.path+' '+x.key).toLowerCase().includes(getById('globalToolSearch').value.trim().toLowerCase());});if(t){navigateTool(t.key);recordToolUse(t.key);}}});
+    function renderToolSearch(query){var host=getById('globalSearchResults');host.replaceChildren();var q=String(query||'').trim().toLowerCase();if(!q){host.style.display='none';return;}var matches=toolRegistry.filter(function(t){return (t.path+' '+t.title+' '+t.key+' '+(t.keywords||'')).toLowerCase().includes(q);}).slice(0,40);host.style.display='block';if(!matches.length){var empty=document.createElement('div');empty.className='search-result';empty.textContent='没有找到匹配的工具';host.appendChild(empty);return;}matches.forEach(function(t){var row=document.createElement('div');row.className='search-result';row.setAttribute('role','option');var open=document.createElement('button');open.type='button';open.style.flex='1';open.style.textAlign='left';open.style.background='transparent';open.style.border='0';open.style.color='inherit';open.style.cursor='pointer';open.textContent=t.path;open.addEventListener('click',function(){navigateTool(t.key);recordToolUse(t.key);});var star=document.createElement('button');star.type='button';star.className='btn small';star.textContent=toolFavorites.includes(t.key)?'★':'☆';star.title='收藏 / 取消收藏';star.addEventListener('click',function(e){e.stopPropagation();toggleFavorite(t.key);});row.appendChild(open);row.appendChild(star);host.appendChild(row);});}
+    getById('globalToolSearch').addEventListener('input',function(){renderToolSearch(this.value);});getById('globalToolSearch').addEventListener('keydown',function(e){if(e.key==='Escape'){this.value='';renderToolSearch('');this.blur();}else if(e.key==='Enter'){var t=toolRegistry.find(function(x){return (x.path+' '+x.key+' '+(x.keywords||'')).toLowerCase().includes(getById('globalToolSearch').value.trim().toLowerCase());});if(t){navigateTool(t.key);recordToolUse(t.key);}}});
     getById('toggleQuickLists').onclick=function(){var el=getById('globalQuickLists');el.style.display=el.style.display==='none'?'grid':'none';};
     getById('favoriteCurrentTool').onclick=function(){toggleFavorite(getCurrentToolKey());};
     document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();getById('globalToolSearch').focus();getById('globalToolSearch').select();}});
@@ -2621,6 +3451,8 @@ timeout"></textarea></div>
         try { generateQr(); } catch(qe) { setToolText('qrStatus', qe.message); }
         updateGradient(); updateShadow();
         try { drawChart(); } catch(ce) { setToolText('chartStatus', ce.message); }
+        try { renderBarcode(); } catch(be) { setToolText('barcodeStatus', be.message); }
+        runRmbConvert(false);
     } catch(e) {
         console.warn('初始化部分功能失败 (可能因浏览器限制): ' + e.message);
     }
