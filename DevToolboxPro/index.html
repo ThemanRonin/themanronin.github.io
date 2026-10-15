@@ -278,6 +278,19 @@
         .reaction-rounds { max-height:220px; }
         .digits-details summary { cursor:pointer; }
 
+        /* ============ 字数统计（实时）：样式全部加 wc- 前缀并限制在本面板内，避免与全局样式冲突 ============ */
+        .wc-input { min-height:200px; }
+        .wc-stats { margin-top:16px; display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:10px; }
+        .wc-stat { display:flex; flex-direction:column; gap:8px; padding:14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; }
+        .wc-stat .wc-label { font-size:12px; color:var(--text-secondary); letter-spacing:.04em; white-space:nowrap; }
+        .wc-stat .wc-value { font-size:24px; font-weight:600; line-height:1.1; color:var(--danger); font-variant-numeric:tabular-nums; letter-spacing:-.01em; word-break:break-all; }
+        .wc-stat .wc-value.wc-text-value { font-size:18px; }
+        @media (max-width:640px) {
+            .wc-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .wc-stat .wc-value { font-size:20px; }
+            .wc-stat .wc-value.wc-text-value { font-size:15px; }
+        }
+
     </style>
 </head>
 <body>
@@ -1183,6 +1196,7 @@ Delta,15</textarea>
             <button class="tab-secondary active" data-sub="charinfo">字符信息</button>
             <button class="tab-secondary" data-sub="whitespace">特殊空白</button>
             <button class="tab-secondary" data-sub="length">文本长度</button>
+            <button class="tab-secondary" data-sub="textstats" data-keywords="字数统计 实时统计 阅读时长 汉字 标点 段落 空白 单词 word count 千分位">字数统计（实时）</button>
             <button class="tab-secondary" data-sub="transpose">转置 / 列操作</button>
             <button class="tab-secondary" data-sub="frequency">频率分析</button>
             <button class="tab-secondary" data-sub="lorem">Lorem Ipsum</button>
@@ -1222,6 +1236,29 @@ Delta,15</textarea>
                 <div class="result-mono">行数 / 段落数 <strong id="utilLenLines">0 / 0</strong></div>
             </div>
             <p class="note mt-sm">优先用 Intl.Segmenter 计算字素簇及语言分词；旧浏览器使用近似回退算法，因此中文等无空格分词场景的单词数可能不同。</p>
+        </div>
+
+        <div class="panel" id="sub-utility-textstats">
+            <div class="section-label mb-sm">实时文本统计</div>
+            <textarea id="wcInput" class="wc-input" placeholder="在此输入或粘贴文本，下方各项统计会实时更新…"></textarea>
+            <div class="row mt-sm gap-sm">
+                <button class="btn primary copy-btn" data-target="wcInput">复制全文</button>
+                <button class="btn" id="wcClear">清空</button>
+            </div>
+            <section class="wc-stats">
+                <div class="wc-stat"><span class="wc-label">总字符数</span><span class="wc-value" data-wc-stat="chars">0</span></div>
+                <div class="wc-stat"><span class="wc-label">不含空格</span><span class="wc-value" data-wc-stat="noSpace">0</span></div>
+                <div class="wc-stat"><span class="wc-label">汉字</span><span class="wc-value" data-wc-stat="chinese">0</span></div>
+                <div class="wc-stat"><span class="wc-label">字母</span><span class="wc-value" data-wc-stat="letters">0</span></div>
+                <div class="wc-stat"><span class="wc-label">数字</span><span class="wc-value" data-wc-stat="digits">0</span></div>
+                <div class="wc-stat"><span class="wc-label">标点符号</span><span class="wc-value" data-wc-stat="punct">0</span></div>
+                <div class="wc-stat"><span class="wc-label">空白字符</span><span class="wc-value" data-wc-stat="spaces">0</span></div>
+                <div class="wc-stat"><span class="wc-label">英文单词</span><span class="wc-value" data-wc-stat="words">0</span></div>
+                <div class="wc-stat"><span class="wc-label">行数</span><span class="wc-value" data-wc-stat="lines">0</span></div>
+                <div class="wc-stat"><span class="wc-label">段落数</span><span class="wc-value" data-wc-stat="paragraphs">0</span></div>
+                <div class="wc-stat"><span class="wc-label">阅读时长</span><span class="wc-value wc-text-value" data-wc-stat="reading">0 秒</span></div>
+            </section>
+            <p class="note mt-sm">按内容构成统计：总字符数按码点计（emoji 等代理对算 1 个），阅读时长按汉字 300 字/分钟、英文 200 词/分钟估算。若需要 Unicode 码点、UTF-16 代码单元、UTF-8 字节等编码层面的长度，请使用「文本长度」。</p>
         </div>
 
         <div class="panel" id="sub-utility-transpose">
@@ -3981,6 +4018,62 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     function utilSegmentCount(text,granularity){if(window.Intl&&Intl.Segmenter){try{return Array.from(new Intl.Segmenter(undefined,{granularity:granularity}).segment(text)).filter(function(x){return granularity!=='word'||x.isWordLike;}).length;}catch(e){}}if(granularity==='grapheme')return Array.from(text).length;if(granularity==='word')return (text.match(/[\p{L}\p{N}_]+/gu)||[]).length;return Array.from(text).length;}
     function utilUpdateLengthStats(){var text=getById('utilLengthInput').value,lines=text.length?text.split(/\r\n|\r|\n/).length:0,paragraphs=text.trim()?(text.trim().split(/\n\s*\n/).filter(function(p){return p.trim()!=='';}).length):0;setToolText('utilLenGraphemes',utilSegmentCount(text,'grapheme'));setToolText('utilLenCodepoints',Array.from(text).length);setToolText('utilLenUtf16',text.length);setToolText('utilLenUtf8',utilUtf8Bytes(text).length);setToolText('utilLenWords',utilSegmentCount(text,'word'));setToolText('utilLenLines',lines+' / '+paragraphs);}
     getById('utilLengthInput').addEventListener('input',utilUpdateLengthStats);utilUpdateLengthStats();
+
+    // ============ 字数统计（实时）：内容构成统计 + 阅读时长估算 ============
+    // 统计口径：总字符数/不含空格按码点计（代理对算 1 个），标点含中英文标点，阅读时长按汉字 300 字/分、英文 200 词/分。
+    var WC_STAT_RE = {
+        punct: /[\u3001-\u303F\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF65!-\/:-@\[-`{-~]/g,
+        chinese: /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g,
+        letters: /[A-Za-z]/g,
+        digits: /[0-9]/g,
+        spaces: /\s/g,
+        words: /[A-Za-z]+(?:['’-][A-Za-z]+)*/g
+    };
+    var wcStatEls = (function() {
+        var map = {}, nodes = document.querySelectorAll('[data-wc-stat]');
+        for (var i = 0; i < nodes.length; i++) map[nodes[i].getAttribute('data-wc-stat')] = nodes[i];
+        return map;
+    })();
+    function wcFormatNumber(num) { return String(num).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function wcReadingTime(chinese, words, hasText) {
+        if (!hasText) return '0 秒';
+        var sec = Math.max(1, Math.round((chinese / 300 + words / 200) * 60));
+        return sec < 60 ? sec + ' 秒' : (sec / 60).toFixed(1) + ' 分钟';
+    }
+    function wcAnalyze(text) {
+        var chinese = (text.match(WC_STAT_RE.chinese) || []).length;
+        var words = (text.match(WC_STAT_RE.words) || []).length;
+        return {
+            chars: Array.from(text).length,
+            noSpace: Array.from(text.replace(WC_STAT_RE.spaces, '')).length,
+            chinese: chinese,
+            letters: (text.match(WC_STAT_RE.letters) || []).length,
+            digits: (text.match(WC_STAT_RE.digits) || []).length,
+            punct: (text.match(WC_STAT_RE.punct) || []).length,
+            spaces: (text.match(WC_STAT_RE.spaces) || []).length,
+            words: words,
+            lines: text.length ? text.split(/\r\n|\r|\n/).length : 0,
+            paragraphs: text.split(/\n+/).filter(function(p) { return p.trim().length > 0; }).length,
+            reading: wcReadingTime(chinese, words, text.trim().length > 0)
+        };
+    }
+    function wcUpdate() {
+        var input = getById('wcInput');
+        if (!input) return;
+        var data = wcAnalyze(input.value);
+        Object.keys(data).forEach(function(key) {
+            var el = wcStatEls[key];
+            if (!el) return;
+            el.textContent = (typeof data[key] === 'number') ? wcFormatNumber(data[key]) : data[key];
+        });
+    }
+    getById('wcInput').addEventListener('input', wcUpdate);
+    getById('wcClear').onclick = function() {
+        getById('wcInput').value = '';
+        wcUpdate();
+        getById('wcInput').focus();
+    };
+    wcUpdate();
 
     function utilGetMatrix(){var delimiter=getById('utilTransposeDelimiter').value,text=getById('utilTransposeInput').value;if(!text.trim())throw new Error('请先输入表格文本');if(text.length>2000000)throw new Error('输入超过 2,000,000 个字符限制');return parseCsv(text,delimiter);}
     function utilMatrixToText(rows,delimiter){return rows.map(function(row){return row.map(function(x){return csvField(x,delimiter);}).join(delimiter);}).join('\n');}
