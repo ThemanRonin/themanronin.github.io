@@ -466,6 +466,7 @@
             <button class="tab-secondary" data-sub="sha3">Keccak-256</button>
             <button class="tab-secondary" data-sub="sha3512">Keccak-512</button>
             <button class="tab-secondary" data-sub="ripemd160">RIPEMD-160</button>
+            <button class="tab-secondary" data-sub="crc32" data-keywords="crc32 crc-32 校验和 checksum 循环冗余">CRC-32</button>
         </div>
         <div class="section-label mb-sm">输入</div>
         <textarea id="hashInput" placeholder="输入任意文本..."></textarea>
@@ -481,7 +482,7 @@
             <span class="note" id="hashNote"></span>
             <span class="note" id="hashVerifyFeedback"></span>
         </div>
-        <p class="note mt-sm">MD5、SHA-1、RIPEMD-160 和 Keccak 变体不应被当作 SHA-2 / 标准 SHA-3 的替代品用于新安全协议。摘要校验仅做字符串比较，不等于数字签名验证。</p>
+        <p class="note mt-sm">MD5、SHA-1、RIPEMD-160 和 Keccak 变体不应被当作 SHA-2 / 标准 SHA-3 的替代品用于新安全协议。CRC-32 是校验和而非抗碰撞哈希，只适合快速完整性检查。摘要校验仅做字符串比较，不等于数字签名验证。</p>
     </div>
 
     <!-- ==================== 加解密 ==================== -->
@@ -586,7 +587,9 @@
             <button class="tab-secondary active" data-sub="uuid">UUID v4</button>
             <button class="tab-secondary" data-sub="password">密码</button>
             <button class="tab-secondary" data-sub="randomstr">随机字符串</button>
+            <button class="tab-secondary" data-sub="mock" data-keywords="mock 假数据 模拟数据 测试数据 faker 造数据 生成">Mock 数据</button>
             <button class="tab-secondary" data-sub="securetools">安全令牌 / 随机整数</button>
+            <button class="tab-secondary" data-sub="totp" data-keywords="totp 2fa 双因素 动态口令 验证码 authenticator google 身份验证器 谷歌">TOTP 验证码</button>
             <button class="tab-secondary" data-sub="barcode" data-keywords="条码 code128 ean13 code39 一维码 商品码">条形码</button>
         </div>
         <div class="panel active" id="sub-gen-uuid">
@@ -655,6 +658,45 @@
                 <button class="btn primary" id="randStrGen">生成</button>
                 <button class="btn small copy-btn" data-target="randStrResultText">复制</button>
             </div>
+        </div>
+        <div class="panel" id="sub-gen-mock">
+            <div class="section-label mb-sm">数据模板（每条记录替换一次占位符）</div>
+            <textarea id="mockTemplate" class="workbench-editor" spellcheck="false" placeholder="使用 {{占位符}} 描述字段，例如 {{uuid}}、{{cname}}、{{int(18,60)}}">{
+  "id": {{id}},
+  "uuid": "{{uuid}}",
+  "name": "{{cname}}",
+  "email": "{{email}}",
+  "phone": "{{phone}}",
+  "age": {{int(18,60)}},
+  "score": {{float(0,100)}},
+  "active": {{bool}},
+  "createdAt": "{{datetime}}",
+  "level": "{{pick(普通|VIP|SVIP)}}"
+}</textarea>
+            <div class="section-label mt-md mb-sm">插入占位符</div>
+            <div class="row gap-sm" id="mockPlaceholders"></div>
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label for="mockCount">生成数量（1–1000）</label><input id="mockCount" type="number" min="1" max="1000" step="1" value="5"></div>
+                <div class="tool-field"><label for="mockFormat">输出格式</label><select id="mockFormat"><option value="json">JSON 数组</option><option value="jsonl">JSON Lines（每行一条）</option><option value="csv">CSV（仅扁平结构）</option></select></div>
+            </div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="mockGenerate">生成</button><button class="btn small copy-btn" data-target="mockOutput">复制</button><button class="btn small" id="mockDownload">下载</button><button class="btn" id="mockSample">重置为示例模板</button><span class="note" id="mockStatus"></span></div>
+            <div class="section-label mt-md mb-sm">输出</div><textarea id="mockOutput" class="output-area" readonly style="min-height:220px" placeholder="生成结果..."></textarea>
+            <p class="note tool-note">占位符语法 {{类型}} 或 {{类型(参数)}}，如 {{int(1,100)}}、{{pick(A|B|C)}}、{{hex(16)}}。全部在本地生成；仅供开发测试，请勿用作真实业务数据。</p>
+        </div>
+        <div class="panel" id="sub-gen-totp">
+            <div class="section-label mb-sm">添加账户</div>
+            <div class="tool-grid">
+                <div class="tool-field"><label for="totpNewLabel">名称 / 备注</label><input id="totpNewLabel" type="text" placeholder="例如：GitHub · me@example.com"></div>
+                <div class="tool-field"><label for="totpNewSecret">Base32 密钥</label><input id="totpNewSecret" type="text" spellcheck="false" placeholder="例如 JBSWY3DPEHPK3PXP"></div>
+                <div class="tool-field"><label for="totpNewDigits">位数</label><select id="totpNewDigits"><option value="6" selected>6 位</option><option value="8">8 位</option></select></div>
+                <div class="tool-field"><label for="totpNewPeriod">刷新周期（秒）</label><select id="totpNewPeriod"><option value="30" selected>30 秒</option><option value="60">60 秒</option></select></div>
+                <div class="tool-field"><label for="totpNewAlgo">算法</label><select id="totpNewAlgo"><option value="SHA1" selected>SHA-1（最兼容）</option><option value="SHA256">SHA-256</option><option value="SHA512">SHA-512</option></select></div>
+                <div class="tool-field" style="align-self:end;"><button class="btn primary" id="totpAdd">添加账户</button></div>
+            </div>
+            <div class="row mt-sm gap-sm"><input id="totpImportUri" type="text" class="flex-1" spellcheck="false" placeholder="或粘贴 otpauth://totp/... 链接（从其他 Authenticator 导出）"><button class="btn" id="totpImport">导入链接</button><button class="btn" id="totpDemo">载入示例</button></div>
+            <div class="section-label mt-md mb-sm">账户列表（仅保存在此浏览器 localStorage）</div>
+            <div id="totpAccounts" class="tool-output" style="display:flex;flex-direction:column;gap:8px;"><span class="note">尚未添加账户。</span></div>
+            <p class="note tool-note">按 RFC 6238 在本地计算动态口令，不联网；Base32 密钥会保存在 localStorage，请勿在公用电脑上保存真实密钥。倒计时结束后自动刷新。</p>
         </div>
         <div class="panel" id="sub-gen-securetools">
             <div class="section-label mb-sm">安全随机令牌</div>
@@ -869,6 +911,7 @@ Bob,25"></textarea></div><div class="tool-field"><label for="csvJsonOutput">转�
             <button class="tab-secondary" data-sub="jsonpath">JSONPath</button>
             <button class="tab-secondary" data-sub="yaml">YAML / JSON</button>
             <button class="tab-secondary" data-sub="xml">XML格式化</button>
+            <button class="tab-secondary" data-sub="sql" data-keywords="sql 格式化 美化 压缩 mysql postgres 数据库 语句">SQL 格式化</button>
             <button class="tab-secondary" data-sub="cron">Cron解析</button>
             <button class="tab-secondary" data-sub="timezone">时区转换</button>
             <button class="tab-secondary" data-sub="color">颜色转换</button>
@@ -882,6 +925,8 @@ Bob,25"></textarea></div><div class="tool-field"><label for="csvJsonOutput">转�
                 <div class="tool-field"><label for="regexPattern">表达式</label><input id="regexPattern" type="text" value="\b\w+\b" placeholder="例如：\b\w+\b"></div>
                 <div class="tool-field"><label for="regexFlags">标志（flags）</label><input id="regexFlags" type="text" value="gm" placeholder="g i m s u y d"></div>
             </div>
+            <div class="section-label mt-md mb-sm">常用正则库（点击填入表达式与示例文本）</div>
+            <div class="row gap-sm" id="regexLibrary"></div>
             <div class="section-label mt-md mb-sm">测试文本</div>
             <textarea id="regexTestText" placeholder="输入要匹配的文本..."></textarea>
             <div class="row mt-sm gap-sm">
@@ -973,6 +1018,20 @@ Bob,25"></textarea></div><div class="tool-field"><label for="csvJsonOutput">转�
             <div class="section-label mb-sm">XML输入</div><textarea id="xmlInput" placeholder="粘贴 XML 文档..." style="min-height:150px;"></textarea>
             <div class="row mt-sm gap-sm"><button class="btn primary" id="xmlFormat">格式化</button><button class="btn" id="xmlMinify">压缩</button><button class="btn" id="xmlValidate">验证</button><button class="btn small copy-btn" data-target="xmlOutput">复制</button></div>
             <div class="section-label mt-md mb-sm">输出</div><textarea id="xmlOutput" class="output-area" readonly placeholder="格式化后的 XML..." style="min-height:180px;"></textarea><p id="xmlFeedback" class="note tool-note"></p>
+        </div>
+
+        <!-- SQL -->
+        <div class="panel" id="sub-extras-sql">
+            <div class="tool-grid">
+                <div class="tool-field"><label for="sqlInput">SQL 输入</label><textarea id="sqlInput" spellcheck="false" placeholder="粘贴 SQL 语句，例如：select id,name from users where age&gt;18 order by id desc"></textarea></div>
+                <div class="tool-field"><label for="sqlOutput">输出</label><textarea id="sqlOutput" class="output-area" readonly spellcheck="false" placeholder="格式化或压缩结果..."></textarea></div>
+            </div>
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label for="sqlKeywordCase">关键字大小写</label><select id="sqlKeywordCase"><option value="upper" selected>大写（SELECT / FROM）</option><option value="lower">小写（select / from）</option><option value="keep">保持原样</option></select></div>
+                <div class="tool-field"><label for="sqlIndent">缩进</label><select id="sqlIndent"><option value="2">2 个空格</option><option value="4" selected>4 个空格</option></select></div>
+            </div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="sqlFormat">格式化</button><button class="btn" id="sqlMinify">压缩</button><button class="btn" id="sqlSample">载入示例</button><button class="btn small copy-btn" data-target="sqlOutput">复制</button><span class="note" id="sqlStatus"></span></div>
+            <p class="note tool-note">轻量 SQL 分词格式化：字符串、标识符引号（" ` [ ]）与注释原样保留，不会改写表名或值。压缩模式会移除注释并折叠空白。单次最多处理 500,000 字符；复杂存储过程语法可能不理想。</p>
         </div>
 
         <!-- Cron -->
@@ -1886,6 +1945,21 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     };
 
     // ============ 哈希功能 ============
+    var crc32Table = (function() {
+        var t = new Uint32Array(256);
+        for (var n = 0; n < 256; n++) {
+            var c = n;
+            for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+            t[n] = c >>> 0;
+        }
+        return t;
+    })();
+    function crc32Hex(str) {
+        var bytes = new TextEncoder().encode(str), crc = 0xFFFFFFFF;
+        for (var i = 0; i < bytes.length; i++) crc = crc32Table[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+        crc = (crc ^ 0xFFFFFFFF) >>> 0;
+        return crc.toString(16).padStart(8, '0');
+    }
     var hashFunctions = {
         md5: function(v) { return CryptoJS.MD5(v).toString(); },
         sha1: function(v) { return CryptoJS.SHA1(v).toString(); },
@@ -1895,9 +1969,10 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         sha384: function(v) { return CryptoJS.SHA384 ? CryptoJS.SHA384(v).toString() : 'SHA-384不支持'; },
         sha3: function(v) { return CryptoJS.SHA3 ? CryptoJS.SHA3(v, {outputLength:256}).toString() : 'Keccak-256 不支持'; },
         sha3512: function(v) { return CryptoJS.SHA3 ? CryptoJS.SHA3(v, {outputLength:512}).toString() : 'Keccak-512 不支持'; },
-        ripemd160: function(v) { return CryptoJS.RIPEMD160 ? CryptoJS.RIPEMD160(v).toString() : 'RIPEMD-160不支持'; }
+        ripemd160: function(v) { return CryptoJS.RIPEMD160 ? CryptoJS.RIPEMD160(v).toString() : 'RIPEMD-160不支持'; },
+        crc32: function(v) { return crc32Hex(v); }
     };
-    var algoNames = { md5:'MD5', sha1:'SHA-1', sha256:'SHA-256', sha512:'SHA-512', sha224:'SHA-224', sha384:'SHA-384', sha3:'Keccak-256 (非标准SHA-3)', sha3512:'Keccak-512 (非标准SHA-3)', ripemd160:'RIPEMD-160' };
+    var algoNames = { md5:'MD5', sha1:'SHA-1', sha256:'SHA-256', sha512:'SHA-512', sha224:'SHA-224', sha384:'SHA-384', sha3:'Keccak-256 (非标准SHA-3)', sha3512:'Keccak-512 (非标准SHA-3)', ripemd160:'RIPEMD-160', crc32:'CRC-32（校验和）' };
 
     function computeHash() {
         var v = getById('hashInput').value;
@@ -2337,6 +2412,311 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     function secureRandomBigIntBelow(maxExclusive){if(typeof maxExclusive!=='bigint'||maxExclusive<=0n)throw new Error('随机范围无效');var bits=maxExclusive.toString(2).length,byteLen=Math.ceil(bits/8),excess=byteLen*8-bits,buf,n;do{buf=getSecureRandomValues(new Uint8Array(byteLen));if(excess)buf[0]&=(0xff>>>excess);n=0n;for(var i=0;i<buf.length;i++)n=(n<<8n)|BigInt(buf[i]);}while(n>=maxExclusive);return n;}
     getById('randIntGenerate').onclick=function(){try{var minRaw=getById('randIntMin').value,maxRaw=getById('randIntMax').value;if(minRaw===''||maxRaw==='')throw new Error('请填写最小值和最大值');var min=Number(minRaw),max=Number(maxRaw);if(!Number.isSafeInteger(min)||!Number.isSafeInteger(max))throw new Error('请使用安全整数范围（±9007199254740991）');if(max<min)throw new Error('最大值不能小于最小值');var span=BigInt(max)-BigInt(min)+1n;var val=BigInt(min)+secureRandomBigIntBelow(span);getById('randIntResult').textContent=val.toString();}catch(e){getById('randIntResult').textContent='生成失败：'+e.message;}};
 
+    // ============ Mock 数据生成器（模板占位符替换，全部本地生成） ============
+    var mockSurnames='王李张刘陈杨黄赵吴周徐孙马朱胡郭何高林罗郑梁谢宋唐许韩冯邓曹彭曾肖田董潘袁蔡蒋余于杜叶程苏魏吕丁任沈姚卢姜崔钟谭陆汪范金石廖贾夏韦付方白邹孟熊秦邱江尹薛闫段雷侯龙史陶黎贺顾毛郝龚邵万钱严覃武戴莫孔向汤'.split('');
+    var mockGivenNames=['伟','芳','娜','秀英','敏','静','丽','强','磊','军','洋','勇','艳','杰','娟','涛','明','超','秀兰','霞','平','刚','桂英','文轩','雨欣','子墨','欣怡','浩然','梓萱','一诺','思远','若曦','嘉懿','晨阳','诗涵','天翊','子涵','宇航','梦琪'];
+    var mockDomains=['example.com','example.cn','mail.com','test.dev','demo.io'];
+    var mockTlds=['com','cn','net','io','dev'];
+    var mockWords='alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu data code tool swift quiet river mountain forest ocean signal matrix vector kernel pixel buffer socket cluster stream'.split(' ');
+    function mockWord(){ return mockWords[secureRandomInt(mockWords.length)]; }
+    function mockCap(w){ return w.charAt(0).toUpperCase()+w.slice(1); }
+    function mockChineseName(){ return mockSurnames[secureRandomInt(mockSurnames.length)] + mockGivenNames[secureRandomInt(mockGivenNames.length)]; }
+    function mockEmail(){ return mockWord()+secureRandomInt(1000)+'@'+mockDomains[secureRandomInt(mockDomains.length)]; }
+    function mockPhone(){ var seg=['133','135','136','137','138','139','150','151','152','155','157','158','159','170','173','176','177','180','181','182','183','185','186','187','188','189','191','193','199']; var s=seg[secureRandomInt(seg.length)]; for(var i=0;i<8;i++)s+=secureRandomInt(10); return s; }
+    function mockUrl(){ return 'https://'+mockWord()+'.'+mockTlds[secureRandomInt(mockTlds.length)]+'/'+mockWord(); }
+    function mockIp(){ return [secureRandomInt(223)+1,secureRandomInt(256),secureRandomInt(256),secureRandomInt(256)].join('.'); }
+    function mockDate(){ var y=2018+secureRandomInt(12),m=1+secureRandomInt(12),d=1+secureRandomInt(28); return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+    function mockTime(){ return String(secureRandomInt(24)).padStart(2,'0')+':'+String(secureRandomInt(60)).padStart(2,'0')+':'+String(secureRandomInt(60)).padStart(2,'0'); }
+    function mockUuid(){ var b=getSecureRandomValues(new Uint8Array(16)); b[6]=(b[6]&0x0f)|0x40; b[8]=(b[8]&0x3f)|0x80; var h=Array.from(b,function(x){return x.toString(16).padStart(2,'0');}).join(''); return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20); }
+    function mockHex(n){ var out=''; for(var i=0;i<n;i++)out+='0123456789abcdef'[secureRandomInt(16)]; return out; }
+    function mockRenderOne(template, index) {
+        return template.replace(/\{\{\s*([a-zA-Z_]+)\s*(?:\(([^)]*)\))?\s*\}\}/g, function(all, type, args) {
+            var params = args ? args.split(',').map(function(x){ return x.trim(); }) : [];
+            switch (type) {
+                case 'id': return String(index + 1);
+                case 'uuid': case 'guid': return mockUuid();
+                case 'int': { var lo = Number(params[0]), hi = Number(params[1]); if (!Number.isFinite(lo)) lo = 0; if (!Number.isFinite(hi)) hi = 100; if (hi < lo) { var t = lo; lo = hi; hi = t; } return String(lo + secureRandomInt(hi - lo + 1)); }
+                case 'float': { var lo = Number(params[0]), hi = Number(params[1]); if (!Number.isFinite(lo)) lo = 0; if (!Number.isFinite(hi)) hi = 1; if (hi < lo) { var t = lo; lo = hi; hi = t; } return (lo + secureRandomInt(1000000) / 1000000 * (hi - lo)).toFixed(2); }
+                case 'bool': return secureRandomInt(2) === 1 ? 'true' : 'false';
+                case 'cname': case 'name': return mockChineseName();
+                case 'email': return mockEmail();
+                case 'phone': case 'mobile': return mockPhone();
+                case 'url': return mockUrl();
+                case 'ip': case 'ipv4': return mockIp();
+                case 'date': return mockDate();
+                case 'datetime': return mockDate() + ' ' + mockTime();
+                case 'time': return mockTime();
+                case 'word': return mockWord();
+                case 'words': case 'sentence': { var c = Math.max(1, Number(params[0]) || 6), w = []; for (var i = 0; i < c; i++) w.push(mockWord()); var s = w.join(' '); return s.charAt(0).toUpperCase() + s.slice(1) + '.'; }
+                case 'pick': case 'enum': { var items = args ? args.split('|') : []; if (!items.length) return ''; return items[secureRandomInt(items.length)]; }
+                case 'hex': { var n = Math.max(1, Math.min(256, Number(params[0]) || 8)); return mockHex(n); }
+                default: return all;
+            }
+        });
+    }
+    var mockPlaceholderList = [
+        ['{{id}}', '序号'], ['{{uuid}}', 'UUID'], ['{{cname}}', '中文姓名'], ['{{email}}', '邮箱'], ['{{phone}}', '手机号'],
+        ['{{int(1,100)}}', '随机整数'], ['{{float(0,1)}}', '随机小数'], ['{{bool}}', '布尔值'], ['{{date}}', '日期'], ['{{datetime}}', '日期时间'],
+        ['{{url}}', '网址'], ['{{ip}}', 'IP 地址'], ['{{pick(A|B|C)}}', '枚举选择'], ['{{word}}', '英文单词'], ['{{sentence}}', '英文句子'], ['{{hex(16)}}', '随机 Hex']
+    ];
+    (function initMockPlaceholders() {
+        var host = getById('mockPlaceholders');
+        if (!host) return;
+        mockPlaceholderList.forEach(function(item) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn small';
+            btn.textContent = item[1];
+            btn.title = '插入 ' + item[0];
+            btn.addEventListener('click', function() {
+                var ta = getById('mockTemplate');
+                var start = ta.selectionStart || ta.value.length, end = ta.selectionEnd || ta.value.length;
+                ta.value = ta.value.slice(0, start) + item[0] + ta.value.slice(end);
+                ta.focus();
+                ta.selectionStart = ta.selectionEnd = start + item[0].length;
+            });
+            host.appendChild(btn);
+        });
+    })();
+    function mockFlatten(value, prefix, out) {
+        if (value !== null && typeof value === 'object') {
+            Object.keys(value).forEach(function(k) { mockFlatten(value[k], prefix ? prefix + '.' + k : k, out); });
+            if (!Object.keys(value).length && prefix) out[prefix] = '';
+        } else { out[prefix] = value; }
+        return out;
+    }
+    getById('mockGenerate').onclick = function() {
+        try {
+            var template = getById('mockTemplate').value;
+            if (!template.trim()) throw new Error('请先输入数据模板');
+            if (template.length > 200000) throw new Error('模板超过 200,000 字符限制');
+            var count = Math.floor(Number(getById('mockCount').value));
+            if (!Number.isInteger(count) || count < 1 || count > 1000) throw new Error('生成数量必须为 1–1000 的整数');
+            var format = getById('mockFormat').value;
+            var records = [];
+            for (var i = 0; i < count; i++) records.push(mockRenderOne(template, i));
+            var output = '';
+            if (format === 'jsonl') {
+                records.forEach(function(r, i) {
+                    try { output += (i ? '\n' : '') + JSON.stringify(JSON.parse(r)); }
+                    catch (e) { throw new Error('第 ' + (i + 1) + ' 条记录不是合法 JSON，JSON Lines 需要单条合法 JSON'); }
+                });
+            } else if (format === 'csv') {
+                var objects = [];
+                records.forEach(function(r, i) {
+                    var obj; try { obj = JSON.parse(r); } catch (e) { throw new Error('第 ' + (i + 1) + ' 条记录不是合法 JSON，CSV 导出需要 JSON 对象模板'); }
+                    if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('第 ' + (i + 1) + ' 条记录不是 JSON 对象，CSV 仅支持扁平结构');
+                    objects.push(obj);
+                });
+                var flat = objects.map(function(o) { return mockFlatten(o, '', {}); });
+                var headers = [];
+                flat.forEach(function(o) { Object.keys(o).forEach(function(k) { if (headers.indexOf(k) < 0) headers.push(k); }); });
+                var lines = [headers.map(csvCell).join(',')];
+                flat.forEach(function(o) { lines.push(headers.map(function(h) { return csvCell(o[h] === undefined ? '' : o[h]); }).join(',')); });
+                output = '\ufeff' + lines.join('\r\n');
+            } else {
+                var parsed = [];
+                records.forEach(function(r, i) {
+                    try { parsed.push(JSON.parse(r)); }
+                    catch (e) { throw new Error('第 ' + (i + 1) + ' 条记录不是合法 JSON，JSON 数组输出需要合法 JSON 对象模板'); }
+                });
+                output = JSON.stringify(parsed, null, 2);
+            }
+            getById('mockOutput').value = output;
+            setToolText('mockStatus', '已生成 ' + count + ' 条记录（' + format.toUpperCase() + '，' + output.length + ' 字符）');
+        } catch (e) { getById('mockOutput').value = ''; setToolText('mockStatus', '生成失败：' + e.message); }
+    };
+    getById('mockSample').onclick = function() {
+        getById('mockTemplate').value = '{\n  "id": {{id}},\n  "uuid": "{{uuid}}",\n  "name": "{{cname}}",\n  "email": "{{email}}",\n  "phone": "{{phone}}",\n  "age": {{int(18,60)}},\n  "score": {{float(0,100)}},\n  "active": {{bool}},\n  "createdAt": "{{datetime}}",\n  "level": "{{pick(普通|VIP|SVIP)}}"\n}';
+        setToolText('mockStatus', '已重置为示例模板。');
+    };
+    getById('mockDownload').onclick = function() {
+        var text = getById('mockOutput').value;
+        if (!text) { setToolText('mockStatus', '请先生成数据'); return; }
+        var format = getById('mockFormat').value;
+        var name = format === 'csv' ? 'mock-data.csv' : format === 'jsonl' ? 'mock-data.jsonl' : 'mock-data.json';
+        var mime = format === 'csv' ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8';
+        downloadBlob(name, text, mime);
+    };
+
+    // ============ TOTP 双因素验证码（RFC 6238，本地计算，CryptoJS HMAC） ============
+    var TOTP_KEY = 'devtoolbox:totp:v1';
+    var totpRows = [];
+    function totpLoad() { try { var v = JSON.parse(localStorage.getItem(TOTP_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+    function totpSave(list) { try { localStorage.setItem(TOTP_KEY, JSON.stringify(list)); } catch (e) { /* storage 可能被禁用 */ } }
+    function totpBase32Decode(input) {
+        var alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        var s = String(input || '').toUpperCase().replace(/[\s-]/g, '');
+        if (!/^[A-Z2-7]+$/.test(s)) throw new Error('Base32 密钥只能包含 A–Z 和 2–7');
+        var bits = 0, value = 0, bytes = [];
+        for (var i = 0; i < s.length; i++) {
+            value = (value << 5) | alphabet.indexOf(s[i]);
+            bits += 5;
+            if (bits >= 8) { bits -= 8; bytes.push((value >> bits) & 0xff); }
+        }
+        if (!bytes.length) throw new Error('密钥为空或过短');
+        return new Uint8Array(bytes);
+    }
+    function bytesToWordArray(bytes) {
+        var words = [];
+        for (var i = 0; i < bytes.length; i += 4) words.push(((bytes[i] || 0) << 24) | ((bytes[i + 1] || 0) << 16) | ((bytes[i + 2] || 0) << 8) | (bytes[i + 3] || 0));
+        return CryptoJS.lib.WordArray.create(words, bytes.length);
+    }
+    function totpCompute(account, atMs) {
+        if (typeof CryptoJS === 'undefined') throw new Error('CryptoJS 未加载');
+        var keyBytes = totpBase32Decode(account.secret);
+        var counter = Math.floor(atMs / 1000 / account.period);
+        var buf = new ArrayBuffer(8), view = new DataView(buf);
+        view.setUint32(0, Math.floor(counter / 4294967296));
+        view.setUint32(4, counter >>> 0);
+        var hmacFn = account.algo === 'SHA256' ? CryptoJS.HmacSHA256 : account.algo === 'SHA512' ? CryptoJS.HmacSHA512 : CryptoJS.HmacSHA1;
+        var mac = hmacFn(bytesToWordArray(new Uint8Array(buf)), bytesToWordArray(keyBytes));
+        var words = mac.words, sigBytes = mac.sigBytes, bytes = [];
+        for (var i = 0; i < sigBytes; i++) bytes.push((words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff);
+        var offset = bytes[bytes.length - 1] & 0x0f;
+        var binary = ((bytes[offset] & 0x7f) << 24) | ((bytes[offset + 1] & 0xff) << 16) | ((bytes[offset + 2] & 0xff) << 8) | (bytes[offset + 3] & 0xff);
+        return String(binary % Math.pow(10, account.digits)).padStart(account.digits, '0');
+    }
+    function totpRender() {
+        var host = getById('totpAccounts');
+        if (!host) return;
+        host.replaceChildren();
+        totpRows = [];
+        var list = totpLoad();
+        if (!list.length) {
+            var empty = document.createElement('span');
+            empty.className = 'note';
+            empty.textContent = '尚未添加账户。填写上方信息后点击「添加账户」，或点击「载入示例」体验。';
+            host.appendChild(empty);
+            return;
+        }
+        list.forEach(function(acc) {
+            var row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);';
+            var label = document.createElement('div');
+            label.style.cssText = 'flex:1;min-width:140px;font-size:12px;';
+            label.textContent = acc.label || '(未命名账户)';
+            var sub = document.createElement('div');
+            sub.style.cssText = 'font-size:10px;color:var(--text-tertiary);';
+            sub.textContent = acc.digits + ' 位 · ' + acc.period + ' 秒 · ' + acc.algo;
+            label.appendChild(sub);
+            var code = document.createElement('div');
+            code.style.cssText = 'font-family:var(--font-mono);font-size:20px;font-weight:600;letter-spacing:.08em;min-width:7em;';
+            var barWrap = document.createElement('div');
+            barWrap.style.cssText = 'width:70px;height:4px;background:var(--border-light);border-radius:2px;overflow:hidden;';
+            var bar = document.createElement('div');
+            bar.style.cssText = 'height:100%;width:100%;background:#2d6a2d;transition:width 200ms linear;';
+            barWrap.appendChild(bar);
+            var copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
+            copyBtn.className = 'btn small copy-btn';
+            copyBtn.textContent = '复制';
+            copyBtn.addEventListener('click', function() { copyText(code.textContent, copyBtn); });
+            var delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'btn small danger';
+            delBtn.textContent = '删除';
+            delBtn.addEventListener('click', function() {
+                var next = totpLoad().filter(function(x) { return x.id !== acc.id; });
+                totpSave(next);
+                totpRender();
+                totpTick();
+            });
+            row.appendChild(label);
+            row.appendChild(code);
+            row.appendChild(barWrap);
+            row.appendChild(copyBtn);
+            row.appendChild(delBtn);
+            host.appendChild(row);
+            totpRows.push({ acc: acc, code: code, bar: bar });
+        });
+    }
+    function totpTick() {
+        var now = Date.now();
+        totpRows.forEach(function(row) {
+            try {
+                var code = totpCompute(row.acc, now);
+                if (row.code.textContent !== code) row.code.textContent = code;
+                var remain = row.acc.period - (Math.floor(now / 1000) % row.acc.period);
+                row.bar.style.width = (remain / row.acc.period * 100).toFixed(1) + '%';
+                row.bar.style.background = remain <= 5 ? '#b42318' : '#2d6a2d';
+            } catch (e) {
+                if (row.code.textContent !== '错误') { row.code.textContent = '错误'; row.code.title = e.message; }
+            }
+        });
+    }
+    function totpAddAccount(acc) {
+        var list = totpLoad();
+        acc.id = 'totp-' + Date.now().toString(36) + '-' + secureRandomInt(46656).toString(36);
+        list.push(acc);
+        totpSave(list);
+        totpRender();
+        totpTick();
+        return acc;
+    }
+    getById('totpAdd').onclick = function() {
+        try {
+            var label = getById('totpNewLabel').value.trim();
+            var secret = getById('totpNewSecret').value.trim();
+            if (!secret) throw new Error('请填写 Base32 密钥');
+            totpBase32Decode(secret);
+            totpAddAccount({
+                label: label || '未命名账户',
+                secret: secret,
+                digits: Number(getById('totpNewDigits').value),
+                period: Number(getById('totpNewPeriod').value),
+                algo: getById('totpNewAlgo').value
+            });
+            getById('totpNewLabel').value = '';
+            getById('totpNewSecret').value = '';
+        } catch (e) {
+            var host = getById('totpAccounts');
+            host.replaceChildren();
+            var err = document.createElement('span');
+            err.className = 'note';
+            err.textContent = '添加失败：' + e.message;
+            host.appendChild(err);
+            totpRows = [];
+        }
+    };
+    getById('totpImport').onclick = function() {
+        var raw = getById('totpImportUri').value.trim();
+        try {
+            var m = /^otpauth:\/\/totp\/([^?]*)\?(.*)$/i.exec(raw);
+            if (!m) throw new Error('不是有效的 otpauth://totp/ 链接');
+            var label = decodeURIComponent(m[1].replace(/\+/g, ' '));
+            var params = {};
+            m[2].split('&').forEach(function(kv) {
+                var idx = kv.indexOf('=');
+                if (idx > 0) params[kv.slice(0, idx)] = decodeURIComponent(kv.slice(idx + 1));
+            });
+            var secret = (params.secret || '').replace(/\s/g, '');
+            if (!secret) throw new Error('链接中缺少 secret 参数');
+            totpBase32Decode(secret);
+            var digits = Number(params.digits) === 8 ? 8 : 6;
+            var period = Number(params.period);
+            if (period !== 30 && period !== 60) period = 30;
+            var algo = String(params.algorithm || 'SHA1').toUpperCase();
+            if (['SHA1', 'SHA256', 'SHA512'].indexOf(algo) < 0) algo = 'SHA1';
+            totpAddAccount({ label: label || '导入的账户', secret: secret, digits: digits, period: period, algo: algo });
+            getById('totpImportUri').value = '';
+        } catch (e) {
+            var host = getById('totpAccounts');
+            host.replaceChildren();
+            var err = document.createElement('span');
+            err.className = 'note';
+            err.textContent = '导入失败：' + e.message;
+            host.appendChild(err);
+            totpRows = [];
+        }
+    };
+    getById('totpDemo').onclick = function() {
+        totpAddAccount({ label: '示例账户 · DevToolbox', secret: 'JBSWY3DPEHPK3PXP', digits: 6, period: 30, algo: 'SHA1' });
+    };
+    totpRender();
+    totpTick();
+    setInterval(totpTick, 1000);
+
     // ============ 转换器 ============
     setInterval(function() { getById('tsNow').textContent = Date.now(); }, 1000);
     getById('tsToDate').onclick = function() {
@@ -2566,6 +2946,212 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     }
     getById('regexRun').onclick = function(){ runRegex('match'); };
     getById('regexReplace').onclick = function(){ runRegex('replace'); };
+
+    // ============ 常用正则库：一键填入表达式与示例文本 ============
+    var regexLibraryItems = [
+        { name: '电子邮箱', pattern: '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+', flags: 'g', sample: '联系方式：alice@example.com、bob.smith@mail.cn；错误示例 test@@com、a@b' },
+        { name: '手机号（大陆）', pattern: '1[3-9]\\d{9}', flags: 'g', sample: '联系人：13812345678，备用 15900001111；固定电话 010-12345678' },
+        { name: '网址 URL', pattern: 'https?://[A-Za-z0-9.\\-]+(?::\\d+)?(?:/[^\\s\'"<>]*)?', flags: 'g', sample: '官网 https://example.com/docs?id=1，镜像 http://mirror.example.com:8080' },
+        { name: '身份证号', pattern: '\\b[1-9]\\d{5}(?:18|19|20)\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])\\d{3}[\\dXx]\\b', flags: 'g', sample: '证件号 110101199003077758 与 31010420010801521X' },
+        { name: 'IPv4 地址', pattern: '\\b(?:(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d)\\b', flags: 'g', sample: '网关 192.168.1.1，DNS 8.8.8.8 与 114.114.114.114；非法 256.1.1.1' },
+        { name: '日期', pattern: '\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])', flags: 'g', sample: '上线日期 2026-10-15，截止 2025-02-30（2 月没有 30 日）' },
+        { name: '时间', pattern: '(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?', flags: 'g', sample: '会议 09:30:00 开始，提醒 18:05' },
+        { name: '中文字符', pattern: '[\\u4e00-\\u9fa5]', flags: 'g', sample: '混合 English 与中文文本，以及数字 123' },
+        { name: '整数', pattern: '-?\\d+', flags: 'g', sample: '温度 -5 到 42 度，共 100 人参加' },
+        { name: '小数', pattern: '-?\\d+\\.\\d+', flags: 'g', sample: '价格 3.14、-0.5 与 12.0 元' },
+        { name: '十六进制颜色', pattern: '#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\\b', flags: 'g', sample: '主色 #4f46e5，背景 #fff，半透明 #00000080' },
+        { name: '强密码校验', pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^\\w\\s]).{8,}$', flags: 'g', sample: 'Abc12345! 合格；abcdefgh 不合格' },
+        { name: '车牌号', pattern: '^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼][A-HJ-NP-Z][A-HJ-NP-Z0-9]{4}[A-HJ-NP-Z0-9挂学警港澳]$', flags: 'g', sample: '京A12345、沪B8888、粤Z1234港' },
+        { name: '邮政编码', pattern: '[1-9]\\d{5}', flags: 'g', sample: '北京邮编 100000，深圳邮编 518048' },
+        { name: 'HTML 标签', pattern: '</?[A-Za-z][^>]*>', flags: 'g', sample: '<div class="a">文本</div><br/>' },
+        { name: 'MAC 地址', pattern: '(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}', flags: 'g', sample: '网卡 00:1A:2B:3C:4D:5E 与 01-23-45-67-89-ab' }
+    ];
+    (function initRegexLibrary() {
+        var host = getById('regexLibrary');
+        if (!host) return;
+        regexLibraryItems.forEach(function(item) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn small';
+            btn.textContent = item.name;
+            btn.title = item.pattern;
+            btn.addEventListener('click', function() {
+                getById('regexPattern').value = item.pattern;
+                getById('regexFlags').value = item.flags;
+                getById('regexTestText').value = item.sample;
+                runRegex('match');
+            });
+            host.appendChild(btn);
+        });
+    })();
+
+    // ============ SQL 轻量格式化 / 压缩（分词器实现，保留字符串与注释） ============
+    function sqlTokenize(src) {
+        var tokens = [], i = 0, n = src.length, prevType = '';
+        function push(t, v) { tokens.push({ t: t, v: v }); prevType = t; }
+        while (i < n) {
+            var c = src[i];
+            if (c === ' ' || c === '\t' || c === '\r' || c === '\n' || c === '\f' || c === '\v') {
+                var j = i; while (j < n && /\s/.test(src[j])) j++;
+                push('ws', src.slice(i, j)); i = j; continue;
+            }
+            if (c === '-' && src[i + 1] === '-') {
+                var j = i; while (j < n && src[j] !== '\n') j++;
+                push('line_comment', src.slice(i, j)); i = j; continue;
+            }
+            if (c === '/' && src[i + 1] === '*') {
+                var j = i + 2; while (j < n && !(src[j] === '*' && src[j + 1] === '/')) j++;
+                j = Math.min(n, j + 2);
+                push('block_comment', src.slice(i, j)); i = j; continue;
+            }
+            if (c === "'" || c === '"' || c === '`') {
+                var q = c, j = i + 1;
+                while (j < n) { if (src[j] === q) { if (src[j + 1] === q) { j += 2; continue; } j++; break; } j++; }
+                push('string', src.slice(i, j)); i = j; continue;
+            }
+            if (c === '[') {
+                var j = src.indexOf(']', i + 1);
+                j = j < 0 ? n : j + 1;
+                push('string', src.slice(i, j)); i = j; continue;
+            }
+            if (/[A-Za-z_]/.test(c)) {
+                var j = i; while (j < n && /[A-Za-z0-9_$#]/.test(src[j])) j++;
+                push('word', src.slice(i, j)); i = j; continue;
+            }
+            if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i + 1] || '')) || ((c === '-' || c === '+') && /[0-9.]/.test(src[i + 1] || '') && (i === 0 || prevType === 'punct' || prevType === 'ws'))) {
+                var j = i + (c === '-' || c === '+' ? 1 : 0);
+                while (j < n && /[0-9.]/.test(src[j])) j++;
+                if (src[j] === 'e' || src[j] === 'E') {
+                    var k = j + 1;
+                    if (src[k] === '+' || src[k] === '-') k++;
+                    if (/[0-9]/.test(src[k] || '')) { j = k; while (j < n && /[0-9]/.test(src[j])) j++; }
+                }
+                push('number', src.slice(i, j)); i = j; continue;
+            }
+            var opMatch = /^(?:->>|#>>|>>=|<<=|!~~\*|!~\*|<>|<=|>=|!=|::|:=|->|#>|@>|<@|\|\||&&|!~|~~|\?\?|\?\||\|=|\^=|&=|\+=|-=|\*=|%=|\/=)/.exec(src.slice(i));
+            if (opMatch) { push('punct', opMatch[0]); i += opMatch[0].length; continue; }
+            push('punct', c); i++;
+        }
+        return tokens;
+    }
+    var SQL_KW_MAIN = { select:1, from:1, where:1, insert:1, update:1, delete:1, create:1, drop:1, alter:1, truncate:1, values:1, set:1, returning:1, with:1 };
+    var SQL_KW_JOINMOD = { left:1, right:1, inner:1, outer:1, cross:1, full:1, natural:1 };
+    var SQL_KW_ANDOR = { and:1, or:1 };
+    var SQL_PAREN_SPACE_KW = { select:1, where:1, from:1, values:1, on:1, and:1, or:1, in:1, exists:1, by:1, using:1, returning:1, as:1, union:1, all:1, any:1, some:1, case:1, when:1, then:1, else:1, not:1, like:1, between:1, is:1, distinct:1 };
+    // 仅对真正的关键字做大小写转换，普通标识符（表名/列名/别名）保持原样。
+    var SQL_KEYWORDS_ALL = (function() {
+        var set = {}, list = ('select from where group by having order limit offset union all distinct as and or not in exists '
+            + 'between like is null join left right inner outer cross full natural on using insert into values update set delete '
+            + 'create table view index drop alter truncate with returning case when then else end asc desc primary key foreign '
+            + 'references default constraint unique check if over partition window fetch first rows only cast count sum avg min '
+            + 'max coalesce nullif true false interval current_date current_timestamp begin commit rollback transaction explain '
+            + 'analyze vacuum grant revoke to declare cursor procedure function trigger replace ignore duplicate conflict do '
+            + 'nothing lateral apply top percent except intersect any some array unnest extract date timestamp numeric varchar '
+            + 'char int integer bigint smallint boolean text uuid json jsonb serial').split(' ');
+        list.forEach(function(w) { set[w] = 1; });
+        return set;
+    })();
+    function sqlCaseWord(word, mode) {
+        if (mode === 'upper' && SQL_KEYWORDS_ALL[word.toLowerCase()] === 1) return word.toUpperCase();
+        if (mode === 'lower' && SQL_KEYWORDS_ALL[word.toLowerCase()] === 1) return word.toLowerCase();
+        return word;
+    }
+    function sqlFormatSql(src, mode, indentWidth) {
+        var tokens = sqlTokenize(src);
+        var out = [], line = '', depth = 0, extra = 0, pendingSpace = false, prevWord = '', expectBy = false, prevJoinMod = false, lineIndent = 0;
+        function padAt(n) { return new Array(indentWidth * n + 1).join(' '); }
+        // 行的缩进在行首确定，避免括号内的深度影响已经成型的上一行。
+        function addText(s) { if (line === '') lineIndent = depth + extra; line += s; }
+        function flush() { var t = line.replace(/\s+$/, ''); if (t !== '') out.push(padAt(lineIndent) + t); line = ''; }
+        function emit(text) { if (pendingSpace && line !== '') addText(' '); addText(text); pendingSpace = false; }
+        tokens.forEach(function(tk) {
+            if (tk.t === 'ws') { if (line !== '') pendingSpace = true; return; }
+            if (tk.t === 'word') {
+                var kw = tk.v.toLowerCase();
+                if (expectBy && kw === 'by') { emit(sqlCaseWord(tk.v, mode)); expectBy = false; prevWord = kw; return; }
+                expectBy = false;
+                if (SQL_KW_MAIN[kw] || SQL_KW_JOINMOD[kw] || kw === 'join' || kw === 'group' || kw === 'order' || kw === 'having' || kw === 'limit' || kw === 'offset' || kw === 'union') {
+                    if (kw === 'join' && prevJoinMod) { emit(sqlCaseWord(tk.v, mode)); prevJoinMod = false; prevWord = kw; return; }
+                    flush(); extra = 0; pendingSpace = false;
+                    addText(sqlCaseWord(tk.v, mode));
+                    prevWord = kw;
+                    if (kw === 'group' || kw === 'order') expectBy = true;
+                    if (SQL_KW_JOINMOD[kw]) prevJoinMod = true;
+                    return;
+                }
+                if (SQL_KW_ANDOR[kw]) { flush(); extra = 1; pendingSpace = false; addText(sqlCaseWord(tk.v, mode)); prevWord = kw; return; }
+                if (kw === 'on') { flush(); extra = 1; pendingSpace = false; addText(sqlCaseWord(tk.v, mode)); prevWord = kw; return; }
+                emit(sqlCaseWord(tk.v, mode));
+                prevWord = kw; return;
+            }
+            if (tk.t === 'string' || tk.t === 'number') { emit(tk.v); prevWord = ''; return; }
+            if (tk.t === 'line_comment') {
+                if (line !== '') { addText(' '); addText(tk.v); flush(); }
+                else { flush(); out.push(padAt(depth + extra) + tk.v); }
+                return;
+            }
+            if (tk.t === 'block_comment') { if (line === '') { flush(); out.push(padAt(depth + extra) + tk.v); } else { addText(' ' + tk.v); } return; }
+            var c = tk.v;
+            if (c === '(') { if (line !== '' && (!prevWord || SQL_PAREN_SPACE_KW[prevWord])) pendingSpace = true; emit('('); depth++; prevWord = ''; return; }
+            if (c === ')') {
+                if (line !== '' && lineIndent >= depth) {
+                    // 括号内部已经另起多行：右括号单独成行并回退一级缩进
+                    flush(); extra = 0; depth = Math.max(0, depth - 1);
+                    addText(')'); pendingSpace = true;
+                } else {
+                    line = line.replace(/\s+$/, ''); emit(')'); depth = Math.max(0, depth - 1);
+                }
+                prevWord = ''; return;
+            }
+            if (c === ';') { emit(';'); flush(); depth = 0; extra = 0; prevWord = ''; return; }
+            if (c === ',') { emit(','); pendingSpace = true; prevWord = ''; return; }
+            if (c === '.') { line = line.replace(/\s+$/, ''); emit('.'); prevWord = ''; return; }
+            // 运算符（= >= <> + 等）：前后各留一个空格
+            line = line.replace(/\s+$/, '');
+            if (line !== '' && !/[(\s]$/.test(line)) addText(' ');
+            addText(c);
+            pendingSpace = true; prevWord = '';
+        });
+        flush();
+        return out.join('\n');
+    }
+    function sqlMinifySql(src) {
+        var tokens = sqlTokenize(src), out = '';
+        function trimEnd() { out = out.replace(/ +$/, ''); }
+        function ensureSpace() { if (out !== '' && !/ $/.test(out)) out += ' '; }
+        for (var i = 0; i < tokens.length; i++) {
+            var tk = tokens[i];
+            if (tk.t === 'ws') { ensureSpace(); continue; }
+            if (tk.t === 'line_comment' || tk.t === 'block_comment') { ensureSpace(); continue; } // 压缩时移除注释，但保留必要的分隔
+            if (tk.t === 'punct' && (tk.v === ',' || tk.v === ';' || tk.v === ')' || tk.v === '.')) { trimEnd(); out += tk.v; continue; }
+            if (tk.t === 'punct' && tk.v === '(') { trimEnd(); out += '('; continue; }
+            if (tk.t === 'punct') { trimEnd(); out += ' ' + tk.v + ' '; continue; }
+            out += tk.v;
+        }
+        return out.replace(/^ +/, '').replace(/ +$/, '');
+    }
+    var SQL_SAMPLE = '-- 查询最近下单较多的活跃成年用户\nSELECT u.id, u.name, u.email, COUNT(o.id) AS order_count\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nWHERE u.age >= 18 AND u.status = \'active\'\nGROUP BY u.id, u.name, u.email\nHAVING COUNT(o.id) > 5\nORDER BY order_count DESC\nLIMIT 20;';
+    getById('sqlFormat').onclick = function() {
+        var src = getById('sqlInput').value;
+        try {
+            if (!src.trim()) throw new Error('请输入 SQL');
+            if (src.length > 500000) throw new Error('输入超过 500,000 字符限制');
+            var mode = getById('sqlKeywordCase').value;
+            var indent = Number(getById('sqlIndent').value) || 4;
+            getById('sqlOutput').value = sqlFormatSql(src, mode, indent);
+            setToolText('sqlStatus', '格式化完成');
+        } catch (e) { getById('sqlOutput').value = ''; setToolText('sqlStatus', '格式化失败：' + e.message); }
+    };
+    getById('sqlMinify').onclick = function() {
+        var src = getById('sqlInput').value;
+        try {
+            if (!src.trim()) throw new Error('请输入 SQL');
+            if (src.length > 500000) throw new Error('输入超过 500,000 字符限制');
+            getById('sqlOutput').value = sqlMinifySql(src);
+            setToolText('sqlStatus', '压缩完成（已移除注释并折叠空白）');
+        } catch (e) { getById('sqlOutput').value = ''; setToolText('sqlStatus', '压缩失败：' + e.message); }
+    };
+    getById('sqlSample').onclick = function() { getById('sqlInput').value = SQL_SAMPLE; setToolText('sqlStatus', '已载入示例，点击「格式化」查看效果。'); };
 
     // 文本 / JSON 差异比较（LCS；限制矩阵规模防止超大输入耗尽内存）。
     function makeLineDiff(left, right) {
@@ -3255,8 +3841,29 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     getById('toggleQuickLists').onclick=function(){var el=getById('globalQuickLists');el.style.display=el.style.display==='none'?'grid':'none';};
     getById('favoriteCurrentTool').onclick=function(){toggleFavorite(getCurrentToolKey());};
     document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();getById('globalToolSearch').focus();getById('globalToolSearch').select();}});
-    document.addEventListener('click',function(e){var sub=e.target.closest('[data-sub]');var primary=e.target.closest('#tabsPrimary [data-tab]');if(sub||primary){window.setTimeout(function(){var active=getCurrentToolKey();recordToolUse(active);},0);}});
+    document.addEventListener('click',function(e){var sub=e.target.closest('[data-sub]');var primary=e.target.closest('#tabsPrimary [data-tab]');if(sub||primary){window.setTimeout(function(){var active=getCurrentToolKey();recordToolUse(active);dtpSyncHashToCurrent();},0);}});
     updateQuickLists();refreshFavoriteButton();
+
+    // ============ 工具 URL 深链：#分类 或 #分类/子工具（如 #extras/regex、#hash/crc32） ============
+    function dtpKeyFromHash(){
+        var raw=String(location.hash||'').replace(/^#\/?/,'');
+        if(!raw)return null;
+        var parts=raw.split('/').filter(Boolean).map(function(p){try{return decodeURIComponent(p);}catch(e){return p;}});
+        if(parts.length>=2)return 'sub:'+parts[0]+':'+parts[1];
+        if(parts.length===1)return 'tab:'+parts[0];
+        return null;
+    }
+    function dtpSyncHashToCurrent(){
+        try{
+            var key=getCurrentToolKey();
+            if(!key)return;
+            var h=key.indexOf('sub:')===0?'#'+key.slice(4).replace(':','/'):'#'+key.slice(4);
+            if(location.hash!==h)history.replaceState(null,'',h);
+        }catch(e){/* 某些环境限制 history 操作时静默降级 */}
+    }
+    window.addEventListener('hashchange',function(){var key=dtpKeyFromHash();if(key&&toolByKey(key))navigateTool(key);});
+    var dtpInitialKey=dtpKeyFromHash();
+    if(dtpInitialKey&&toolByKey(dtpInitialKey)){navigateTool(dtpInitialKey);}else{dtpSyncHashToCurrent();}
     document.addEventListener('DOMContentLoaded',function(){if(window.mermaid){try{window.mermaid.initialize({startOnLoad:false,securityLevel:'strict',theme:'default',htmlLabels:false,suppressErrorRendering:true});}catch(e){}}updateMarkdownPreview();if(typeof window.QRCode!=='undefined'){try{generateQr();}catch(e){setToolText('qrStatus',e.message);}}});
 
     // ============ Markdown 预览 ============
@@ -3318,7 +3925,10 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     getById('qrGenerate').onclick=function(){try{generateQr();}catch(e){setToolText('qrStatus',e.message);}};
     getById('qrDownload').onclick=function(){var box=getById('qrCodeBox'),canvas=box.querySelector('canvas'),img=box.querySelector('img');if(canvas){downloadBlob('qrcode.png',dataUrlToBlob(canvas.toDataURL('image/png')),'image/png');return;}if(img&&img.src){var a=document.createElement('a');a.href=img.src;a.download='qrcode.png';a.click();return;}setToolText('qrStatus','请先生成二维码');};
     function dataUrlToBlob(dataUrl){var parts=dataUrl.split(','),mime=(parts[0].match(/:(.*?);/)||[])[1]||'application/octet-stream',bin=atob(parts[1]),arr=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime});}
-    getById('qrDecode').onclick=function(){var file=(getById('qrFile').files||[])[0],out=getById('qrDecodeOutput');out.value='';if(!file){out.value='请先选择二维码图片';return;}if(file.size>20*1024*1024){out.value='图片过大，最大支持 20 MiB';return;}if(typeof window.jsQR!=='function'){out.value='二维码识别库未加载，请检查网络';return;}var reader=new FileReader();reader.onerror=function(){out.value='读取文件失败';};reader.onload=function(){var image=new Image();image.onerror=function(){out.value='无法解码该图片';};image.onload=function(){var scale=Math.min(1,2000/Math.max(image.naturalWidth,image.naturalHeight)),w=Math.max(1,Math.round(image.naturalWidth*scale)),h=Math.max(1,Math.round(image.naturalHeight*scale)),canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;var ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(image,0,0,w,h);try{var result=window.jsQR(ctx.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'attemptBoth'});out.value=result?result.data:'未识别到二维码，请尝试更清晰或更正向的图片';}catch(e){out.value='识别失败：'+e.message;}};image.src=reader.result;};reader.readAsDataURL(file);};
+    function qrDecodeFromDataUrl(dataUrl){var out=getById('qrDecodeOutput');out.value='识别中…';var image=new Image();image.onerror=function(){out.value='无法解码该图片';};image.onload=function(){var scale=Math.min(1,2000/Math.max(image.naturalWidth,image.naturalHeight)),w=Math.max(1,Math.round(image.naturalWidth*scale)),h=Math.max(1,Math.round(image.naturalHeight*scale)),canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;var ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(image,0,0,w,h);try{var result=window.jsQR(ctx.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'attemptBoth'});out.value=result?result.data:'未识别到二维码，请尝试更清晰或更正向的图片';}catch(e){out.value='识别失败：'+e.message;}};image.src=dataUrl;}
+    getById('qrDecode').onclick=function(){var file=(getById('qrFile').files||[])[0],out=getById('qrDecodeOutput');out.value='';if(!file){out.value='请先选择二维码图片';return;}if(file.size>20*1024*1024){out.value='图片过大，最大支持 20 MiB';return;}if(typeof window.jsQR!=='function'){out.value='二维码识别库未加载，请检查网络';return;}var reader=new FileReader();reader.onerror=function(){out.value='读取文件失败';};reader.onload=function(){qrDecodeFromDataUrl(reader.result);};reader.readAsDataURL(file);};
+    // 在二维码工具激活时，支持直接粘贴剪贴板图片识别（截图后 Ctrl+V / Cmd+V）。
+    document.addEventListener('paste',function(e){if(!e.clipboardData)return;var panel=getById('sub-workbench-qr');if(!panel||!panel.classList.contains('active'))return;var items=e.clipboardData.items||[],out=getById('qrDecodeOutput');for(var i=0;i<items.length;i++){var it=items[i];if(it.type&&it.type.indexOf('image/')===0){var file=it.getAsFile();if(!file)return;if(file.size>20*1024*1024){out.value='图片过大，最大支持 20 MiB';return;}if(typeof window.jsQR!=='function'){out.value='二维码识别库未加载，请检查网络';return;}var reader=new FileReader();reader.onerror=function(){out.value='读取文件失败';};reader.onload=function(){qrDecodeFromDataUrl(reader.result);};reader.readAsDataURL(file);e.preventDefault();return;}}});
 
     // ============ JavaScript / CSS formatting ============
     function basicFormatCode(source,type){if(source.length>500000)throw new Error('输入最多 500,000 字符');var s=source.trim();if(!s)return '';var out='',indent=0,quote=null,escape=false,lineStart=true,paren=0;function pad(){if(lineStart){out+='    '.repeat(Math.min(indent,30));lineStart=false;}}function newline(){out=out.replace(/[ \t]+$/,'');if(!out.endsWith('\n'))out+='\n';lineStart=true;}
