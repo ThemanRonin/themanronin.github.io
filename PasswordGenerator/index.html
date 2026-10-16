@@ -1,332 +1,311 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PasswordGenerator</title>
-<link href="https://fonts.googleapis.com/css2?family=Courier+Prime&display=swap" rel="stylesheet">
+<title>密码生成器</title>
+<script>
+    /* 在样式生效前确定主题，避免深色模式下的白屏闪烁；存储键与站内其他页面保持一致。 */
+    (function () {
+        try {
+            var t = localStorage.getItem('cipher_theme_v2');
+            if (t === 'dark' || t === 'light') { document.documentElement.setAttribute('data-theme', t); return; }
+        } catch (e) { /* localStorage 不可用时忽略 */ }
+        try {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        } catch (e) { /* 忽略 */ }
+    })();
+</script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; }
+    :root {
+        --bg: #fafafa;
+        --surface: #fff;
+        --text: #1a1a1a;
+        --text-secondary: #6e6e6e;
+        --text-tertiary: #999;
+        --border: #e0e0e0;
+        --border-light: #eee;
+        --accent: #1a1a1a;
+        --accent-hover: #3a3a3a;
+        --danger: #c0392b;
+        --ok: #237a38;
+        --radius: 4px;
+        --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', 'Menlo', monospace;
+        --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        --transition: 120ms ease;
+        color-scheme: light;
+    }
 
-  :root {
-    --bg: #eceef1;
-    --card: #ffffff;
-    --soft: #f4f5f7;
-    --soft-hover: #edeff3;
-    --line: #e6e8ec;
-    --line-strong: #cdd2d9;
-    --text: #15171b;
-    --muted: #8b909a;
-    --accent: #15171b;
-  }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  body {
-    margin: 0;
-    padding: 32px 20px;
-    min-height: 100vh;
-    display: flex;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-                 "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
-    font-size: 15px;
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-  }
+    body {
+        font-family: var(--font-sans);
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 40px 16px 60px;
+    }
 
-  .app {
-    width: 100%;
-    max-width: 700px;
-    margin: auto;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 26px;
-    padding: 36px 44px 34px;
-  }
+    .container { width: 100%; max-width: 820px; min-width: 0; }
 
-  /* ---------- 头部 ---------- */
-  .header { margin-bottom: 22px; }
-  .header h1 {
-    margin: 0;
-    font-size: 19px;
-    font-weight: 650;
-    letter-spacing: .3px;
-  }
+    /* ---------- 顶部标题 ---------- */
+    .header { margin-bottom: 36px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .header-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+    .header-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text); flex-shrink: 0; }
+    .header-subtitle { font-size: 12px; color: var(--text-tertiary); }
 
-  /* ---------- 密码输出区（固定高度） ---------- */
-  .output {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    height: 132px;
-    padding: 22px 16px 22px 26px;
-    background: var(--soft);
-    border-radius: 18px;
-    cursor: pointer;
-    transition: background-color .18s ease;
-  }
-  .output:hover { background: var(--soft-hover); }
-  .output:focus-visible { outline: 2px solid #8ab4f8; outline-offset: 2px; }
+    /* ---------- 主题切换按钮 ---------- */
+    .dtp-theme-toggle { align-self: center; margin-left: auto; padding: 6px 12px; font-size: 11px; }
 
-  .password {
-    flex: 1;
-    min-width: 0;
-    max-height: 100%;
-    overflow-y: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    font-family: 'Courier Prime', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 24px;
-    line-height: 1.45;
-    letter-spacing: .5px;
-    word-break: break-all;
-    overflow-wrap: anywhere;
-  }
-  .password::-webkit-scrollbar { display: none; }
+    /* ---------- 分区标签 ---------- */
+    .section-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-tertiary);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
 
-  .password.error {
-    font-family: inherit;
-    font-size: 13.5px;
-    line-height: 1.6;
-    letter-spacing: 0;
-    color: #e5484d;
-  }
+    /* ---------- 按钮 ---------- */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 16px;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        transition: all var(--transition);
+        font-family: var(--font-sans);
+        white-space: nowrap;
+        outline: none;
+        user-select: none;
+    }
+    .btn:hover { background: #f4f4f4; border-color: #c0c0c0; }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn.small { padding: 5px 10px; font-size: 11px; }
+    .btn.copy-btn.copied { background: #f0faf0; border-color: #b7d9b7; color: #2d6a2d; pointer-events: none; }
 
-  .ch-upper  { color: #16a34a; }
-  .ch-lower  { color: #15171b; }
-  .ch-digit  { color: #2563eb; }
-  .ch-symbol { color: #e8590c; }
+    /* ---------- 布局工具类 ---------- */
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .gap-sm { gap: 8px; }
+    .mt-sm { margin-top: 10px; }
+    .mt-md { margin-top: 18px; }
+    .mb-sm { margin-bottom: 8px; }
+    .note { font-size: 11px; color: var(--text-tertiary); letter-spacing: 0.02em; }
+    .note b { font-family: var(--font-mono); font-weight: 700; color: var(--text); }
 
-  .copy-btn {
-    flex: none;
-    border: none;
-    background: transparent;
-    padding: 8px 12px;
-    border-radius: 10px;
-    font-family: inherit;
-    font-size: 12.5px;
-    color: var(--muted);
-    cursor: pointer;
-    transition: color .15s ease, background-color .15s ease;
-  }
-  .copy-btn:hover { color: var(--text); background: rgba(0, 0, 0, .05); }
-  .copy-btn.copied { color: #16a34a; }
+    /* ---------- 密码输出区 ---------- */
+    .output {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 96px;
+        padding: 16px 14px 16px 18px;
+        background: #f9f9f9;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: border-color var(--transition);
+    }
+    .output:hover { border-color: #c0c0c0; }
+    .output:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(26,26,26,0.08); outline: none; }
 
-  /* ---------- 统计信息 ---------- */
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px 22px;
-    padding: 14px 6px 0;
-    font-size: 12.5px;
-    color: var(--muted);
-    white-space: nowrap;
-  }
-  .meta b {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-weight: 700;
-    font-size: 13.5px;
-    color: var(--text);
-  }
+    .password {
+        flex: 1;
+        min-width: 0;
+        max-height: 128px;
+        overflow-y: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        font-family: var(--font-mono);
+        font-size: 20px;
+        line-height: 1.5;
+        letter-spacing: .02em;
+        word-break: break-all;
+        overflow-wrap: anywhere;
+    }
+    .password::-webkit-scrollbar { display: none; }
 
-  /* 熵值颜色分级 */
-  #entropyValue { transition: color .25s ease; }
-  #entropyValue.weak   { color: #e5484d; }
-  #entropyValue.fair   { color: #ea580c; }
-  #entropyValue.good   { color: #ca8a04; }
-  #entropyValue.strong { color: #16a34a; }
-  #entropyValue.ultra  { color: #0e7490; }
+    .password.error {
+        font-family: var(--font-sans);
+        font-size: 13px;
+        line-height: 1.6;
+        letter-spacing: 0;
+        color: var(--danger);
+    }
 
-  /* ---------- 区块 ---------- */
-  .section { margin-top: 28px; }
-  .section-title {
-    margin: 0 0 12px;
-    font-size: 12.5px;
-    font-weight: 600;
-    letter-spacing: .5px;
-    color: var(--muted);
-  }
+    /* 字符着色：沿用站内语法高亮配色 */
+    .ch-upper  { color: #7a3e9d; }
+    .ch-lower  { color: var(--text); }
+    .ch-digit  { color: #175ca8; }
+    .ch-symbol { color: #b35b00; }
 
-  /* ---------- 长度滑块 ---------- */
-  .length-row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 14px;
-  }
-  .length-row .label { font-size: 13.5px; color: var(--muted); }
-  .length-value {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 18px;
-    font-weight: 650;
-    min-width: 3ch;
-    text-align: right;
-  }
+    /* ---------- 熵值 ---------- */
+    .strength-bar-wrap { height: 3px; background: var(--border-light); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+    .strength-bar-fill { height: 100%; width: 0%; border-radius: 2px; background: var(--border); transition: width 200ms ease, background 200ms ease; }
+    #entropyValue { font-family: var(--font-mono); transition: color .25s ease; }
+    #entropyValue.weak   { color: #c0392b; }
+    #entropyValue.fair   { color: #b35b00; }
+    #entropyValue.good   { color: #856404; }
+    #entropyValue.strong { color: #237a38; }
+    #entropyValue.ultra  { color: #175ca8; }
+    .strength-bar-fill.weak   { background: #c0392b; }
+    .strength-bar-fill.fair   { background: #b35b00; }
+    .strength-bar-fill.good   { background: #856404; }
+    .strength-bar-fill.strong { background: #237a38; }
+    .strength-bar-fill.ultra  { background: #175ca8; }
 
-  input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    display: block;
-    width: 100%;
-    height: 7px;
-    border-radius: 999px;
-    outline: none;
-    cursor: pointer;
-    background: linear-gradient(to right,
-                var(--accent) var(--fill, 26%),
-                var(--line) var(--fill, 26%));
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #fff;
-    border: 2.5px solid var(--accent);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
-    transition: transform .15s ease;
-  }
-  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.12); }
-  input[type="range"]::-moz-range-thumb {
-    width: 17px;
-    height: 17px;
-    border-radius: 50%;
-    background: #fff;
-    border: 2.5px solid var(--accent);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
-    cursor: pointer;
-  }
-  input[type="range"]::-moz-range-track {
-    height: 7px;
-    border-radius: 999px;
-    background: var(--line);
-  }
-  input[type="range"]::-moz-range-progress {
-    height: 7px;
-    border-radius: 999px;
-    background: var(--accent);
-  }
+    /* ---------- 长度滑块 ---------- */
+    input[type="range"] {
+        flex: 1;
+        min-width: 0;
+        accent-color: var(--accent);
+        cursor: pointer;
+    }
+    .length-value {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 600;
+        min-width: 3ch;
+        text-align: right;
+    }
 
-  /* ---------- 标签式复选框 ---------- */
-  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
-  .chip {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    padding: 10px 18px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: #fff;
-    font-size: 13.5px;
-    color: var(--muted);
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-    transition: background-color .15s ease, color .15s ease, border-color .15s ease;
-  }
-  .chip:hover { border-color: var(--line-strong); color: var(--text); }
-  .chip input {
-    position: absolute;
-    width: 0; height: 0;
-    opacity: 0;
-    pointer-events: none;
-  }
-  .chip.is-on {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-  }
-  .chip:has(input:focus-visible) {
-    outline: 2px solid #8ab4f8;
-    outline-offset: 2px;
-  }
+    /* ---------- 复选框 ---------- */
+    .checkbox-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+    }
+    .checkbox-label input { accent-color: var(--accent); }
+    .checkbox-label input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  /* ---------- 主按钮 ---------- */
-  .btn-primary {
-    width: 100%;
-    margin-top: 30px;
-    padding: 17px 20px;
-    border: none;
-    border-radius: 16px;
-    background: var(--accent);
-    color: #fff;
-    font-family: inherit;
-    font-size: 15.5px;
-    font-weight: 550;
-    letter-spacing: .5px;
-    cursor: pointer;
-    transition: opacity .15s ease, transform .08s ease;
-  }
-  .btn-primary:hover { opacity: .86; }
-  .btn-primary:active { transform: scale(.99); }
+    /* ---------- 主按钮 ---------- */
+    .btn-generate {
+        width: 100%;
+        margin-top: 24px;
+        padding: 12px 20px;
+        font-size: 13px;
+    }
 
-  /* ---------- 窄屏适配 ---------- */
-  @media (max-width: 560px) {
-    body { padding: 16px 12px; }
-    .app { padding: 26px 20px 24px; border-radius: 20px; }
-    .header { margin-bottom: 18px; }
-    .output { height: 128px; padding: 18px 12px 18px 18px; gap: 10px; }
-    .password { font-size: 17px; }
-    .copy-btn { padding: 6px 8px; font-size: 12px; }
-    .section { margin-top: 24px; }
-    .chip { padding: 9px 14px; font-size: 13px; }
-    .btn-primary { padding: 15px 18px; margin-top: 26px; }
-  }
+    ::selection { background: var(--text); color: var(--bg); }
+
+    /* ---------- 深色模式（与站内其他页面共用 cipher_theme_v2 存储键） ---------- */
+    [data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0d0d0f;
+        --surface: #17171a;
+        --text: #e9e9ec;
+        --text-secondary: #a1a1a8;
+        --text-tertiary: #71717a;
+        --border: #2c2c31;
+        --border-light: #222227;
+        --accent: #e9e9ec;
+        --accent-hover: #ffffff;
+        --danger: #e5484d;
+        --ok: #7bd88f;
+    }
+    [data-theme="dark"] .btn:hover { background: #232328; border-color: #45454d; }
+    [data-theme="dark"] .btn.primary { color: #101013; }
+    [data-theme="dark"] .btn.primary:hover { background: #ffffff; border-color: #ffffff; }
+    [data-theme="dark"] .btn.copy-btn.copied { background: #16261a; border-color: #2f5c39; color: #7bd88f; }
+    [data-theme="dark"] .output { background: #1d1d21; }
+    [data-theme="dark"] .output:hover { border-color: #45454d; }
+    [data-theme="dark"] .output:focus-visible { box-shadow: 0 0 0 1px rgba(255,255,255,0.14); }
+    [data-theme="dark"] .ch-upper  { color: #c792ea; }
+    [data-theme="dark"] .ch-digit  { color: #79b8ff; }
+    [data-theme="dark"] .ch-symbol { color: #ffab70; }
+    [data-theme="dark"] #entropyValue.weak   { color: #e5484d; }
+    [data-theme="dark"] #entropyValue.fair   { color: #ffab70; }
+    [data-theme="dark"] #entropyValue.good   { color: #f5c877; }
+    [data-theme="dark"] #entropyValue.strong { color: #7bd88f; }
+    [data-theme="dark"] #entropyValue.ultra  { color: #79b8ff; }
+    [data-theme="dark"] .strength-bar-fill.weak   { background: #e5484d; }
+    [data-theme="dark"] .strength-bar-fill.fair   { background: #ffab70; }
+    [data-theme="dark"] .strength-bar-fill.good   { background: #f5c877; }
+    [data-theme="dark"] .strength-bar-fill.strong { background: #7bd88f; }
+    [data-theme="dark"] .strength-bar-fill.ultra  { background: #79b8ff; }
+
+    @media (max-width: 600px) {
+        body { padding: 20px 10px 40px; }
+        .header { margin-bottom: 24px; }
+        .output { min-height: 84px; padding: 14px 10px 14px 14px; gap: 10px; }
+        .password { font-size: 16px; }
+        .btn-generate { margin-top: 18px; }
+    }
 </style>
 </head>
 <body>
 
-<div class="app">
-  <header class="header">
-    <h1>密码生成器</h1>
-  </header>
-
-  <!-- 密码显示 -->
-  <div class="output" id="outputBox" tabindex="0" role="button" aria-label="点击复制密码">
-    <div class="password" id="coloredPassword"></div>
-    <button class="copy-btn" id="copyBtn" type="button">复制</button>
-  </div>
-
-  <!-- 统计信息 -->
-  <div class="meta">
-    <span>熵值 <b id="entropyValue">0</b> bits</span>
-    <span>组合总数 <b id="totalCombinations">0</b></span>
-  </div>
-
-  <!-- 长度 -->
-  <section class="section">
-    <div class="length-row">
-      <span class="label">密码长度</span>
-      <span class="length-value" id="passwordLength">20</span>
+<div class="container">
+    <div class="header">
+        <span class="header-title">密码生成器</span>
+        <span class="header-dot"></span>
+        <span class="header-subtitle">安全随机 · 本地生成</span>
+        <button class="btn dtp-theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色模式" aria-label="切换深色或浅色模式" aria-pressed="false">深色模式</button>
     </div>
-    <input type="range" id="lengthSlider" min="6" max="60" value="20" aria-label="密码长度">
-  </section>
 
-  <!-- 字符类型 -->
-  <section class="section">
-    <h2 class="section-title">字符类型</h2>
-    <div class="chips">
-      <label class="chip"><input type="checkbox" id="includeUppercase" checked><span>大写字母</span></label>
-      <label class="chip"><input type="checkbox" id="includeLowercase" checked><span>小写字母</span></label>
-      <label class="chip"><input type="checkbox" id="includeNumbers" checked><span>数字</span></label>
-      <label class="chip"><input type="checkbox" id="includeSymbols" checked><span>常用符号</span></label>
-      <label class="chip"><input type="checkbox" id="includeLatin1" checked><span>Latin-1 补充</span></label>
+    <!-- 密码显示 -->
+    <div class="section-label">密码</div>
+    <div class="output" id="outputBox" tabindex="0" role="button" aria-label="点击复制密码">
+        <div class="password" id="coloredPassword"></div>
+        <button class="btn small copy-btn" id="copyBtn" type="button">复制</button>
     </div>
-  </section>
+    <div class="strength-bar-wrap"><div class="strength-bar-fill" id="entropyBar"></div></div>
+    <p class="note mt-sm">熵值 <b id="entropyValue">0</b> bits · 组合总数 <b id="totalCombinations">0</b> · 点击密码也可复制</p>
 
-  <!-- 高级设置 -->
-  <section class="section">
-    <h2 class="section-title">高级设置</h2>
-    <div class="chips">
-      <label class="chip"><input type="checkbox" id="noRepeat" checked><span>字符不重复</span></label>
-      <label class="chip"><input type="checkbox" id="excludeSimilar" checked><span>排除相似字符</span></label>
-      <label class="chip"><input type="checkbox" id="noConsecutive" checked><span>避免连续字符</span></label>
+    <!-- 长度 -->
+    <div class="section-label mt-md">密码长度</div>
+    <div class="row gap-sm">
+        <input type="range" id="lengthSlider" min="6" max="60" value="20" aria-label="密码长度">
+        <span class="length-value" id="passwordLength">20</span>
     </div>
-  </section>
 
-  <button class="btn-primary" id="generateBtn" type="button">重新生成密码</button>
+    <!-- 字符类型 -->
+    <div class="section-label mt-md">字符类型</div>
+    <div class="row gap-sm">
+        <label class="checkbox-label"><input type="checkbox" id="includeUppercase" checked> 大写字母</label>
+        <label class="checkbox-label"><input type="checkbox" id="includeLowercase" checked> 小写字母</label>
+        <label class="checkbox-label"><input type="checkbox" id="includeNumbers" checked> 数字</label>
+        <label class="checkbox-label"><input type="checkbox" id="includeSymbols" checked> 常用符号</label>
+        <label class="checkbox-label"><input type="checkbox" id="includeLatin1" checked> Latin-1 补充</label>
+    </div>
+
+    <!-- 高级设置 -->
+    <div class="section-label mt-md">高级设置</div>
+    <div class="row gap-sm">
+        <label class="checkbox-label"><input type="checkbox" id="noRepeat" checked> 字符不重复</label>
+        <label class="checkbox-label"><input type="checkbox" id="excludeSimilar" checked> 排除相似字符</label>
+        <label class="checkbox-label"><input type="checkbox" id="noConsecutive" checked> 避免连续字符</label>
+    </div>
+
+    <button class="btn primary btn-generate" id="generateBtn" type="button">重新生成密码</button>
+
+    <p class="note mt-sm">密码由 crypto.getRandomValues 在本地生成，不会上传；设置项记忆在当前浏览器。熵值按「长度 × log₂(字符池大小)」估算，仅供参考。</p>
 </div>
 
 <script>
@@ -371,6 +350,7 @@
   const passwordEl          = $('coloredPassword');
   const outputBox           = $('outputBox');
   const entropyValue        = $('entropyValue');
+  const entropyBar          = $('entropyBar');
   const totalCombinationsEl = $('totalCombinations');
   const copyBtn             = $('copyBtn');
   const generateBtn         = $('generateBtn');
@@ -486,6 +466,8 @@
 
     entropyValue.textContent = '0';
     entropyValue.className = '';
+    entropyBar.className = 'strength-bar-fill';
+    entropyBar.style.width = '0%';
     totalCombinationsEl.textContent = '—';
   }
 
@@ -497,6 +479,8 @@
 
     const level = LEVELS.find((l) => entropy < l.max) || LEVELS[LEVELS.length - 1];
     entropyValue.className = level.key;
+    entropyBar.className = 'strength-bar-fill ' + level.key;
+    entropyBar.style.width = Math.min(100, (entropy / 160) * 100) + '%';
 
     const total = Math.pow(poolSize, length);
     totalCombinationsEl.textContent =
@@ -587,33 +571,15 @@
     }
   }
 
-  /* ---------------- 滑块进度填充 ---------------- */
-  function updateSliderFill() {
-    const min = Number(lengthSlider.min);
-    const max = Number(lengthSlider.max);
-    const val = Number(lengthSlider.value);
-    const percent = ((val - min) / (max - min)) * 100;
-    lengthSlider.style.setProperty('--fill', percent + '%');
-  }
-
-  /* ---------------- 标签状态同步 ---------------- */
-  function syncChips() {
-    document.querySelectorAll('.chip input').forEach((input) => {
-      input.closest('.chip').classList.toggle('is-on', input.checked);
-    });
-  }
-
   /* ---------------- 事件绑定 ---------------- */
   lengthSlider.addEventListener('input', () => {
     lengthValue.textContent = lengthSlider.value;
-    updateSliderFill();
     saveSettings();          // 记忆
     generatePassword();
   });
 
-  document.querySelectorAll('.chip input').forEach((input) => {
+  document.querySelectorAll('.checkbox-label input').forEach((input) => {
     input.addEventListener('change', () => {
-      syncChips();
       saveSettings();        // 记忆
       generatePassword();
     });
@@ -636,11 +602,33 @@
 
   /* ---------------- 初始化（先还原记忆，再渲染） ---------------- */
   loadSettings();
-  syncChips();
   lengthValue.textContent = lengthSlider.value;
-  updateSliderFill();
   generatePassword();
 })();
+
+/* ============ 主题切换：与站内其他页面共用 cipher_theme_v2 ============ */
+var THEME_KEY = 'cipher_theme_v2';
+function applyTheme(theme, persist) {
+    var normalized = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', normalized);
+    var isDark = normalized === 'dark';
+    var btn = document.getElementById('themeToggle');
+    if (btn) {
+        btn.textContent = isDark ? '☀ 浅色模式' : '🌙 深色模式';
+        btn.setAttribute('aria-pressed', String(isDark));
+        btn.setAttribute('aria-label', isDark ? '切换到浅色模式' : '切换到深色模式');
+    }
+    /* 用户未显式选择过时，只跟随系统的深浅偏好显示，不写入存储，避免影响站内其他页面。 */
+    if (persist !== false) {
+        try { localStorage.setItem(THEME_KEY, normalized); } catch (e) { /* 存储不可用时仅本次生效 */ }
+    }
+}
+applyTheme(document.documentElement.getAttribute('data-theme') || 'light', false);
+document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
 </script>
+
 </body>
 </html>
