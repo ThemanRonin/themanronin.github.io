@@ -5021,7 +5021,11 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     } catch(e) {
         console.warn('主题 / 草稿初始化失败: ' + e.message);
     }
-    document.addEventListener('DOMContentLoaded', function () { try { computeHash(); } catch (e) { /* 忽略 */ } });
+    /* crypto-js 已改为 defer，依赖它的初始化统一放到 DOMContentLoaded 之后补算一次。 */
+    document.addEventListener('DOMContentLoaded', function () {
+        try { computeHash(); } catch (e) { /* 忽略 */ }
+        try { if (typeof totpRender === 'function') totpRender(); } catch (e) { /* 忽略 */ }
+    });
 })();
 </script>
 </body>
