@@ -57,7 +57,9 @@
             align-items: center;
             padding: 40px 16px 60px;
         }
-        .container { width: 100%; max-width: 820px; }
+        /* min-width:0 必要：body 是 flex 容器，子项默认 min-width:auto，
+           否则下拉框等元素的固有宽度会把页面撑出横向滚动。 */
+        .container { width: 100%; max-width: 820px; min-width: 0; }
         .header { margin-bottom: 36px; display: flex; align-items: baseline; gap: 12px; }
         .header-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
         .header-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text); flex-shrink: 0; }
@@ -332,13 +334,80 @@
         .dtp-theme-toggle { align-self: center; margin-left: auto; padding: 6px 12px; font-size: 11px; }
 
         /* ============ 移动端导航（小屏用下拉选择替代横向滚动标签条） ============ */
-        .dtp-nav-select { display: block; width: 100%; font-family: var(--font-sans); font-size: 13px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); margin-bottom: 12px; }
-        .dtp-nav-select-wrap { display: none; }
+        .dtp-nav-select { display: block; width: 100%; max-width: 100%; min-width: 0; font-family: var(--font-sans); font-size: 13px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); margin-bottom: 12px; }
+        .dtp-nav-select-wrap { display: none; min-width: 0; }
         @media (max-width: 720px) {
             .dtp-nav-select-wrap { display: block; }
             .tabs-primary { display: none; }
             .tabs-secondary-wrap { padding: 10px 0 8px; gap: 6px; }
             .tab-secondary { padding: 7px 12px; }
+        }
+
+        /* ============ PC 端（≥1080px）：左侧分类栏 + 右侧内容区，充分利用横向空间 ============ */
+        .dtp-body { display: block; }
+        .dtp-panels { min-width: 0; }
+
+        /* 900–1080px：还没到分栏断点，但也不该只有 820px 宽 */
+        @media (min-width: 900px) {
+            .container { max-width: 940px; }
+        }
+
+        @media (min-width: 1080px) {
+            body { padding: 44px 32px 72px; }
+            .container { max-width: 1200px; }
+
+            .dtp-body {
+                display: grid;
+                grid-template-columns: 176px minmax(0, 1fr);
+                column-gap: 36px;
+                align-items: start;
+            }
+            .tabs-primary {
+                flex-direction: column;
+                flex-wrap: nowrap;
+                gap: 2px;
+                border-bottom: 0;
+                border-right: 1px solid var(--border);
+                padding-right: 14px;
+                overflow: visible;
+                position: sticky;
+                top: 24px;
+                margin-bottom: 0;
+            }
+            .tab-primary {
+                width: 100%;
+                text-align: left;
+                padding: 9px 12px;
+                border-radius: var(--radius);
+                font-size: 13px;
+            }
+            .tab-primary:hover { background: var(--surface); }
+            .tab-primary.active { background: var(--surface); font-weight: 500; }
+            .tab-primary.active::after {
+                left: auto;
+                right: -15px;
+                top: 6px;
+                bottom: 6px;
+                width: 2px;
+                height: auto;
+                border-radius: 2px;
+            }
+            /* 面板较长时让二级标签吸顶，滚动中也能随时切换工具 */
+            .dtp-panels .tabs-secondary-wrap {
+                position: sticky;
+                top: 0;
+                z-index: 5;
+                background: var(--bg);
+                padding-top: 4px;
+                padding-bottom: 10px;
+            }
+            .workbench-editor { min-height: 320px; }
+            .global-tools input[type="search"] { max-width: 520px; }
+        }
+
+        @media (min-width: 1500px) {
+            .container { max-width: 1320px; }
+            .dtp-body { grid-template-columns: 200px minmax(0, 1fr); column-gap: 48px; }
         }
 
         /* ============ 底部依赖状态提示（仅在有依赖缺失时出现，尽量不干扰阅读） ============ */
@@ -430,6 +499,7 @@
         <select id="mobilePrimarySelect" class="dtp-nav-select" aria-label="选择工具分类"></select>
     </div>
 
+    <div class="dtp-body" id="dtpBody">
     <div class="tabs-primary" id="tabsPrimary">
         <button class="tab-primary active" data-tab="encode">编解码</button>
         <button class="tab-primary" data-tab="hash">哈希</button>
@@ -442,6 +512,7 @@
         <button class="tab-primary" data-tab="utility">文本与效率</button>
     </div>
 
+    <div class="dtp-panels" id="dtpPanels">
     <!-- ==================== 编解码 ==================== -->
     <div class="panel active" id="panel-encode">
         <div class="tabs-secondary-wrap" id="tabsEncodeSub">
@@ -1579,6 +1650,9 @@ timeout"></textarea></div>
             <div class="section-label mb-sm">多类别单位换算</div><div class="tool-grid"><div class="tool-field"><label for="utilUnitCategory">换算类别</label><select id="utilUnitCategory"><option value="length">长度</option><option value="area">面积</option><option value="volume">体积</option><option value="mass">质量</option><option value="speed">速度</option><option value="temperature">温度</option><option value="pressure">压力</option><option value="energy">能量</option><option value="power">功率</option><option value="data">数据容量</option><option value="time">时间</option><option value="angle">角度</option></select></div><div class="tool-field"><label for="utilUnitValue">输入数值</label><input id="utilUnitValue" type="number" value="1" step="any"></div><div class="tool-field"><label for="utilUnitFrom">从单位</label><select id="utilUnitFrom"></select></div><div class="tool-field"><label for="utilUnitTo">转换为</label><select id="utilUnitTo"></select></div></div>
             <div class="row mt-sm gap-sm"><button class="btn primary" id="utilUnitConvert">换算</button><button class="btn" id="utilUnitSwap">交换单位</button></div><div class="section-label mt-md mb-sm">换算结果</div><div id="utilUnitOutput" class="result-mono tool-output">输入数值后换算。</div><p class="note mt-sm">覆盖长度、面积、体积、质量、速度、温度、压力、能量、功率、数据容量、时间和角度。数值按标准单位比例换算；温度使用单独的偏移公式。</p>
         </div>
+    </div>
+
+    </div>
     </div>
 
     <hr class="divider">
