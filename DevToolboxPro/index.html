@@ -1,10 +1,24 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DevToolbox Pro · 功能扩展版</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <script>
+        /* 在样式生效前确定主题，避免深色模式下的白屏闪烁；存储键与站内其他页面保持一致。 */
+        (function () {
+            try {
+                var t = localStorage.getItem('cipher_theme_v2');
+                if (t === 'dark' || t === 'light') { document.documentElement.setAttribute('data-theme', t); return; }
+            } catch (e) { /* localStorage 不可用时忽略 */ }
+            try {
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) { /* 忽略 */ }
+        })();
+    </script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
@@ -24,6 +38,7 @@
             --accent: #1a1a1a;
             --accent-hover: #3a3a3a;
             --danger: #c0392b;
+            --ok: #237a38;
             --radius: 4px;
             --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', 'Menlo', monospace;
             --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -291,11 +306,83 @@
             .wc-stat .wc-value.wc-text-value { font-size:15px; }
         }
 
+        /* ============ 主题切换按钮 ============ */
+        .header { flex-wrap: wrap; }
+        .dtp-theme-toggle { align-self: center; margin-left: auto; padding: 6px 12px; font-size: 11px; }
+
+        /* ============ 移动端导航（小屏用下拉选择替代横向滚动标签条） ============ */
+        .dtp-nav-select { display: block; width: 100%; font-family: var(--font-sans); font-size: 13px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); margin-bottom: 12px; }
+        .dtp-nav-select-wrap { display: none; }
+        @media (max-width: 720px) {
+            .dtp-nav-select-wrap { display: block; }
+            .tabs-primary { display: none; }
+            .tabs-secondary-wrap { padding: 10px 0 8px; gap: 6px; }
+            .tab-secondary { padding: 7px 12px; }
+        }
+
+        /* ============ 底部依赖状态提示（仅在有依赖缺失时出现，尽量不干扰阅读） ============ */
+        .dtp-dep-note { text-align: center; font-size: 11px; color: var(--text-tertiary); margin-top: 10px; }
+        .dtp-dep-toggle { font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px dashed var(--border); cursor: pointer; padding: 0 0 1px; opacity: .8; }
+        .dtp-dep-toggle:hover { opacity: 1; }
+        .dtp-dep-detail { display: block; margin-top: 4px; opacity: .75; }
+
+        /* ============ 深色模式（与站内其他页面共用 cipher_theme_v2 存储键） ============ */
+        [data-theme="dark"] {
+            color-scheme: dark;
+            --bg: #0d0d0f;
+            --surface: #17171a;
+            --text: #e9e9ec;
+            --text-secondary: #a1a1a8;
+            --text-tertiary: #71717a;
+            --border: #2c2c31;
+            --border-light: #222227;
+            --accent: #e9e9ec;
+            --accent-hover: #ffffff;
+            --danger: #e5484d;
+            --ok: #7bd88f;
+        }
+        [data-theme="dark"] textarea.output-area,
+        [data-theme="dark"] .result-mono,
+        [data-theme="dark"] .css-demo-box { background: #1d1d21; }
+        [data-theme="dark"] .btn:hover { background: #232328; border-color: #45454d; }
+        [data-theme="dark"] .btn.primary { color: #101013; }
+        [data-theme="dark"] .btn.primary:hover { background: #ffffff; }
+        [data-theme="dark"] .btn.copy-btn.copied { background: #16261a; border-color: #2f5c39; color: #7bd88f; }
+        [data-theme="dark"] .btn.danger:hover { background: #2a1618; border-color: #7a2b2f; }
+        [data-theme="dark"] .quick-chip:hover,
+        [data-theme="dark"] .search-result:hover { background: #232328; }
+        [data-theme="dark"] .smart-result-item .confidence { background: #232328; }
+        [data-theme="dark"] .confidence.high { background: #132b19; color: #7bd88f; }
+        [data-theme="dark"] .confidence.medium { background: #2e2410; color: #f5c877; }
+        [data-theme="dark"] .confidence.low { background: #2d1417; color: #ff9a9a; }
+        [data-theme="dark"] textarea:focus,
+        [data-theme="dark"] input:focus,
+        [data-theme="dark"] select:focus { box-shadow: 0 0 0 1px rgba(255,255,255,0.14); }
+        [data-theme="dark"] .diff-line.added { background: #132b19; color: #7bd88f; }
+        [data-theme="dark"] .diff-line.removed { background: #2d1417; color: #ff9a9a; }
+        [data-theme="dark"] .diff-line.context { color: #8b8b93; }
+        [data-theme="dark"] .json-tree,
+        [data-theme="dark"] .chart-canvas-wrap { background: #101013; }
+        [data-theme="dark"] .json-tree summary { color: #c9c9d1; }
+        [data-theme="dark"] .json-tree .json-key { color: #c792ea; }
+        [data-theme="dark"] .json-tree .json-string { color: #7ee08a; }
+        [data-theme="dark"] .json-tree .json-number { color: #79b8ff; }
+        [data-theme="dark"] .json-tree .json-bool { color: #ffab70; }
+        [data-theme="dark"] .json-tree .json-null { color: #8b8b93; }
+        [data-theme="dark"] .markdown-preview { color: #d7d7de; }
+        [data-theme="dark"] .markdown-preview pre { background: #1d1d21; }
+        [data-theme="dark"] .markdown-preview code { background: #232328; }
+        [data-theme="dark"] .markdown-preview th,
+        [data-theme="dark"] .markdown-preview td { border-color: #33333a; }
+        [data-theme="dark"] .markdown-preview blockquote { border-left-color: #4a4a52; color: #a1a1a8; }
+        [data-theme="dark"] .svg-preview-frame { background-image: repeating-conic-gradient(#1d1d21 0% 25%, #101013 0% 50%); }
+        [data-theme="dark"] .reaction-stage { color: #fff; }
+
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="header"><span class="header-title">DevToolbox Pro</span><span class="header-dot"></span><span class="header-subtitle">编码·哈希·加密·生成·转换·中文·智能解码·开发辅助</span></div>
+    <div class="header"><span class="header-title">DevToolbox Pro</span><span class="header-dot"></span><span class="header-subtitle">编码·哈希·加密·生成·转换·中文·智能解码·开发辅助</span><button class="btn dtp-theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色模式" aria-label="切换深色或浅色模式" aria-pressed="false">深色模式</button></div>
     <section class="global-tools" aria-label="全局工具导航">
         <div class="global-tools-top">
             <input id="globalToolSearch" type="search" placeholder="搜索所有工具… 例如 Markdown、Base58、JSON 树（Ctrl+K）" autocomplete="off" aria-label="搜索所有工具">
@@ -306,8 +393,17 @@
         <div class="global-tools-lists" id="globalQuickLists">
             <div class="quick-list"><div class="quick-list-title">收藏工具</div><div id="favoriteToolsList" class="quick-list-items"><span class="note">尚未收藏工具</span></div></div>
             <div class="quick-list"><div class="quick-list-title">最近使用</div><div id="recentToolsList" class="quick-list-items"><span class="note">使用工具后会显示在这里</span></div></div>
+            <div class="quick-list" style="grid-column:1/-1"><div class="quick-list-title">输入草稿</div><div class="quick-list-items">
+                <label class="checkbox-label"><input type="checkbox" id="draftToggle" checked> 自动保存各工具的输入内容</label>
+                <button class="btn small" id="draftClear" type="button">清空全部草稿</button>
+                <span class="note" id="draftStatus"></span>
+            </div><p class="note mt-sm">草稿只保存在本浏览器，按工具分别记录；加解密、RSA、TOTP、HMAC 及含密钥 / 口令的字段不会保存。</p></div>
         </div>
     </section>
+
+    <div class="dtp-nav-select-wrap" id="mobileNavWrap">
+        <select id="mobilePrimarySelect" class="dtp-nav-select" aria-label="选择工具分类"></select>
+    </div>
 
     <div class="tabs-primary" id="tabsPrimary">
         <button class="tab-primary active" data-tab="encode">编解码</button>
@@ -332,6 +428,7 @@
             <button class="tab-secondary" data-sub="hextext">Hex文本</button>
             <button class="tab-secondary" data-sub="base32">Base32</button>
             <button class="tab-secondary" data-sub="base58">Base58</button>
+            <button class="tab-secondary" data-sub="base85" data-keywords="base85 ascii85 z85 编码 解码 encode decode">Base85</button>
             <button class="tab-secondary" data-sub="rot13">ROT13</button>
             <button class="tab-secondary" data-sub="fileb64" data-keywords="base64 文件 图片 image file 编码 转换">文件 ⇋ Base64</button>
         </div>
@@ -436,6 +533,18 @@
             <div class="section-label mt-md mb-sm">输出</div><textarea id="base58Output" class="output-area" readonly placeholder="结果…"></textarea>
             <p class="note mt-sm">Base58 不是加密；编码输入按 UTF-8 转为字节后处理。</p>
         </div>
+        <div class="panel" id="sub-encode-base85">
+            <div class="section-label mb-sm">Base85（Ascii85 / Z85）</div>
+            <textarea id="base85Input" placeholder="输入文本或 Base85 字符串…"></textarea>
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label for="base85Variant">变体</label><select id="base85Variant"><option value="ascii85" selected>Ascii85（Adobe / btoa，字符 33–117）</option><option value="z85">Z85（ZeroMQ，固定字母表）</option></select></div>
+                <div class="tool-field"><label class="checkbox-label" style="margin-top:22px;"><input type="checkbox" id="base85ZAbbrev" checked> Ascii85：用「z」缩写连续 4 个零字节</label></div>
+            </div>
+            <div class="row mt-sm gap-sm"><label class="checkbox-label"><input type="checkbox" id="base85Delim"> Ascii85：用 &lt;~ ~&gt; 包裹输出</label></div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="base85Encode">编码</button><button class="btn" id="base85Decode">解码</button><button class="btn small copy-btn" data-target="base85Output">复制</button><span class="note" id="base85Status"></span></div>
+            <div class="section-label mt-md mb-sm">输出</div><textarea id="base85Output" class="output-area" readonly placeholder="结果…"></textarea>
+            <p class="note mt-sm">两种变体都把每 4 个字节编成 5 个字符，体积约为原文的 125%。Ascii85（btoa / Adobe）使用字符 33–117，支持 <code>z</code> 缩写与可选的 <code>&lt;~ ~&gt;</code> 包裹，长度不足 4 字节时末尾按实到字节数截短；解码会自动忽略空白与包裹符。Z85（ZeroMQ）使用固定 85 字符字母表、不做截短，因此要求字节数为 4 的倍数、字符串长度为 5 的倍数。Base85 只是编码，不是加密。</p>
+        </div>
         <div class="panel" id="sub-encode-rot13">
             <div class="section-label mb-sm">ROT13 / ROT47</div><textarea id="rotInput" placeholder="输入文本…"></textarea>
             <div class="row mt-sm gap-sm"><button class="btn primary" id="rot13Run">ROT13（字母）</button><button class="btn" id="rot47Run">ROT47（可打印 ASCII）</button><button class="btn small copy-btn" data-target="rotOutput">复制</button></div>
@@ -480,6 +589,9 @@
             <button class="tab-secondary" data-sub="sha3512">Keccak-512</button>
             <button class="tab-secondary" data-sub="ripemd160">RIPEMD-160</button>
             <button class="tab-secondary" data-sub="crc32" data-keywords="crc32 crc-32 校验和 checksum 循环冗余">CRC-32</button>
+            <button class="tab-secondary" data-sub="sm3" data-keywords="sm3 国密 商用密码 商用密码算法 摘要 哈希 hash">SM3（国密）</button>
+            <button class="tab-secondary" data-sub="blake2b512" data-keywords="blake2b blake2 哈希 hash 摘要">BLAKE2b-512</button>
+            <button class="tab-secondary" data-sub="blake2b256" data-keywords="blake2b blake2 哈希 hash 摘要">BLAKE2b-256</button>
         </div>
         <div class="section-label mb-sm">输入</div>
         <textarea id="hashInput" placeholder="输入任意文本..."></textarea>
@@ -495,7 +607,7 @@
             <span class="note" id="hashNote"></span>
             <span class="note" id="hashVerifyFeedback"></span>
         </div>
-        <p class="note mt-sm">MD5、SHA-1、RIPEMD-160 和 Keccak 变体不应被当作 SHA-2 / 标准 SHA-3 的替代品用于新安全协议。CRC-32 是校验和而非抗碰撞哈希，只适合快速完整性检查。摘要校验仅做字符串比较，不等于数字签名验证。</p>
+        <p class="note mt-sm">MD5、SHA-1、RIPEMD-160 和 Keccak 变体不应被当作 SHA-2 / 标准 SHA-3 的替代品用于新安全协议。CRC-32 是校验和而非抗碰撞哈希，只适合快速完整性检查。SM3 为 GB/T 32905-2016 商用密码算法，BLAKE2b 遵循 RFC 7693，两者均由本页面本地实现、不依赖外部库；本实现仅用于学习与校验，未经第三方密码库交叉认证，涉及合规场景请使用经认证的密码模块。摘要校验仅做字符串比较，不等于数字签名验证。</p>
     </div>
 
     <!-- ==================== 加解密 ==================== -->
@@ -1100,7 +1212,8 @@ Bob,25"></textarea></div><div class="tool-field"><label for="csvJsonOutput">转�
             <button class="tab-secondary" data-sub="svg">SVG 预览</button>
             <button class="tab-secondary" data-sub="jsonTree">JSON 树</button>
             <button class="tab-secondary" data-sub="qr">二维码</button>
-            <button class="tab-secondary" data-sub="formatcode">JS / CSS 格式化</button>
+            <button class="tab-secondary" data-sub="formatcode" data-keywords="js css html 格式化 美化 压缩 minify 代码">JS / CSS / HTML 美化压缩</button>
+            <button class="tab-secondary" data-sub="jsonts" data-keywords="json typescript 类型 生成 interface 接口 ts 定义">JSON → TS 类型</button>
             <button class="tab-secondary" data-sub="datebatch">日期时间批处理</button>
             <button class="tab-secondary" data-sub="chart">图表生成</button>
             <button class="tab-secondary" data-sub="csvclean">CSV 预览 / 清洗</button>
@@ -1155,8 +1268,24 @@ Bob,25"></textarea></div><div class="tool-field"><label for="csvJsonOutput">转�
         </div>
 
         <div class="panel" id="sub-workbench-formatcode">
-            <div class="row gap-sm mb-sm"><select id="codeFormatType" style="max-width:180px"><option value="js">JavaScript</option><option value="css">CSS</option></select><button class="btn primary" id="codeFormatRun">格式化</button><button class="btn" id="codeMinifyRun">压缩空白（基础）</button><button class="btn small copy-btn" data-target="codeFormatOutput">复制结果</button><span class="note" id="codeFormatStatus">优先使用 js-beautify；未加载时使用基础格式化。</span></div>
-            <div class="workbench-grid"><div class="workbench-card"><div class="workbench-card-title">源代码</div><textarea id="codeFormatInput" class="workbench-editor" spellcheck="false" placeholder="粘贴 JavaScript 或 CSS…"></textarea></div><div class="workbench-card"><div class="workbench-card-title">处理结果</div><textarea id="codeFormatOutput" class="workbench-editor output-area" readonly spellcheck="false"></textarea></div></div>
+            <div class="row gap-sm mb-sm"><select id="codeFormatType" style="max-width:180px"><option value="js">JavaScript</option><option value="css">CSS</option><option value="html">HTML</option></select><span class="note">压缩强度</span><select id="codeMinifyLevel" style="max-width:200px"><option value="safe" selected>安全（保留换行）</option><option value="aggressive">激进（合并可合并行）</option></select></div>
+            <div class="row gap-sm mb-sm"><button class="btn primary" id="codeFormatRun">美化 / 格式化</button><button class="btn" id="codeMinifyRun">压缩（minify）</button><button class="btn small copy-btn" data-target="codeFormatOutput">复制结果</button><button class="btn small" id="codeMinifyDownload">下载结果</button><span class="note" id="codeFormatStatus">美化优先使用 js-beautify；未加载时回退到内置基础格式化。压缩由本地实现完成。</span></div>
+            <div class="workbench-grid"><div class="workbench-card"><div class="workbench-card-title">源代码</div><textarea id="codeFormatInput" class="workbench-editor" spellcheck="false" placeholder="粘贴 JavaScript、CSS 或 HTML…"></textarea></div><div class="workbench-card"><div class="workbench-card-title">处理结果</div><textarea id="codeFormatOutput" class="workbench-editor output-area" readonly spellcheck="false"></textarea></div></div>
+            <p class="note mt-sm">压缩说明：JavaScript 走词法扫描，字符串、模板字符串与正则字面量原样保留，注释（<code>/*! … */</code> 除外）会被移除；「安全」模式只删除水平空白与空行、保留换行，不会改变自动分号插入（ASI）的行为；「激进」模式只在行尾是明确的续行符号（如 <code>; , { [ ( : = &amp;&amp; ?</code>）时才合并行，其余位置仍保留换行。CSS 采用深度感知处理，不会把后代选择器 <code>a :hover</code> 误压成伪类，并保留 <code>calc()</code> 内运算符两侧的空格。HTML 会移除普通注释、折叠标签之间的空白，并原样保留 <code>&lt;pre&gt;</code> / <code>&lt;textarea&gt;</code> 内容。压缩结果务必在真实环境回归测试后再上线。</p>
+        </div>
+
+        <div class="panel" id="sub-workbench-jsonts">
+            <div class="section-label mb-sm">JSON → TypeScript 类型</div>
+            <div class="tool-grid mt-sm">
+                <div class="tool-field"><label for="tsRootName">根类型名称</label><input id="tsRootName" type="text" value="Root" spellcheck="false"></div>
+                <div class="tool-field"><label for="tsKind">声明形式</label><select id="tsKind"><option value="interface" selected>interface 接口</option><option value="type">type 类型别名</option></select></div>
+                <div class="tool-field"><label class="checkbox-label" style="margin-top:22px;"><input type="checkbox" id="tsExport" checked> 添加 export</label></div>
+                <div class="tool-field"><label class="checkbox-label" style="margin-top:22px;"><input type="checkbox" id="tsAllOptional"> 所有字段设为可选（?）</label></div>
+            </div>
+            <div class="tool-field mt-sm"><label for="tsInput">JSON 输入</label><textarea id="tsInput" class="workbench-editor" spellcheck="false" placeholder='{"id":1,"name":"Ada","tags":["a","b"],"meta":{"ok":true}}'></textarea></div>
+            <div class="row mt-sm gap-sm"><button class="btn primary" id="tsGenerate">生成类型</button><button class="btn" id="tsSample">载入示例</button><button class="btn small copy-btn" data-target="tsOutput">复制结果</button><button class="btn small" id="tsDownload">下载 .ts</button><span class="note" id="tsStatus"></span></div>
+            <div class="tool-field mt-md"><label for="tsOutput">TypeScript 结果</label><textarea id="tsOutput" class="workbench-editor output-area" readonly spellcheck="false" placeholder="生成的类型定义会显示在这里…"></textarea></div>
+            <p class="note mt-sm">按值推断类型：同键多个值类型不一致时退化为 <code>unknown</code>；对象数组会合并所有元素的键，只在部分元素中出现的键标记为可选；数组为空时用 <code>unknown[]</code>；<code>null</code> 输出为 <code>null</code>。生成结果只是起点，<code>number</code> 不区分整数与浮点、日期字符串仍是 <code>string</code>，请按业务语义再调整。</p>
         </div>
 
         <div class="panel" id="sub-workbench-datebatch">
@@ -1356,6 +1485,10 @@ timeout"></textarea></div>
 
     <hr class="divider">
     <p class="note" style="text-align:center;">主要工具逻辑在浏览器端运行；CryptoJS、Markdown、Mermaid、二维码和代码格式化等部分功能依赖外部 CDN。条形码、中文转换、进制转换与人民币大写等新增工具完全本地运行，不依赖外部资源。HTML 预览使用隔离沙箱与 CSP；仍请勿运行不可信代码。处理敏感内容前，建议自行托管依赖并配置完整性校验。</p>
+    <p class="dtp-dep-note" id="depStatusWrap" hidden>
+        <button type="button" class="dtp-dep-toggle" id="depToggle" aria-expanded="false" aria-controls="depDetail">部分可选依赖未加载</button>
+        <span class="dtp-dep-detail" id="depDetail" hidden></span>
+    </p>
 </div>
 
 <script>
@@ -1741,6 +1874,449 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         do { v /= 1024; i++; } while (v >= 1024 && i < u.length - 1);
         return (Math.round(v * 10) / 10) + ' ' + u[i];
     }
+    // ---- SM3（国密哈希，GB/T 32905-2016），输出 256 位 ----
+    function sm3Hex(msgBytes) {
+        var IV = [0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600, 0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e];
+        function rotl(x, n) { return ((x << n) | (x >>> (32 - n))) >>> 0; }
+        function ff(x, y, z, j) { return j < 16 ? ((x ^ y ^ z) >>> 0) : (((x & y) | (x & z) | (y & z)) >>> 0); }
+        function gg(x, y, z, j) { return j < 16 ? ((x ^ y ^ z) >>> 0) : (((x & y) | ((~x >>> 0) & z)) >>> 0); }
+        function p0(x) { return (x ^ rotl(x, 9) ^ rotl(x, 17)) >>> 0; }
+        function p1(x) { return (x ^ rotl(x, 15) ^ rotl(x, 23)) >>> 0; }
+        var len = msgBytes.length, bitLen = len * 8;
+        var padLen = (56 - (len + 1) % 64 + 64) % 64;
+        var total = len + 1 + padLen + 8;
+        var m = new Uint8Array(total);
+        m.set(msgBytes, 0);
+        m[len] = 0x80;
+        var hiBits = Math.floor(bitLen / 4294967296), loBits = bitLen % 4294967296;
+        for (var q = 0; q < 4; q++) {
+            m[total - 8 + q] = (hiBits >>> (24 - 8 * q)) & 0xff;
+            m[total - 4 + q] = (loBits >>> (24 - 8 * q)) & 0xff;
+        }
+        var v = IV.slice();
+        for (var off = 0; off < total; off += 64) {
+            var w = new Array(68), w1 = new Array(64), i, j;
+            for (i = 0; i < 16; i++) {
+                var b = off + i * 4;
+                w[i] = ((m[b] << 24) | (m[b + 1] << 16) | (m[b + 2] << 8) | m[b + 3]) >>> 0;
+            }
+            for (j = 16; j < 68; j++) w[j] = (p1((w[j - 16] ^ w[j - 9] ^ rotl(w[j - 3], 15)) >>> 0) ^ rotl(w[j - 13], 7) ^ w[j - 6]) >>> 0;
+            for (j = 0; j < 64; j++) w1[j] = (w[j] ^ w[j + 4]) >>> 0;
+            var a = v[0], b2 = v[1], c = v[2], d = v[3], e = v[4], f = v[5], g = v[6], h = v[7];
+            for (j = 0; j < 64; j++) {
+                var t = j < 16 ? 0x79cc4519 : 0x7a879d8a;
+                var ss1 = rotl((((rotl(a, 12) >>> 0) + e + (rotl(t, j % 32) >>> 0)) >>> 0), 7);
+                var ss2 = (ss1 ^ rotl(a, 12)) >>> 0;
+                var tt1 = ((ff(a, b2, c, j) >>> 0) + d + ss2 + w1[j]) >>> 0;
+                var tt2 = ((gg(e, f, g, j) >>> 0) + h + ss1 + w[j]) >>> 0;
+                d = c; c = rotl(b2, 9); b2 = a; a = tt1;
+                h = g; g = rotl(f, 19); f = e; e = p0(tt2);
+            }
+            v[0] = (v[0] ^ a) >>> 0; v[1] = (v[1] ^ b2) >>> 0; v[2] = (v[2] ^ c) >>> 0; v[3] = (v[3] ^ d) >>> 0;
+            v[4] = (v[4] ^ e) >>> 0; v[5] = (v[5] ^ f) >>> 0; v[6] = (v[6] ^ g) >>> 0; v[7] = (v[7] ^ h) >>> 0;
+        }
+        var hex = '';
+        for (var k = 0; k < 8; k++) hex += ('0000000' + (v[k] >>> 0).toString(16)).slice(-8);
+        return hex;
+    }
+
+    // ---- BLAKE2b（RFC 7693），64 位字用两个 32 位半字模拟 ----
+    var DTP_B2B_IV = [[0x6a09e667, 0xf3bcc908], [0xbb67ae85, 0x84caa73b], [0x3c6ef372, 0xfe94f82b], [0xa54ff53a, 0x5f1d36f1],
+                      [0x510e527f, 0xade682d1], [0x9b05688c, 0x2b3e6c1f], [0x1f83d9ab, 0xfb41bd6b], [0x5be0cd19, 0x137e2179]];
+    var DTP_B2B_SIGMA = [
+        [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15], [14,10,4,8,9,15,13,6,1,12,0,2,11,7,5,3],
+        [11,8,12,0,5,2,15,13,10,14,3,6,7,1,9,4], [7,9,3,1,13,12,11,14,2,6,5,10,4,0,15,8],
+        [9,0,5,7,2,4,10,15,14,1,11,12,6,8,3,13], [2,12,6,10,0,11,8,3,4,13,7,5,15,14,1,9],
+        [12,5,1,15,14,13,4,10,0,7,6,3,9,2,8,11], [13,11,7,14,12,1,3,9,5,0,15,4,8,6,2,10],
+        [6,15,14,9,11,3,0,8,12,2,13,7,1,4,10,5], [10,2,8,4,7,6,1,5,15,11,9,14,3,12,13,0]];
+    var DTP_B2B_QUAD = [[0,4,8,12], [1,5,9,13], [2,6,10,14], [3,7,11,15], [0,5,10,15], [1,6,11,12], [2,7,8,13], [3,4,9,14]];
+    function dtpAdd64(ah, al, bh, bl) {
+        var l = (al >>> 0) + (bl >>> 0);
+        var lo = l >>> 0, carry = l > 0xffffffff ? 1 : 0;
+        return [((ah >>> 0) + (bh >>> 0) + carry) >>> 0, lo];
+    }
+    function dtpRotR64(hi, lo, n) {
+        hi = hi >>> 0; lo = lo >>> 0;
+        if (n === 0 || n === 64) return [hi, lo];
+        if (n === 32) return [lo, hi];
+        var k = 64 - n;
+        if (k < 32) return [((hi << k) | (lo >>> (32 - k))) >>> 0, ((lo << k) | (hi >>> (32 - k))) >>> 0];
+        var m = k - 32, h1 = lo, l1 = hi;
+        return [((h1 << m) | (l1 >>> (32 - m))) >>> 0, ((l1 << m) | (h1 >>> (32 - m))) >>> 0];
+    }
+    function blake2bHex(msgBytes, outLen) {
+        outLen = outLen || 64;
+        var hh = new Array(8), hl = new Array(8), i;
+        for (i = 0; i < 8; i++) { hh[i] = DTP_B2B_IV[i][0]; hl[i] = DTP_B2B_IV[i][1]; }
+        hl[0] = (hl[0] ^ (0x01010000 ^ (outLen & 0xff))) >>> 0;
+        var total = msgBytes.length;
+        var blocks = Math.max(1, Math.ceil(total / 128));
+        for (var b = 0; b < blocks; b++) {
+            var start = b * 128, take = Math.min(128, total - start);
+            var m = new Uint8Array(128);
+            if (take > 0) m.set(msgBytes.subarray(start, start + take), 0);
+            var mh = new Array(16), ml = new Array(16);
+            for (i = 0; i < 16; i++) {
+                var o = i * 8;
+                ml[i] = (m[o] | (m[o+1] << 8) | (m[o+2] << 16) | (m[o+3] << 24)) >>> 0;
+                mh[i] = (m[o+4] | (m[o+5] << 8) | (m[o+6] << 16) | (m[o+7] << 24)) >>> 0;
+            }
+            var vh = hh.slice(), vl = hl.slice();
+            for (i = 0; i < 8; i++) { vh.push(DTP_B2B_IV[i][0]); vl.push(DTP_B2B_IV[i][1]); }
+            var tLo = Math.min(total, (b + 1) * 128) % 4294967296;
+            var tHi = Math.floor(Math.min(total, (b + 1) * 128) / 4294967296);
+            vl[12] = (vl[12] ^ tLo) >>> 0; vh[12] = (vh[12] ^ tHi) >>> 0;
+            if (b === blocks - 1) { vl[14] = (vl[14] ^ 0xffffffff) >>> 0; vh[14] = (vh[14] ^ 0xffffffff) >>> 0; }
+            var quad = DTP_B2B_QUAD;
+            for (var r = 0; r < 12; r++) {
+                var s = DTP_B2B_SIGMA[r % 10];
+                for (var gi = 0; gi < 8; gi++) {
+                    var mi = s[gi * 2], mj = s[gi * 2 + 1];
+                    dtpB2bG(vh, vl, quad[gi][0], quad[gi][1], quad[gi][2], quad[gi][3], mh[mi], ml[mi], mh[mj], ml[mj]);
+                }
+            }
+            for (i = 0; i < 8; i++) {
+                hh[i] = (hh[i] ^ vh[i] ^ vh[i + 8]) >>> 0;
+                hl[i] = (hl[i] ^ vl[i] ^ vl[i + 8]) >>> 0;
+            }
+        }
+        var outBytes = [];
+        for (i = 0; i < outLen; i++) {
+            var wordIdx = i >> 3, byteIdx = i & 7;
+            var w = byteIdx < 4 ? hl[wordIdx] : hh[wordIdx];
+            outBytes.push((w >>> (8 * (byteIdx < 4 ? byteIdx : byteIdx - 4))) & 0xff);
+        }
+        var hex = '';
+        for (i = 0; i < outBytes.length; i++) hex += ('0' + outBytes[i].toString(16)).slice(-2);
+        return hex;
+    }
+    function dtpB2bG(vh, vl, a, b, c, d, xh, xl, yh, yl) {
+        var r = dtpAdd64(vh[a], vl[a], vh[b], vl[b]); r = dtpAdd64(r[0], r[1], xh, xl); vh[a] = r[0]; vl[a] = r[1];
+        var t = dtpRotR64((vh[d] ^ vh[a]) >>> 0, (vl[d] ^ vl[a]) >>> 0, 32); vh[d] = t[0]; vl[d] = t[1];
+        r = dtpAdd64(vh[c], vl[c], vh[d], vl[d]); vh[c] = r[0]; vl[c] = r[1];
+        t = dtpRotR64((vh[b] ^ vh[c]) >>> 0, (vl[b] ^ vl[c]) >>> 0, 24); vh[b] = t[0]; vl[b] = t[1];
+        r = dtpAdd64(vh[a], vl[a], vh[b], vl[b]); r = dtpAdd64(r[0], r[1], yh, yl); vh[a] = r[0]; vl[a] = r[1];
+        t = dtpRotR64((vh[d] ^ vh[a]) >>> 0, (vl[d] ^ vl[a]) >>> 0, 16); vh[d] = t[0]; vl[d] = t[1];
+        r = dtpAdd64(vh[c], vl[c], vh[d], vl[d]); vh[c] = r[0]; vl[c] = r[1];
+        t = dtpRotR64((vh[b] ^ vh[c]) >>> 0, (vl[b] ^ vl[c]) >>> 0, 63); vh[b] = t[0]; vl[b] = t[1];
+    }
+
+    // ---- Base85：Ascii85（Adobe / btoa）与 Z85（ZeroMQ） ----
+    var DTP_Z85_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#';
+    function dtpBytesToBase85Digits(value, count, alphabet) {
+        var digits = new Array(5), i;
+        for (i = 4; i >= 0; i--) { digits[i] = value % 85; value = Math.floor(value / 85); }
+        var out = '';
+        for (i = 0; i < count; i++) out += alphabet ? alphabet.charAt(digits[i]) : String.fromCharCode(33 + digits[i]);
+        return out;
+    }
+    function ascii85Encode(bytes, useZ, wrapDelim) {
+        var out = '', i = 0, n = bytes.length;
+        while (i < n) {
+            var remain = n - i;
+            if (remain >= 4) {
+                var v = bytes[i] * 16777216 + bytes[i+1] * 65536 + bytes[i+2] * 256 + bytes[i+3];
+                if (v === 0 && useZ) out += 'z';
+                else out += dtpBytesToBase85Digits(v, 5, null);
+                i += 4;
+            } else {
+                var v2 = bytes[i] * 16777216;
+                if (remain > 1) v2 += bytes[i+1] * 65536;
+                if (remain > 2) v2 += bytes[i+2] * 256;
+                out += dtpBytesToBase85Digits(v2, remain + 1, null);
+                i = n;
+            }
+        }
+        return wrapDelim ? '<~' + out + '~>' : out;
+    }
+    function ascii85Decode(text) {
+        var s = String(text).replace(/\s+/g, '');
+        s = s.replace(/^<~/, '').replace(/~>$/, '');
+        var bytes = [], buffer = [], i;
+        function flush(lastCount) {
+            var value = 0, k;
+            for (k = 0; k < 5; k++) {
+                var code = k < buffer.length ? buffer[k] : 84;
+                value = value * 85 + code;
+            }
+            var octets = [Math.floor(value / 16777216) % 256, Math.floor(value / 65536) % 256, Math.floor(value / 256) % 256, value % 256];
+            for (k = 0; k < lastCount; k++) bytes.push(octets[k]);
+            buffer = [];
+        }
+        for (i = 0; i < s.length; i++) {
+            var ch = s.charAt(i);
+            if (ch === 'z') {
+                if (buffer.length) throw new Error('"z" 缩写只能出现在 4 字节组边界');
+                bytes.push(0, 0, 0, 0);
+                continue;
+            }
+            var code2 = s.charCodeAt(i);
+            if (code2 < 33 || code2 > 117) throw new Error('包含无效字符：' + JSON.stringify(ch));
+            buffer.push(code2 - 33);
+            if (buffer.length === 5) flush(4);
+        }
+        if (buffer.length === 1) throw new Error('结尾残留 1 个字符，不是合法的 Base85 分组');
+        if (buffer.length) flush(buffer.length - 1);
+        return Uint8Array.from(bytes);
+    }
+    function z85Encode(bytes) {
+        if (bytes.length % 4 !== 0) throw new Error('Z85 要求字节数为 4 的倍数（当前 ' + bytes.length + ' 字节）');
+        var out = '';
+        for (var i = 0; i < bytes.length; i += 4) {
+            var v = bytes[i] * 16777216 + bytes[i+1] * 65536 + bytes[i+2] * 256 + bytes[i+3];
+            out += dtpBytesToBase85Digits(v, 5, DTP_Z85_ALPHABET);
+        }
+        return out;
+    }
+    function z85Decode(text) {
+        var s = String(text).replace(/\s+/g, '');
+        if (s.length % 5 !== 0) throw new Error('Z85 字符串长度必须是 5 的倍数（当前 ' + s.length + '）');
+        var bytes = [];
+        for (var i = 0; i < s.length; i += 5) {
+            var value = 0;
+            for (var k = 0; k < 5; k++) {
+                var idx = DTP_Z85_ALPHABET.indexOf(s.charAt(i + k));
+                if (idx < 0) throw new Error('包含无效字符：' + JSON.stringify(s.charAt(i + k)));
+                value = value * 85 + idx;
+            }
+            bytes.push(Math.floor(value / 16777216) % 256, Math.floor(value / 65536) % 256, Math.floor(value / 256) % 256, value % 256);
+        }
+        return Uint8Array.from(bytes);
+    }
+
+    // ---- 代码压缩：JS 采用词法扫描，字符串 / 模板串 / 正则字面量原样保留 ----
+    var DTP_JS_OPS = ['>>>=', '...', '===', '!==', '**=', '<<=', '>>=', '>>>', '&&=', '||=', '??=', '=>', '==', '!=', '<=', '>=', '&&', '||', '??', '?.', '++', '--', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=', '<<', '>>', '**'];
+    var DTP_JS_REGEX_PREV_WORDS = ['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'case', 'do', 'else', 'yield', 'await', 'throw'];
+    function dtpJsTokenize(src) {
+        var tokens = [], i = 0, n = src.length, wordBuf = '', lastPunct = '';
+        var pendingNl = false;
+        function prevTok() { return wordBuf || lastPunct; }
+        function regexAllowed() {
+            var p = prevTok(), two = src.slice(i - 2, i);
+            if (two === '++' || two === '--') return false;
+            if (!p) return true;
+            if (DTP_JS_REGEX_PREV_WORDS.indexOf(p) >= 0) return true;
+            return '(,=:[!&|?{};+-*%~^<>'.indexOf(p.charAt(p.length - 1)) >= 0;
+        }
+        while (i < n) {
+            var c = src.charAt(i);
+            if (c === '\n' || c === '\r') { pendingNl = true; i++; continue; }
+            if (c === ' ' || c === '\t' || c === '\f' || c === '\v' || c === '﻿') { i++; continue; }
+            if (c === '/' && src.charAt(i + 1) === '/') { while (i < n && src.charAt(i) !== '\n') i++; pendingNl = true; continue; }
+            if (c === '/' && src.charAt(i + 1) === '*') {
+                var end = src.indexOf('*/', i + 2), stop = end < 0 ? n : end + 2, block = src.slice(i, stop);
+                if (/^\/\*!/.test(block)) tokens.push({ t: 'bang', v: block, nl: pendingNl });
+                else if (block.indexOf('\n') >= 0) pendingNl = true;
+                i = stop; continue;
+            }
+            if (c === '"' || c === "'" || c === '`') {
+                var s0 = i; i++;
+                while (i < n) {
+                    var sc = src.charAt(i);
+                    if (sc === '\\') { i += 2; continue; }
+                    if (c === '`' && sc === '$' && src.charAt(i + 1) === '{') {
+                        var depth = 1; i += 2;
+                        while (i < n && depth > 0) {
+                            if (src.charAt(i) === '{') depth++;
+                            else if (src.charAt(i) === '}') depth--;
+                            if (depth === 0) break;
+                            i++;
+                        }
+                        i++; continue;
+                    }
+                    if (sc === c) { i++; break; }
+                    i++;
+                }
+                tokens.push({ t: 'str', v: src.slice(s0, i), nl: pendingNl });
+                pendingNl = false; wordBuf = ''; lastPunct = c; continue;
+            }
+            if (c === '/' && regexAllowed()) {
+                var r0 = i, inClass = false; i++;
+                while (i < n) {
+                    var rc = src.charAt(i);
+                    if (rc === '\\') { i += 2; continue; }
+                    if (rc === '[') inClass = true;
+                    else if (rc === ']') inClass = false;
+                    else if (rc === '/' && !inClass) { i++; break; }
+                    else if (rc === '\n') break;
+                    i++;
+                }
+                while (i < n && /[a-z]/.test(src.charAt(i))) i++;
+                tokens.push({ t: 'regex', v: src.slice(r0, i), nl: pendingNl });
+                pendingNl = false; wordBuf = ''; lastPunct = '/'; continue;
+            }
+            var numMatch = /^(?:0[xX][0-9a-fA-F]+n?|0[bB][01]+n?|0[oO][0-7]+n?|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?n?)/.exec(src.slice(i, i + 64));
+            if (numMatch && /[0-9]/.test(c)) {
+                tokens.push({ t: 'num', v: numMatch[0], nl: pendingNl });
+                i += numMatch[0].length; pendingNl = false; wordBuf = numMatch[0]; lastPunct = ''; continue;
+            }
+            var wordMatch = /^[A-Za-z_$][A-Za-z0-9_$]*/.exec(src.slice(i, i + 128));
+            if (wordMatch) {
+                tokens.push({ t: 'word', v: wordMatch[0], nl: pendingNl });
+                i += wordMatch[0].length; pendingNl = false; wordBuf = wordMatch[0]; lastPunct = ''; continue;
+            }
+            var op = '';
+            for (var oi = 0; oi < DTP_JS_OPS.length; oi++) { if (src.substr(i, DTP_JS_OPS[oi].length) === DTP_JS_OPS[oi]) { op = DTP_JS_OPS[oi]; break; } }
+            if (!op) op = c;
+            tokens.push({ t: 'punct', v: op, nl: pendingNl });
+            i += op.length; pendingNl = false; wordBuf = ''; lastPunct = op; continue;
+        }
+        return tokens;
+    }
+    function dtpJsNeedSpace(prev, cur) {
+        if (prev.t === 'bang' || cur.t === 'bang') return true;
+        if ((prev.t === 'word' || prev.t === 'num') && (cur.t === 'word' || cur.t === 'num')) return true;
+        if ((prev.t === 'str' || prev.t === 'regex') && (cur.t === 'word' || cur.t === 'num')) return true;
+        if (prev.t === 'punct' && cur.t === 'punct') {
+            var a = prev.v.charAt(prev.v.length - 1), b = cur.v.charAt(0);
+            if ((a === '+' && b === '+') || (a === '-' && b === '-')) return true;
+        }
+        return false;
+    }
+    var DTP_JS_JOIN_OK = [';', ',', '{', '[', '(', ':', '=', '>', '?', '.', '&&', '||', '=>', '+', '-', '*', '/', '%', '&', '|', '^', '!', '~'];
+    function dtpJsCanJoin(prev, cur) {
+        if (cur.v === '++' || cur.v === '--') return false;
+        if (prev.t !== 'punct') return false;
+        if (cur.v.charAt(0) === '`') return false;
+        return DTP_JS_JOIN_OK.indexOf(prev.v) >= 0;
+    }
+    function dtpJsMinify(src, aggressive) {
+        var tokens = dtpJsTokenize(String(src));
+        var out = '', i;
+        for (i = 0; i < tokens.length; i++) {
+            var tk = tokens[i];
+            if (i === 0) { out += tk.v; continue; }
+            var prev = tokens[i - 1], need = dtpJsNeedSpace(prev, tk) ? ' ' : '';
+            if (tk.nl && !(aggressive && dtpJsCanJoin(prev, tk))) out += '\n' + tk.v;
+            else out += need + tk.v;
+        }
+        return out.replace(/\n{2,}/g, '\n').replace(/^\n+/, '').replace(/\n+$/, '');
+    }
+    var DTP_MIN_HOLE = '\u0000';
+    function dtpHoleIn(holes, text) { holes.push(text); return DTP_MIN_HOLE + (holes.length - 1) + DTP_MIN_HOLE; }
+    function dtpHoleOut(holes, s) {
+        return s.replace(new RegExp(DTP_MIN_HOLE + '(\\d+)' + DTP_MIN_HOLE, 'g'), function (m, idx) { var v = holes[Number(idx)]; return v === undefined ? m : v; });
+    }
+    function dtpCssMinify(src) {
+        var holes = [], s = String(src);
+        s = s.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, function (m) { return dtpHoleIn(holes, m); });
+        s = s.replace(/\/\*[\s\S]*?\*\//g, function (m) { return /^\/\*!/.test(m) ? m : ''; });
+        /* 分深度处理：只有声明块内部才去掉冒号两侧的空格，避免把后代选择器 "a :hover" 压成伪类 "a:hover"。 */
+        var parts = s.split(/([{}])/), depth = 0, out = '';
+        for (var i = 0; i < parts.length; i++) {
+            var p = parts[i];
+            if (p === '{') { depth++; out += '{'; continue; }
+            if (p === '}') { depth = depth > 0 ? depth - 1 : 0; out += '}'; continue; }
+            p = p.replace(/\s+/g, ' ');
+            if (depth > 0) {
+                p = p.replace(/\s*,\s*/g, ',').replace(/\s*:\s*/g, ':').replace(/\s*;\s*/g, ';');
+                p = p.replace(/\s+!important/gi, '!important');
+                p = p.replace(/^[\s;]+|[\s;]+$/g, '');
+            } else {
+                p = p.replace(/\s*,\s*/g, ',').replace(/^\s+|\s+$/g, '');
+            }
+            out += p;
+        }
+        out = out.replace(/;}/g, '}').replace(/\s*!\s*important/gi, '!important').trim();
+        return dtpHoleOut(holes, out);
+    }
+    function dtpHtmlMinify(src) {
+        var holes = [], s = String(src);
+        s = s.replace(/<!--[\s\S]*?-->/g, function (m) { return (/^<!--\[/.test(m) || /^<!--!/.test(m)) ? m : ''; });
+        s = s.replace(/<(pre|textarea)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, function (m) { holes.push(m); return '\u0000' + (holes.length - 1) + '\u0000'; });
+        s = s.replace(/>\s+</g, '><');
+        s = s.replace(/>\s+(?=\u0000\d+\u0000)/g, '>');
+        s = s.replace(/\s{2,}/g, ' ');
+        s = s.trim();
+        s = s.replace(/\u0000(\d+)\u0000/g, function (m, idx) { return holes[Number(idx)]; });
+        return s;
+    }
+
+    // ---- JSON → TypeScript 类型生成 ----
+    function dtpPascalCase(name) {
+        var s = String(name == null ? '' : name).replace(/[^A-Za-z0-9]+/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim();
+        if (!s) return 'Item';
+        s = s.split(/\s+/).map(function (p) { return p.charAt(0).toUpperCase() + p.slice(1); }).join('');
+        if (/^[0-9]/.test(s)) s = 'N' + s;
+        return s;
+    }
+    function dtpJsonToTs(json, options) {
+        var opts = options || {};
+        var rootName = dtpPascalCase(opts.rootName || 'Root');
+        var asType = opts.kind === 'type';
+        var exportPrefix = opts.exportName ? 'export ' : '';
+        var allOptional = !!opts.allOptional;
+        var semi = opts.semicolons === false ? '' : ';';
+        var declarations = [], usedNames = Object.create(null), budget = { nodes: 0 };
+        function uniqueName(base) {
+            var name = base, n = 2;
+            while (usedNames[name]) { name = base + n; n++; }
+            usedNames[name] = true;
+            return name;
+        }
+        function scalarName(v) {
+            if (v === null) return 'null';
+            var t = typeof v;
+            if (t === 'string' || t === 'number' || t === 'boolean') return t;
+            return 'unknown';
+        }
+        function isIdent(k) { return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k); }
+        function emitObject(name, fields) {
+            var typeName = uniqueName(dtpPascalCase(name));
+            var lines = fields.map(function (f) {
+                var key = isIdent(f.key) ? f.key : JSON.stringify(f.key);
+                var opt = (allOptional || f.optional) ? '?' : '';
+                return '  ' + key + opt + ': ' + f.type + semi;
+            });
+            declarations.push({ name: typeName, lines: lines, kind: asType ? 'type' : 'interface' });
+            return typeName;
+        }
+        function build(value, name, depth) {
+            budget.nodes++;
+            if (budget.nodes > 20000) throw new Error('结构过大，已超过 20,000 个节点上限');
+            if (depth > 24) return 'unknown';
+            if (value === null) return 'null';
+            var t = typeof value;
+            if (t === 'string' || t === 'number' || t === 'boolean') return t;
+            if (Array.isArray(value)) {
+                if (!value.length) return 'unknown[]';
+                var allObjects = value.every(function (x) { return x && typeof x === 'object' && !Array.isArray(x); });
+                if (allObjects) {
+                    var keys = [];
+                    value.forEach(function (item) { Object.keys(item).forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); }); });
+                    var fields = keys.map(function (k) {
+                        var seen = [];
+                        value.forEach(function (item) { if (Object.prototype.hasOwnProperty.call(item, k)) seen.push(item[k]); });
+                        var representative = seen.length ? seen[0] : null, mixed = false;
+                        seen.forEach(function (v) { if (scalarName(v) !== scalarName(representative) || (Array.isArray(v) !== Array.isArray(representative))) mixed = true; });
+                        return { key: k, type: mixed ? 'unknown' : build(representative, k, depth + 1), optional: seen.length < value.length };
+                    });
+                    return emitObject(name + 'Item', fields) + '[]';
+                }
+                var kinds = Object.create(null), list = [];
+                value.forEach(function (x) { var nm = Array.isArray(x) ? 'unknown[]' : scalarName(x); if (!kinds[nm]) { kinds[nm] = true; list.push(nm); } });
+                var base = list.length === 1 ? list[0] : '(' + list.join(' | ') + ')';
+                return base + '[]';
+            }
+            var fields2 = Object.keys(value).map(function (k) { return { key: k, type: build(value[k], k, depth + 1), optional: false }; });
+            return emitObject(name, fields2);
+        }
+        var rootType = build(json, rootName, 0);
+        /* 声明是自底向上生成的，根类型在最后；输出时把根类型放到最前面更利于阅读。 */
+        var ordered = declarations.slice(0, -1);
+        if (declarations.length) ordered = [declarations[declarations.length - 1]].concat(ordered);
+        var text = '';
+        if (!declarations.length) {
+            text = exportPrefix + 'type ' + rootName + ' = ' + rootType + semi + '\n';
+        }
+        ordered.forEach(function (d, idx) {
+            if (idx) text += '\n';
+            if (d.kind === 'type') text += exportPrefix + 'type ' + d.name + ' = {\n' + d.lines.join('\n') + '\n}' + semi + '\n';
+            else text += exportPrefix + 'interface ' + d.name + ' {\n' + d.lines.join('\n') + '\n}\n';
+        });
+        return { code: text.trim() + '\n', rootType: rootType, count: declarations.length };
+    }
+
 // <<<DTP-PURE-END
 </script>
 
@@ -2007,21 +2583,26 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         sha3: function(v) { return CryptoJS.SHA3 ? CryptoJS.SHA3(v, {outputLength:256}).toString() : 'Keccak-256 不支持'; },
         sha3512: function(v) { return CryptoJS.SHA3 ? CryptoJS.SHA3(v, {outputLength:512}).toString() : 'Keccak-512 不支持'; },
         ripemd160: function(v) { return CryptoJS.RIPEMD160 ? CryptoJS.RIPEMD160(v).toString() : 'RIPEMD-160不支持'; },
-        crc32: function(v) { return crc32Hex(v); }
+        crc32: function(v) { return crc32Hex(v); },
+        sm3: function(v) { return sm3Hex(new TextEncoder().encode(v)); },
+        blake2b512: function(v) { return blake2bHex(new TextEncoder().encode(v), 64); },
+        blake2b256: function(v) { return blake2bHex(new TextEncoder().encode(v), 32); }
     };
-    var algoNames = { md5:'MD5', sha1:'SHA-1', sha256:'SHA-256', sha512:'SHA-512', sha224:'SHA-224', sha384:'SHA-384', sha3:'Keccak-256 (非标准SHA-3)', sha3512:'Keccak-512 (非标准SHA-3)', ripemd160:'RIPEMD-160', crc32:'CRC-32（校验和）' };
+    var algoNames = { md5:'MD5', sha1:'SHA-1', sha256:'SHA-256', sha512:'SHA-512', sha224:'SHA-224', sha384:'SHA-384', sha3:'Keccak-256 (非标准SHA-3)', sha3512:'Keccak-512 (非标准SHA-3)', ripemd160:'RIPEMD-160', crc32:'CRC-32（校验和）', sm3:'SM3（国密，GB/T 32905）', blake2b512:'BLAKE2b-512（RFC 7693）', blake2b256:'BLAKE2b-256（RFC 7693）' };
+    var localHashAlgos = { sm3: true, blake2b512: true, blake2b256: true, crc32: true };
 
     function computeHash() {
         var v = getById('hashInput').value;
         if (getById('hashVerifyFeedback')) { getById('hashVerifyFeedback').textContent = ''; getById('hashVerifyFeedback').style.color = ''; }
-        if (typeof CryptoJS === 'undefined') {
-            getById('hashResult').textContent = '无法加载 CryptoJS';
-            getById('hashNote').textContent = '请检查网络、CDN 可用性或自行托管依赖';
-            return;
-        }
         var active = document.querySelector('#tabsHashSub .tab-secondary.active');
         var algo = active ? active.getAttribute('data-sub') : 'md5';
         getById('hashAlgoLabel').textContent = algoNames[algo] || algo;
+        /* SM3 / BLAKE2b / CRC-32 是本地实现，即使 CryptoJS 未加载也能使用。 */
+        if (typeof CryptoJS === 'undefined' && !localHashAlgos[algo]) {
+            getById('hashResult').textContent = '无法加载 CryptoJS';
+            getById('hashNote').textContent = '该算法依赖 CryptoJS，请检查网络、CDN 可用性或自行托管依赖；SM3 / BLAKE2b / CRC-32 不受影响。';
+            return;
+        }
         if (!v) {
             getById('hashResult').textContent = '—';
             getById('hashNote').textContent = '';
@@ -2049,7 +2630,7 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         if (!actual || actual === '—' || actual.indexOf('不支持') >= 0 || actual.indexOf('无法加载') >= 0) { feedback.textContent = '请先输入文本并计算摘要'; return; }
         var same = expected.toLowerCase() === actual.toLowerCase();
         feedback.textContent = same ? '✓ 摘要匹配' : '✗ 摘要不匹配';
-        feedback.style.color = same ? '#237a38' : '#b42318';
+        feedback.style.color = same ? 'var(--ok)' : 'var(--danger)';
     };
 
     // ============ AES (Web Crypto API) ============
@@ -3578,6 +4159,30 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     getById('base32Decode').onclick=function(){try{getById('base32Output').value=base32DecodeText(getById('base32Input').value);}catch(e){getById('base32Output').value='解码失败：'+e.message;}};
     getById('base58Encode').onclick=function(){try{getById('base58Output').value=base58EncodeText(getById('base58Input').value);}catch(e){getById('base58Output').value='编码失败：'+e.message;}};
     getById('base58Decode').onclick=function(){try{getById('base58Output').value=base58DecodeText(getById('base58Input').value);}catch(e){getById('base58Output').value='解码失败：'+e.message;}};
+    // ============ Base85（Ascii85 / Z85） ============
+    function dtpBase85Status(message){setToolText('base85Status',message||'');}
+    getById('base85Encode').onclick=function(){
+        try{
+            var bytes=new TextEncoder().encode(getById('base85Input').value),variant=getById('base85Variant').value;
+            var out=variant==='z85'?z85Encode(bytes):ascii85Encode(bytes,getById('base85ZAbbrev').checked,getById('base85Delim').checked);
+            getById('base85Output').value=out;
+            dtpBase85Status('已编码 '+bytes.length+' 字节 → '+out.length+' 字符');
+        }catch(e){getById('base85Output').value='';dtpBase85Status('编码失败：'+e.message);}
+    };
+    getById('base85Decode').onclick=function(){
+        try{
+            var variant=getById('base85Variant').value;
+            var bytes=variant==='z85'?z85Decode(getById('base85Input').value):ascii85Decode(getById('base85Input').value);
+            getById('base85Output').value=new TextDecoder().decode(bytes);
+            dtpBase85Status('已解码 '+bytes.length+' 字节');
+        }catch(e){getById('base85Output').value='';dtpBase85Status('解码失败：'+e.message);}
+    };
+    getById('base85Variant').addEventListener('change',function(){
+        var isZ85=this.value==='z85';
+        getById('base85ZAbbrev').disabled=isZ85;
+        getById('base85Delim').disabled=isZ85;
+        dtpBase85Status(isZ85?'Z85 要求字节数为 4 的倍数':'Ascii85 支持 z 缩写与 <~ ~> 包裹');
+    });
     function rot13(s){return s.replace(/[a-zA-Z]/g,function(c){var b=c<='Z'?65:97;return String.fromCharCode((c.charCodeAt(0)-b+13)%26+b);});}
     function rot47(s){return s.replace(/[!-~]/g,function(c){return String.fromCharCode(33+((c.charCodeAt(0)-33+47)%94));});}
     getById('rot13Run').onclick=function(){getById('rotOutput').value=rot13(getById('rotInput').value);};getById('rot47Run').onclick=function(){getById('rotOutput').value=rot47(getById('rotInput').value);};
@@ -3972,7 +4577,51 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         for(var i=0;i<s.length;i++){var c=s[i],next=s[i+1];if(quote){pad();out+=c;if(escape){escape=false;continue;}if(c==='\\'){escape=true;continue;}if(c===quote)quote=null;continue;}if(c==='"'||c==="'"||c==='`'){pad();quote=c;out+=c;continue;}if(type==='js'&&(c==='/'&&next==='/')){pad();while(i<s.length&&s[i]!=='\n')out+=s[i++];newline();continue;}if(c==='{'){pad();out+=' {';indent++;newline();}else if(c==='}'){indent=Math.max(0,indent-1);newline();pad();out+='}';if(next&&next!==';'&&next!==','&&next!==')'&&next!==']'&&next!=='.'&&next!=='\n')newline();}else if(c===';'){pad();out+=';';newline();}else if(c===','){pad();out+=', ';}else if(c==='\n'||c==='\r'){newline();}else if(/\s/.test(c)){if(!lineStart&&!out.endsWith(' '))out+=' ';}else{pad();out+=c;}}
         return out.split('\n').map(function(l){return l.trimEnd();}).filter(function(l,i,a){return l!==''||i===0||a[i-1]!=='';}).join('\n').trim();}
     getById('codeFormatRun').onclick=function(){var src=getById('codeFormatInput').value,type=getById('codeFormatType').value;try{var result;if(type==='js'&&typeof window.js_beautify==='function')result=window.js_beautify(src,{indent_size:4,space_in_empty_paren:false,preserve_newlines:true,max_preserve_newlines:2});else if(type==='css'&&typeof window.css_beautify==='function')result=window.css_beautify(src,{indent_size:4,selector_separator_newline:true});else result=basicFormatCode(src,type);getById('codeFormatOutput').value=result;setToolText('codeFormatStatus',typeof window.js_beautify==='function'?'格式化完成（js-beautify / CSS beautifier 可用）':'基础格式化完成；复杂语法建议加载 js-beautify 后再检查');}catch(e){getById('codeFormatOutput').value='';setToolText('codeFormatStatus','格式化失败：'+e.message);}};
-    getById('codeMinifyRun').onclick=function(){var src=getById('codeFormatInput').value,type=getById('codeFormatType').value;try{var result=src.replace(/\/\*[\s\S]*?\*\//g,'').replace(/[ \t]*\r?\n[ \t]*/g,' ').replace(/\s+/g,' ').replace(/\s*([{}:;,])\s*/g,'$1').trim();getById('codeFormatOutput').value=result;setToolText('codeFormatStatus','完成基础空白压缩；没有执行语义级压缩。');}catch(e){setToolText('codeFormatStatus','处理失败：'+e.message);}};
+    function dtpMinifyCode(src,type,level){
+        if(src.length>2000000)throw new Error('输入最多 2,000,000 字符');
+        var out;
+        if(type==='js')out=dtpJsMinify(src,level==='aggressive');
+        else if(type==='css')out=dtpCssMinify(src);
+        else if(type==='html')out=dtpHtmlMinify(src);
+        else throw new Error('不支持的类型：'+type);
+        return out;
+    }
+    getById('codeMinifyRun').onclick=function(){
+        var src=getById('codeFormatInput').value,type=getById('codeFormatType').value,level=getById('codeMinifyLevel').value;
+        try{
+            var before=src.length,result=dtpMinifyCode(src,type,level);
+            getById('codeFormatOutput').value=result;
+            var saved=before?Math.round((1-result.length/before)*100):0;
+            setToolText('codeFormatStatus','压缩完成：'+before+' → '+result.length+' 字符（减少 '+saved+'%）'+(type==='js'&&level==='safe'?' · 安全模式保留了换行':''));
+        }catch(e){getById('codeFormatOutput').value='';setToolText('codeFormatStatus','压缩失败：'+e.message);}
+    };
+    getById('codeMinifyDownload').onclick=function(){
+        var out=getById('codeFormatOutput').value;
+        if(!out){setToolText('codeFormatStatus','请先生成结果');return;}
+        var ext={js:'js',css:'css',html:'html'}[getById('codeFormatType').value]||'txt',mime={js:'application/javascript',css:'text/css',html:'text/html'}[getById('codeFormatType').value]||'text/plain';
+        downloadBlob('minified.'+ext,out,mime+';charset=utf-8');
+    };
+
+    // ============ JSON → TypeScript 类型生成 ============
+    function dtpGenerateTs(){
+        var raw=getById('tsInput').value;
+        if(!raw.trim()){getById('tsOutput').value='';setToolText('tsStatus','请输入 JSON');return;}
+        if(raw.length>2000000)throw new Error('输入最多 2,000,000 字符');
+        var data=JSON.parse(raw);
+        var result=dtpJsonToTs(data,{
+            rootName:getById('tsRootName').value||'Root',
+            kind:getById('tsKind').value,
+            exportName:getById('tsExport').checked,
+            allOptional:getById('tsAllOptional').checked
+        });
+        getById('tsOutput').value=result.code;
+        setToolText('tsStatus','已生成 '+result.count+' 个类型声明，根类型：'+result.rootType);
+    }
+    getById('tsGenerate').onclick=function(){try{dtpGenerateTs();}catch(e){getById('tsOutput').value='';setToolText('tsStatus','生成失败：'+e.message);}};
+    getById('tsSample').onclick=function(){getById('tsInput').value=JSON.stringify({id:1024,name:'Ada Lovelace',email:'ada@example.com',active:true,score:98.5,tags:['math','engine'],profile:{city:'London',joined:'1843-01-01',links:[{title:'Notes',url:'https://example.com/n'}]},history:[{year:1843,event:'first algorithm'},{year:1843,event:'published'}],note:null},null,2);try{dtpGenerateTs();}catch(e){setToolText('tsStatus','生成失败：'+e.message);}};
+    getById('tsDownload').onclick=function(){var out=getById('tsOutput').value;if(!out){setToolText('tsStatus','请先生成类型');return;}downloadBlob('types.ts',out,'text/plain;charset=utf-8');};
+    getById('tsRootName').addEventListener('input',function(){if(getById('tsOutput').value){try{dtpGenerateTs();}catch(e){/* 输入过程中忽略错误 */}}});
+    ['tsKind','tsExport','tsAllOptional'].forEach(function(id){getById(id).addEventListener('change',function(){if(getById('tsOutput').value){try{dtpGenerateTs();}catch(e){/* 忽略 */}}});});
 
     // ============ Batch date/time converter ============
     var dateBatchCsv='';function csvCell(v){var s=String(v===null||v===undefined?'':v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
@@ -3981,7 +4630,7 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
 
     // ============ Native Canvas chart renderer ============
     var lastChartData=null;function parseChartData(src){var trimmed=src.trim();if(!trimmed)throw new Error('请输入数据');var list;if(trimmed[0]==='['){list=JSON.parse(trimmed);if(!Array.isArray(list))throw new Error('JSON 顶层必须是数组');list=list.map(function(x,i){return {label:String(x.label===undefined?(x.name===undefined?i:x.name):x.label),value:Number(x.value)};});}else{var rows=parseCsv(trimmed,',');if(!rows.length)throw new Error('CSV 为空');var header=rows[0].map(function(x){return x.trim().toLowerCase();}),labelIndex=header.indexOf('label');if(labelIndex<0)labelIndex=header.indexOf('name');var valueIndex=header.indexOf('value');var start=(labelIndex>=0||valueIndex>=0)?1:0;if(labelIndex<0)labelIndex=0;if(valueIndex<0)valueIndex=1;list=rows.slice(start).filter(function(r){return r.length>1&&r.some(function(x){return x.trim()!=='';});}).map(function(r){return {label:String(r[labelIndex]===undefined?'':r[labelIndex]),value:Number(r[valueIndex])};});}if(!list.length||list.length>500)throw new Error('数据行数必须为 1–500');if(list.some(function(x){return !Number.isFinite(x.value);}))throw new Error('value 必须是有限数字');return list;}
-    function drawChart(){var canvas=getById('chartCanvas'),ctx=canvas.getContext('2d'),data=parseChartData(getById('chartInput').value),type=getById('chartType').value;lastChartData=data;var w=1000,h=520;canvas.width=w;canvas.height=h;ctx.clearRect(0,0,w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);if(type==='pie'){var total=data.reduce(function(a,x){return a+Math.max(0,x.value);},0);if(total<=0)throw new Error('饼图数值总和必须大于 0，不能包含负数');var cx=w/2,cy=h/2,r=170,start=-Math.PI/2;data.forEach(function(d,i){var end=start+Math.max(0,d.value)/total*Math.PI*2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,start,end);ctx.closePath();ctx.fillStyle='hsl('+(i*137.508%360)+',65%,55%)';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();start=end;});ctx.font='15px sans-serif';data.forEach(function(d,i){var y=35+i*24;ctx.fillStyle='hsl('+(i*137.508%360)+',65%,45%)';ctx.fillRect(30,y-12,14,14);ctx.fillStyle='#222';ctx.fillText(d.label+' '+d.value+' ('+(d.value/total*100).toFixed(1)+'%)',52,y);});}else{var pad={l:72,r:28,t:30,b:100},cw=w-pad.l-pad.r,ch=h-pad.t-pad.b,max=Math.max(1,...data.map(function(d){return d.value;})),min=Math.min(0,...data.map(function(d){return d.value;})),range=max-min||1;ctx.strokeStyle='#ddd';ctx.fillStyle='#555';ctx.font='13px sans-serif';ctx.textAlign='right';for(var i=0;i<=5;i++){var v=min+range*i/5,y=pad.t+ch-(v-min)/range*ch;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.fillText(v.toFixed(2).replace(/\.00$/,''),pad.l-8,y+4);}var step=cw/data.length;if(type==='bar'){var bw=Math.min(64,step*.66);data.forEach(function(d,i){var x=pad.l+i*step+(step-bw)/2,zeroY=pad.t+ch-(0-min)/range*ch,valY=pad.t+ch-(d.value-min)/range*ch;ctx.fillStyle='hsl('+(i*47+220)%360+',62%,54%)';ctx.fillRect(x,Math.min(zeroY,valY),bw,Math.max(1,Math.abs(zeroY-valY)));});}else{ctx.beginPath();ctx.strokeStyle='#4f46e5';ctx.lineWidth=3;data.forEach(function(d,i){var x=pad.l+i*step+step/2,y=pad.t+ch-(d.value-min)/range*ch;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});ctx.stroke();data.forEach(function(d,i){var x=pad.l+i*step+step/2,y=pad.t+ch-(d.value-min)/range*ch;ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fillStyle='#4f46e5';ctx.fill();});}ctx.save();ctx.translate(0,0);ctx.textAlign='right';ctx.fillStyle='#333';data.forEach(function(d,i){var x=pad.l+i*step+step/2;ctx.save();ctx.translate(x,h-pad.b+16);ctx.rotate(-Math.PI/5);ctx.textAlign='right';ctx.fillText(d.label,0,0);ctx.restore();});ctx.restore();}setToolText('chartStatus','已绘制 '+data.length+' 个数据点');}
+    function drawChart(){var canvas=getById('chartCanvas'),ctx=canvas.getContext('2d'),data=parseChartData(getById('chartInput').value),type=getById('chartType').value;lastChartData=data;var _dark=document.documentElement.getAttribute('data-theme')==='dark',_bg=_dark?'#101013':'#ffffff',_grid=_dark?'#2c2c31':'#dddddd',_axis=_dark?'#a1a1a8':'#555555',_label=_dark?'#e9e9ec':'#222222';var w=1000,h=520;canvas.width=w;canvas.height=h;ctx.clearRect(0,0,w,h);ctx.fillStyle=_bg;ctx.fillRect(0,0,w,h);if(type==='pie'){var total=data.reduce(function(a,x){return a+Math.max(0,x.value);},0);if(total<=0)throw new Error('饼图数值总和必须大于 0，不能包含负数');var cx=w/2,cy=h/2,r=170,start=-Math.PI/2;data.forEach(function(d,i){var end=start+Math.max(0,d.value)/total*Math.PI*2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,start,end);ctx.closePath();ctx.fillStyle='hsl('+(i*137.508%360)+',65%,55%)';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();start=end;});ctx.font='15px sans-serif';data.forEach(function(d,i){var y=35+i*24;ctx.fillStyle='hsl('+(i*137.508%360)+',65%,45%)';ctx.fillRect(30,y-12,14,14);ctx.fillStyle=_label;ctx.fillText(d.label+' '+d.value+' ('+(d.value/total*100).toFixed(1)+'%)',52,y);});}else{var pad={l:72,r:28,t:30,b:100},cw=w-pad.l-pad.r,ch=h-pad.t-pad.b,max=Math.max(1,...data.map(function(d){return d.value;})),min=Math.min(0,...data.map(function(d){return d.value;})),range=max-min||1;ctx.strokeStyle=_grid;ctx.fillStyle=_axis;ctx.font='13px sans-serif';ctx.textAlign='right';for(var i=0;i<=5;i++){var v=min+range*i/5,y=pad.t+ch-(v-min)/range*ch;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.fillText(v.toFixed(2).replace(/\.00$/,''),pad.l-8,y+4);}var step=cw/data.length;if(type==='bar'){var bw=Math.min(64,step*.66);data.forEach(function(d,i){var x=pad.l+i*step+(step-bw)/2,zeroY=pad.t+ch-(0-min)/range*ch,valY=pad.t+ch-(d.value-min)/range*ch;ctx.fillStyle='hsl('+(i*47+220)%360+',62%,54%)';ctx.fillRect(x,Math.min(zeroY,valY),bw,Math.max(1,Math.abs(zeroY-valY)));});}else{ctx.beginPath();ctx.strokeStyle='#4f46e5';ctx.lineWidth=3;data.forEach(function(d,i){var x=pad.l+i*step+step/2,y=pad.t+ch-(d.value-min)/range*ch;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});ctx.stroke();data.forEach(function(d,i){var x=pad.l+i*step+step/2,y=pad.t+ch-(d.value-min)/range*ch;ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fillStyle='#4f46e5';ctx.fill();});}ctx.save();ctx.translate(0,0);ctx.textAlign='right';ctx.fillStyle='#333';data.forEach(function(d,i){var x=pad.l+i*step+step/2;ctx.save();ctx.translate(x,h-pad.b+16);ctx.rotate(-Math.PI/5);ctx.textAlign='right';ctx.fillText(d.label,0,0);ctx.restore();});ctx.restore();}setToolText('chartStatus','已绘制 '+data.length+' 个数据点');}
     getById('chartRender').onclick=function(){try{drawChart();}catch(e){setToolText('chartStatus','图表生成失败：'+e.message);}};getById('chartDownload').onclick=function(){try{drawChart();var a=document.createElement('a');a.href=getById('chartCanvas').toDataURL('image/png');a.download='chart.png';a.click();}catch(e){setToolText('chartStatus','导出失败：'+e.message);}};
 
     // ============ CSV preview and safe data cleaning ============
@@ -4141,6 +4790,207 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     function utilConvertUnits(){try{var cat=getById('utilUnitCategory').value,value=Number(getById('utilUnitValue').value),from=getById('utilUnitFrom').value,to=getById('utilUnitTo').value;if(!Number.isFinite(value))throw new Error('请输入有效数值');var units=utilUnitData[cat].units,result=cat==='temperature'?utilCToTemp(utilTempToC(value,from),to):(value*units[from][1])/units[to][1];if(!Number.isFinite(result))throw new Error('换算结果超出可表示范围');var digits=Math.abs(result)<1e-7&&result!==0?8:12;setToolText('utilUnitOutput',value+' '+units[from][0]+' = '+Number(result.toPrecision(digits))+' '+units[to][0]+'\n类别：'+utilUnitData[cat].label+'\n基准结果未进行额外舍入；显示值为有限精度。');}catch(e){setToolText('utilUnitOutput','换算失败：'+e.message);}}
     getById('utilUnitCategory').addEventListener('change',function(){utilPopulateUnits();utilConvertUnits();});getById('utilUnitConvert').onclick=utilConvertUnits;getById('utilUnitValue').addEventListener('input',utilConvertUnits);getById('utilUnitFrom').addEventListener('change',utilConvertUnits);getById('utilUnitTo').addEventListener('change',utilConvertUnits);getById('utilUnitSwap').onclick=function(){var a=getById('utilUnitFrom'),b=getById('utilUnitTo'),v=a.value;a.value=b.value;b.value=v;utilConvertUnits();};utilPopulateUnits();utilConvertUnits();
 
+    // ============ 主题切换：与站内其他页面共用 cipher_theme_v2 ============
+    var DTP_THEME_KEY = 'cipher_theme_v2';
+    function dtpRepaintThemeAware() {
+        try { if (document.getElementById('panel-workbench') && document.getElementById('panel-workbench').classList.contains('active')) drawChart(); } catch (e) { /* 图表未初始化时忽略 */ }
+    }
+    function dtpApplyTheme(theme, persist) {
+        var normalized = theme === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', normalized);
+        var isDark = normalized === 'dark', btn = getById('themeToggle');
+        if (btn) {
+            btn.textContent = isDark ? '☀ 浅色模式' : '🌙 深色模式';
+            btn.setAttribute('aria-pressed', String(isDark));
+            btn.setAttribute('aria-label', isDark ? '切换到浅色模式' : '切换到深色模式');
+        }
+        /* 用户未显式选择过时，只跟随系统的深浅偏好显示，不写入存储，避免影响站内其他页面。 */
+        if (persist !== false) { try { localStorage.setItem(DTP_THEME_KEY, normalized); } catch (e) { /* 存储不可用时仅本次生效 */ } }
+        dtpRepaintThemeAware();
+    }
+    getById('themeToggle').addEventListener('click', function () {
+        var cur = document.documentElement.getAttribute('data-theme') || 'light';
+        dtpApplyTheme(cur === 'dark' ? 'light' : 'dark');
+    });
+
+    // ============ 移动端导航：小屏用下拉选择替代横向滚动的标签条 ============
+    var dtpMobileSelect = getById('mobilePrimarySelect');
+    Array.prototype.forEach.call(document.querySelectorAll('#tabsPrimary [data-tab]'), function (btn) {
+        var opt = document.createElement('option');
+        opt.value = btn.getAttribute('data-tab');
+        opt.textContent = btn.textContent.trim();
+        dtpMobileSelect.appendChild(opt);
+    });
+    function dtpSyncMobileSelect() {
+        var act = document.querySelector('#tabsPrimary [data-tab].active');
+        if (act && dtpMobileSelect.value !== act.getAttribute('data-tab')) dtpMobileSelect.value = act.getAttribute('data-tab');
+    }
+    dtpMobileSelect.addEventListener('change', function () {
+        var target = document.querySelector('#tabsPrimary [data-tab="' + this.value + '"]');
+        if (target) target.click();
+    });
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.closest && e.target.closest('#tabsPrimary [data-tab]')) dtpSyncMobileSelect();
+    });
+    dtpSyncMobileSelect();
+
+    // ============ 输入草稿自动保存（只保存非敏感字段，不保存输出框） ============
+    var DTP_DRAFT_KEY = 'devtoolbox:drafts:v1';
+    var DTP_DRAFT_OFF_KEY = 'devtoolbox:drafts:off';
+    var DTP_DRAFT_MAX_FIELD = 20000;
+    /* 这些面板涉及密钥、私钥、口令等，一律不保存。 */
+    var DTP_DRAFT_BLOCKED_TOOLS = { 'cipher/aes': 1, 'cipher/rsa': 1, 'cipher/hybrid': 1, 'cipher/file': 1, 'generate/totp': 1, 'extras/hmac': 1 };
+    var DTP_DRAFT_BLOCKED_FIELD = /(pass|pwd|secret|token|key|salt|seed|private|mnemonic|otp|cipher)/i;
+    var dtpDrafts = (function () { try { var v = JSON.parse(localStorage.getItem(DTP_DRAFT_KEY) || '{}'); return (v && typeof v === 'object') ? v : {}; } catch (e) { return {}; } })();
+    var dtpDraftTimer = null, dtpFlushTimer = null, dtpLastToolKey = null;
+
+    function dtpDraftReadFlag(name) { try { return localStorage.getItem(name); } catch (e) { return null; } }
+    function dtpDraftWriteFlag(name, value) { try { localStorage.setItem(name, value); } catch (e) { /* 忽略 */ } }
+    function dtpDraftEnabled() { return dtpDraftReadFlag(DTP_DRAFT_OFF_KEY) !== '1'; }
+    function dtpDraftPanelId(key) {
+        if (!key) return null;
+        if (key.indexOf('sub:') === 0) return 'sub-' + key.slice(4).replace(':', '-');
+        if (key.indexOf('tab:') === 0) return 'panel-' + key.slice(4);
+        return null;
+    }
+    function dtpDraftEligible(el) {
+        if (!el || !el.id) return false;
+        if (el.readOnly || el.disabled) return false;
+        if (el.type === 'file' || el.type === 'button' || el.type === 'submit') return false;
+        if (DTP_DRAFT_BLOCKED_FIELD.test(el.id)) return false;
+        return true;
+    }
+    function dtpDraftCollect(panel) {
+        var data = {}, controls = panel.querySelectorAll('input, textarea, select'), i;
+        for (i = 0; i < controls.length; i++) {
+            var el = controls[i];
+            if (!dtpDraftEligible(el)) continue;
+            var value = (el.type === 'checkbox' || el.type === 'radio') ? String(el.checked) : el.value;
+            if (!value || value.length > DTP_DRAFT_MAX_FIELD) continue;
+            data[el.id] = value;
+        }
+        return data;
+    }
+    function dtpDraftFlush() {
+        if (dtpFlushTimer) return;
+        dtpFlushTimer = setTimeout(function () {
+            dtpFlushTimer = null;
+            try { localStorage.setItem(DTP_DRAFT_KEY, JSON.stringify(dtpDrafts)); }
+            catch (e) { /* 超出配额时丢弃一半最旧的草稿再试一次 */
+                var keys = Object.keys(dtpDrafts);
+                keys.slice(0, Math.ceil(keys.length / 2)).forEach(function (k) { delete dtpDrafts[k]; });
+                try { localStorage.setItem(DTP_DRAFT_KEY, JSON.stringify(dtpDrafts)); } catch (e2) {}
+            }
+        }, 500);
+    }
+    function dtpDraftSave(key, immediate) {
+        if (!dtpDraftEnabled()) return;
+        var toolKey = key || getCurrentToolKey();
+        if (!toolKey) return;
+        var toolId = toolKey.replace(/^sub:/, '').replace(/^tab:/, '');
+        var panel = getById(dtpDraftPanelId(toolKey));
+        if (!panel || DTP_DRAFT_BLOCKED_TOOLS[toolId]) { if (dtpDrafts[toolKey]) { delete dtpDrafts[toolKey]; dtpDraftFlush(); } return; }
+        var data = dtpDraftCollect(panel), empty = true, k;
+        for (k in data) { if (Object.prototype.hasOwnProperty.call(data, k)) { empty = false; break; } }
+        if (empty) { if (dtpDrafts[toolKey]) { delete dtpDrafts[toolKey]; dtpDraftFlush(); } return; }
+        dtpDrafts[toolKey] = data;
+        if (immediate) { try { localStorage.setItem(DTP_DRAFT_KEY, JSON.stringify(dtpDrafts)); } catch (e) {} }
+        else dtpDraftFlush();
+    }
+    function dtpDraftRestore(key) {
+        if (!dtpDraftEnabled() || !key) return 0;
+        var data = dtpDrafts[key], panel = getById(dtpDraftPanelId(key));
+        if (!data || !panel) return 0;
+        var changed = [], prop;
+        for (prop in data) {
+            if (!Object.prototype.hasOwnProperty.call(data, prop)) continue;
+            var el = getById(prop);
+            if (!el || !panel.contains(el) || !dtpDraftEligible(el)) continue;
+            if (el.type === 'checkbox' || el.type === 'radio') {
+                if (el.checked !== (data[prop] === 'true')) { el.checked = (data[prop] === 'true'); changed.push(el); }
+            } else if (el.value !== data[prop]) { el.value = data[prop]; changed.push(el); }
+        }
+        /* 触发一次事件，让实时计算类工具（哈希、Markdown、字数等）跟着刷新。 */
+        changed.forEach(function (el) {
+            try {
+                var isToggle = el.type === 'checkbox' || el.type === 'radio';
+                el.dispatchEvent(new Event(isToggle ? 'change' : 'input', { bubbles: true }));
+                if (isToggle || el.tagName === 'SELECT') el.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (e) {}
+        });
+        return changed.length;
+    }
+    function dtpDraftSchedule(e) {
+        var t = e && e.target;
+        if (!t || !t.closest || !t.closest('.panel')) return;
+        var status = getById('draftStatus');
+        if (status && status.textContent.indexOf('已恢复') >= 0) status.textContent = '';
+        clearTimeout(dtpDraftTimer);
+        dtpDraftTimer = setTimeout(function () { dtpDraftSave(); }, 600);
+    }
+    document.addEventListener('input', dtpDraftSchedule, true);
+    document.addEventListener('change', dtpDraftSchedule, true);
+    /* 切换工具前先落盘当前工具的草稿，再恢复目标工具的草稿。 */
+    document.addEventListener('click', function (e) {
+        if (!(e.target && e.target.closest)) return;
+        var hit = e.target.closest('[data-sub]') || e.target.closest('#tabsPrimary [data-tab]');
+        if (!hit) return;
+        if (dtpLastToolKey) dtpDraftSave(dtpLastToolKey, true);
+        setTimeout(function () {
+            var key = getCurrentToolKey();
+            dtpLastToolKey = key;
+            var n = dtpDraftRestore(key);
+            /* 只有真正恢复了内容才提示；否则保持原有文案，避免频繁切换时被反复清空。 */
+            if (n) setToolText('draftStatus', '已恢复该工具上次的输入（' + n + ' 个字段）');
+        }, 0);
+    });
+    var dtpDraftToggle = getById('draftToggle'), dtpDraftClear = getById('draftClear');
+    if (dtpDraftToggle) {
+        dtpDraftToggle.checked = dtpDraftEnabled();
+        dtpDraftToggle.addEventListener('change', function () {
+            dtpDraftWriteFlag(DTP_DRAFT_OFF_KEY, this.checked ? '0' : '1');
+            setToolText('draftStatus', this.checked ? '已开启草稿保存' : '已关闭草稿保存，并清空已保存的草稿');
+            if (!this.checked) { dtpDrafts = {}; try { localStorage.removeItem(DTP_DRAFT_KEY); } catch (e) {} }
+        });
+    }
+    if (dtpDraftClear) dtpDraftClear.addEventListener('click', function () {
+        dtpDrafts = {};
+        try { localStorage.removeItem(DTP_DRAFT_KEY); } catch (e) {}
+        setToolText('draftStatus', '已清空全部草稿');
+    });
+
+    // ============ 外部依赖加载状态：仅在缺失时于页脚显示一行极弱的提示 ============
+    var DTP_DEPS = [
+        { name: 'CryptoJS', need: '哈希 / UUID v3·v5 / TOTP', test: function () { return typeof window.CryptoJS !== 'undefined'; } },
+        { name: 'Marked', need: 'Markdown 预览', test: function () { return typeof window.marked !== 'undefined'; } },
+        { name: 'DOMPurify', need: 'HTML 安全清理', test: function () { return typeof window.DOMPurify !== 'undefined'; } },
+        { name: 'Mermaid', need: '流程图渲染', test: function () { return typeof window.mermaid !== 'undefined'; } },
+        { name: 'QRCode', need: '二维码生成', test: function () { return typeof window.QRCode !== 'undefined'; } },
+        { name: 'jsQR', need: '二维码识别', test: function () { return typeof window.jsQR === 'function'; } },
+        { name: 'js-beautify', need: 'JS / CSS 美化', test: function () { return typeof window.js_beautify === 'function'; } }
+    ];
+    function dtpRefreshDepStatus() {
+        var wrap = getById('depStatusWrap');
+        if (!wrap) return;
+        var missing = DTP_DEPS.filter(function (d) { return !d.test(); });
+        if (!missing.length) { wrap.hidden = true; return; }
+        var toggle = getById('depToggle'), detail = getById('depDetail');
+        wrap.hidden = false;
+        toggle.textContent = missing.length + ' 项可选依赖未加载';
+        toggle.title = missing.map(function (d) { return d.name + ' · ' + d.need; }).join('\n');
+        detail.textContent = missing.map(function (d) { return d.name; }).join(' · ');
+    }
+    getById('depToggle').addEventListener('click', function () {
+        var detail = getById('depDetail'), expanded = this.getAttribute('aria-expanded') === 'true';
+        this.setAttribute('aria-expanded', String(!expanded));
+        detail.hidden = expanded;
+    });
+    /* 依赖脚本均为 defer，统一在 DOMContentLoaded 之后判定；3 秒后复查一次慢加载的情况。 */
+    document.addEventListener('DOMContentLoaded', function () {
+        dtpRefreshDepStatus();
+        setTimeout(dtpRefreshDepStatus, 3000);
+    });
+
     // ============ 初始化 ============
     try {
         getById('uuidGen').click();
@@ -4159,6 +5009,19 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     } catch(e) {
         console.warn('初始化部分功能失败 (可能因浏览器限制): ' + e.message);
     }
+
+    /* 主题按钮状态、当前工具草稿恢复，以及 CryptoJS 改为 defer 后的哈希补算。 */
+    try {
+        var dtpStoredTheme = null;
+        try { dtpStoredTheme = localStorage.getItem(DTP_THEME_KEY); } catch (e) {}
+        dtpApplyTheme(document.documentElement.getAttribute('data-theme') || 'light', dtpStoredTheme === 'dark' || dtpStoredTheme === 'light');
+        dtpLastToolKey = getCurrentToolKey();
+        var dtpRestored = dtpDraftRestore(dtpLastToolKey);
+        if (dtpRestored) setToolText('draftStatus', '已恢复该工具上次的输入（' + dtpRestored + ' 个字段）');
+    } catch(e) {
+        console.warn('主题 / 草稿初始化失败: ' + e.message);
+    }
+    document.addEventListener('DOMContentLoaded', function () { try { computeHash(); } catch (e) { /* 忽略 */ } });
 })();
 </script>
 </body>
