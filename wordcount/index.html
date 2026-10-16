@@ -1,190 +1,225 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>字数统计工具</title>
+<script>
+    /* 在样式生效前确定主题，避免深色模式下的白屏闪烁；存储键与站内其他页面保持一致。 */
+    (function () {
+        try {
+            var t = localStorage.getItem('cipher_theme_v2');
+            if (t === 'dark' || t === 'light') { document.documentElement.setAttribute('data-theme', t); return; }
+        } catch (e) { /* localStorage 不可用时忽略 */ }
+        try {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        } catch (e) { /* 忽略 */ }
+    })();
+</script>
 <style>
     :root {
-        --bg: #f5f5f7;
-        --card: #ffffff;
-        --line: #e8e8ec;
-        --line-strong: #111114;
-        --text: #111114;
-        --muted: #8a8a93;
-        --soft: #f2f2f5;
-        --accent: #ef4444;
-        --radius: 12px;
+        --bg: #fafafa;
+        --surface: #fff;
+        --text: #1a1a1a;
+        --text-secondary: #6e6e6e;
+        --text-tertiary: #999;
+        --border: #e0e0e0;
+        --border-light: #eee;
+        --accent: #1a1a1a;
+        --accent-hover: #3a3a3a;
+        --danger: #c0392b;
+        --ok: #237a38;
+        --radius: 4px;
+        --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', 'Menlo', monospace;
+        --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        --transition: 120ms ease;
+        color-scheme: light;
     }
 
-    * { box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-        margin: 0;
-        min-height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        padding: 48px 20px 64px;
+        font-family: var(--font-sans);
         background: var(--bg);
         color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-                     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        line-height: 1.6;
         -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 40px 16px 60px;
     }
 
-    .app {
-        width: 100%;
-        max-width: 720px;
-    }
+    .container { width: 100%; max-width: 820px; min-width: 0; }
 
     /* ---------- 顶部标题 ---------- */
-    .app-header {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 18px;
-    }
-    .app-header h1 {
-        margin: 0;
-        font-size: 20px;
+    .header { margin-bottom: 36px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .header-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+    .header-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text); flex-shrink: 0; }
+    .header-subtitle { font-size: 12px; color: var(--text-tertiary); }
+
+    /* ---------- 主题切换按钮 ---------- */
+    .dtp-theme-toggle { align-self: center; margin-left: auto; padding: 6px 12px; font-size: 11px; }
+
+    /* ---------- 分区标签 ---------- */
+    .section-label {
+        font-size: 11px;
         font-weight: 600;
-        letter-spacing: .01em;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-tertiary);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
-    .app-header .sub {
-        font-size: 13px;
-        color: var(--muted);
-        letter-spacing: .04em;
-    }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
 
     /* ---------- 输入区 ---------- */
     textarea {
-        display: block;
         width: 100%;
-        height: 320px;
-        padding: 18px;
-        font-family: inherit;
-        font-size: 16px;
-        line-height: 1.75;
-        color: var(--text);
-        background: var(--card);
-        border: 1px solid var(--line);
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.55;
+        padding: 10px 14px;
+        border: 1px solid var(--border);
         border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
         resize: vertical;
+        transition: border-color var(--transition);
         outline: none;
-        transition: border-color .18s ease;
+        -webkit-appearance: none;
     }
-    textarea::placeholder { color: #b9b9c1; }
-    textarea:focus { border-color: var(--line-strong); }
+    textarea:focus, input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(26,26,26,0.08); }
+    textarea::placeholder { color: var(--text-tertiary); }
+    #text-input { min-height: 260px; max-height: 560px; }
     textarea::-webkit-scrollbar { width: 8px; }
-    textarea::-webkit-scrollbar-thumb {
-        background: #d8d8de;
-        border-radius: 4px;
-    }
+    textarea::-webkit-scrollbar-thumb { background: #d8d8de; border-radius: 4px; }
     textarea::-webkit-scrollbar-track { background: transparent; }
+    [data-theme="dark"] textarea::-webkit-scrollbar-thumb { background: #33333a; }
 
     /* ---------- 按钮 ---------- */
-    .toolbar {
-        display: flex;
-        gap: 10px;
-        margin-top: 12px;
-    }
     .btn {
-        flex: 1;
-        padding: 13px 16px;
-        font-family: inherit;
-        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 16px;
+        font-size: 12px;
         font-weight: 500;
-        letter-spacing: .02em;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--card);
-        color: var(--text);
+        letter-spacing: 0.02em;
         cursor: pointer;
-        transition: background .15s ease, color .15s ease,
-                    border-color .15s ease, filter .15s ease;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        transition: all var(--transition);
+        font-family: var(--font-sans);
+        white-space: nowrap;
+        outline: none;
+        user-select: none;
     }
-    .btn:hover { background: var(--soft); }
-    .btn:active { transform: translateY(1px); }
+    .btn:hover { background: #f4f4f4; border-color: #c0c0c0; }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn.danger { border-color: var(--danger); color: var(--danger); }
+    .btn.danger:hover { background: #fdf2f2; border-color: var(--danger); }
 
-    .btn.primary {
-        background: var(--text);
-        border-color: var(--text);
-        color: #fff;
-    }
-    .btn.primary:hover { background: #2b2b33; border-color: #2b2b33; }
-
-    .btn.danger {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: #fff;
-    }
-    .btn.danger:hover { filter: brightness(.92); }
+    /* ---------- 布局工具类 ---------- */
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .gap-sm { gap: 8px; }
+    .mt-sm { margin-top: 10px; }
+    .mt-md { margin-top: 18px; }
+    .mb-sm { margin-bottom: 8px; }
+    .note { font-size: 11px; color: var(--text-tertiary); letter-spacing: 0.02em; }
 
     /* ---------- 统计网格 ---------- */
-    .stats {
-        margin-top: 20px;
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-        gap: 10px;
-    }
+    .stats { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
     .stat {
         display: flex;
         flex-direction: column;
         gap: 8px;
-        padding: 16px 16px 14px;
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        transition: border-color .15s ease;
+        padding: 14px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
     }
-    .stat:hover { border-color: #d6d6dd; }
-
     .stat .label {
         font-size: 12px;
-        color: var(--muted);
-        letter-spacing: .06em;
+        color: var(--text-secondary);
+        letter-spacing: .04em;
         white-space: nowrap;
     }
     .stat .value {
-        font-size: 26px;
+        font-size: 24px;
         font-weight: 600;
         line-height: 1.1;
-        color: var(--accent);
+        color: var(--danger);
         font-variant-numeric: tabular-nums;
         letter-spacing: -.01em;
         word-break: break-all;
     }
     /* 阅读时长这类文本值小一点 */
-    .stat .value.text-value { font-size: 20px; }
+    .stat .value.text-value { font-size: 18px; }
 
-    ::selection { background: #111114; color: #fff; }
+    ::selection { background: var(--text); color: var(--bg); }
 
-    @media (max-width: 480px) {
-        body { padding: 28px 16px 48px; }
-        textarea { height: 240px; }
-        .stats { grid-template-columns: repeat(2, 1fr); }
-        .stat .value { font-size: 22px; }
-        .stat .value.text-value { font-size: 16px; }
+    /* ---------- 深色模式（与站内其他页面共用 cipher_theme_v2 存储键） ---------- */
+    [data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0d0d0f;
+        --surface: #17171a;
+        --text: #e9e9ec;
+        --text-secondary: #a1a1a8;
+        --text-tertiary: #71717a;
+        --border: #2c2c31;
+        --border-light: #222227;
+        --accent: #e9e9ec;
+        --accent-hover: #ffffff;
+        --danger: #e5484d;
+        --ok: #7bd88f;
+    }
+    [data-theme="dark"] .btn:hover { background: #232328; border-color: #45454d; }
+    [data-theme="dark"] .btn.primary { color: #101013; }
+    [data-theme="dark"] .btn.primary:hover { background: #ffffff; border-color: #ffffff; }
+    [data-theme="dark"] .btn.danger:hover { background: #2a1618; border-color: #7a2b2f; }
+    [data-theme="dark"] textarea:focus,
+    [data-theme="dark"] input:focus,
+    [data-theme="dark"] select:focus { box-shadow: 0 0 0 1px rgba(255,255,255,0.14); }
+
+    @media (max-width: 600px) {
+        body { padding: 20px 10px 40px; }
+        .header { margin-bottom: 24px; }
+        #text-input { min-height: 200px; }
+        .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .stat .value { font-size: 20px; }
+        .stat .value.text-value { font-size: 15px; }
     }
 </style>
 </head>
 <body>
 
-<div class="app">
-    <header class="app-header">
-        <h1>字数统计工具</h1>
-        <span class="sub">实时统计</span>
-    </header>
+<div class="container">
+    <div class="header">
+        <span class="header-title">字数统计工具</span>
+        <span class="header-dot"></span>
+        <span class="header-subtitle">实时统计</span>
+        <button class="btn dtp-theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色模式" aria-label="切换深色或浅色模式" aria-pressed="false">深色模式</button>
+    </div>
 
-    <textarea id="text-input" placeholder="在此输入或粘贴文本…"></textarea>
+    <div class="section-label">输入</div>
+    <textarea id="text-input" placeholder="在此输入或粘贴文本，下方各项统计会实时更新…"></textarea>
 
-    <div class="toolbar">
+    <div class="row mt-sm gap-sm">
         <button class="btn primary" id="copy-button" type="button">复制全文</button>
         <button class="btn danger" id="clear-button" type="button">清空</button>
     </div>
 
+    <div class="section-label mt-md">统计</div>
     <section class="stats">
         <div class="stat"><span class="label">总字符数</span><span class="value" data-stat="chars">0</span></div>
         <div class="stat"><span class="label">不含空格</span><span class="value" data-stat="noSpace">0</span></div>
@@ -198,6 +233,8 @@
         <div class="stat"><span class="label">段落数</span><span class="value" data-stat="paragraphs">0</span></div>
         <div class="stat"><span class="label">阅读时长</span><span class="value text-value" data-stat="reading">0 秒</span></div>
     </section>
+
+    <p class="note mt-sm">按内容构成统计：总字符数按码点计（emoji 等代理对算 1 个），阅读时长按汉字 300 字/分钟、英文 200 词/分钟估算。</p>
 </div>
 
 <script>
@@ -309,6 +346,29 @@
     /* 初始化 */
     update();
 })();
+
+/* ============ 主题切换：与站内其他页面共用 cipher_theme_v2 ============ */
+var THEME_KEY = 'cipher_theme_v2';
+function applyTheme(theme, persist) {
+    var normalized = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', normalized);
+    var isDark = normalized === 'dark';
+    var btn = document.getElementById('themeToggle');
+    if (btn) {
+        btn.textContent = isDark ? '☀ 浅色模式' : '🌙 深色模式';
+        btn.setAttribute('aria-pressed', String(isDark));
+        btn.setAttribute('aria-label', isDark ? '切换到浅色模式' : '切换到深色模式');
+    }
+    /* 用户未显式选择过时，只跟随系统的深浅偏好显示，不写入存储，避免影响站内其他页面。 */
+    if (persist !== false) {
+        try { localStorage.setItem(THEME_KEY, normalized); } catch (e) { /* 存储不可用时仅本次生效 */ }
+    }
+}
+applyTheme(document.documentElement.getAttribute('data-theme') || 'light', false);
+document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
 </script>
 
 </body>
