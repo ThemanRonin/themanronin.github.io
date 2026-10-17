@@ -9,7 +9,7 @@
 
 - [DevToolboxPro](https://themanronin.github.io/DevToolboxPro/) — 全能开发者工具箱。编解码、哈希、加解密、生成器、格式转换、JSON ⇄ TypeScript、Markdown ⇄ HTML、JWT 签发与校验等。
 
-- [Calendar](https://themanronin.github.io/Calendar/) — 排班日历。月视图排班，支持白班 / 夜班 / 休班 / 请假 / 加班，内置默认班次规则，支持文本导入与周期统计。
+- [Calendar](https://themanronin.github.io/Calendar/) — 排班日历。月视图排班，支持白班 / 夜班 / 休班 / 请假 / 加班，内置默认班次规则，支持文本导入、JSON / CSV 导出、JSONBin 云同步与周期统计。
 
 - [WebhookForwarder](https://themanronin.github.io/WebhookForwarder/) — Webhook 发送器。企业微信群机器人文本消息发送，支持代理转发（`{url}` 占位符）、请求预览、响应查看与发送记录。
 

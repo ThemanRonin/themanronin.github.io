@@ -541,12 +541,14 @@
     .import-textarea::placeholder { color: var(--text-tertiary); }
     .import-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 8px; letter-spacing: .02em; }
     .import-status { margin-right: auto; font-size: 11px; color: var(--text-tertiary); letter-spacing: .02em; }
+    .import-status:empty { display: none; }
     .import-status.error { color: var(--danger); }
 
     /* ---------- 云同步弹窗 ---------- */
     .sync-form { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
     .sync-row { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-tertiary); letter-spacing: .02em; }
-    .sync-row input {
+    .sync-row input,
+    .sync-row select {
         font-family: var(--font-mono);
         font-size: 12px;
         padding: 7px 10px;
@@ -558,8 +560,42 @@
         transition: border-color var(--transition);
         width: 100%;
     }
-    .sync-row input:focus { border-color: var(--accent); }
+    .sync-row select { cursor: pointer; }
+    .sync-row input:focus,
+    .sync-row select:focus { border-color: var(--accent); }
     .sync-actions { display: flex; gap: 8px; margin-left: auto; }
+
+    /* ---------- 导出 / 备份 ---------- */
+    .export-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .export-actions .btn { flex: 1 1 120px; }
+
+    .import-file-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+    .import-file-row input[type="file"] {
+        max-width: 100%;
+        font-size: 11px;
+        color: var(--text-secondary);
+    }
+    .import-file-row input[type="file"]::file-selector-button {
+        margin-right: 8px;
+        padding: 5px 10px;
+        font-family: var(--font-sans);
+        font-size: 11px;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        cursor: pointer;
+    }
+    .import-file-row input[type="file"]::file-selector-button:hover {
+        border-color: var(--border-strong);
+        background: var(--bg);
+    }
     .sync-reset-row {
         display: flex;
         align-items: center;
@@ -688,7 +724,7 @@
     <div class="header">
         <span class="header-title">排班日历</span>
         <span class="header-dot"></span>
-        <span class="header-subtitle">本地记录 · 数据不上传</span>
+        <span class="header-subtitle">本地存储 · 可选云同步</span>
         <span class="sync-state" id="syncState" data-state="off">本地</span>
         <button class="btn dtp-theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色模式" aria-label="切换深色或浅色模式" aria-pressed="false">深色模式</button>
     </div>
@@ -708,6 +744,7 @@
                     <button class="btn small" id="defaultBtn" type="button" aria-pressed="false" title="工作2天休息2天，白/夜班每2个班次周期切换">默认班次</button>
                     <button class="btn small" id="invertBtn" type="button" aria-pressed="false" disabled title="临时互换默认的白班与夜班">倒转</button>
                     <button class="btn small" id="importBtn" type="button">导入</button>
+                    <button class="btn small" id="exportBtn" type="button">导出</button>
                     <button class="btn small" id="syncBtn" type="button">云同步</button>
                 </div>
             </div>
@@ -721,10 +758,10 @@
             <div class="calendar" id="calendar" role="grid" aria-label="排班日历"></div>
 
             <!-- 统计 -->
-            <div class="section-label mt-md"><span id="periodLabel">本月统计</span></div>
+            <div class="section-label mt-md"><span id="periodLabel">本期统计</span></div>
             <div class="stats" id="stats"></div>
 
-            <p class="note mt-sm">点击任意日期即可设置班次；数据保存在当前浏览器中，不会上传。统计周期为每月 26 号至次月 25 号。「默认班次」按工作 2 天、休息 2 天循环，工作日每 2 个班次周期在夜班 / 白班之间切换：10 月、11 月班次（9/26 - 11/25）为夜班，12 月、1 月班次（11/26 - 1/25）为白班。开启「倒转」可临时互换默认的白班 / 夜班，不影响手动设置。</p>
+            <p class="note mt-sm">点击任意日期即可设置班次。数据默认保存在当前浏览器中；只有主动点击「云同步 → 上传」时，才会写入你自己的 JSONBin。统计按班次周期计算：查看某月时，统计该月 1 号所在周期（上月 26 号至本月 25 号），26 号及以后计入下期。「默认班次」按工作 2 天、休息 2 天循环，工作日每 2 个班次周期在夜班 / 白班之间切换：10 月、11 月班次（9/26 - 11/25）为夜班，12 月、1 月班次（11/26 - 1/25）为白班。开启「倒转」可临时互换默认的白班 / 夜班，不影响手动设置。</p>
         </main>
 
         <!-- ================= 侧栏 ================= -->
@@ -792,7 +829,11 @@
         </div>
         <textarea class="import-textarea" id="importText" spellcheck="false"
             placeholder="2026/06/26 (周五): 休息&#10;2026/06/27 (周六): 休息&#10;2026/06/28 (周日): 请假&#10;2026/07/02 (周四): 夜班&#10;2026/07/04 (周六): 夜班加班"></textarea>
-        <div class="import-hint">支持 白班 / 夜班 / 休班（休息）/ 请假 / 白班加班 / 夜班加班；日期支持 2026/06/26、2026-6-26、2026年6月26日 等写法，星期与括号内容会自动忽略。导入的班次优先于默认班次。</div>
+        <div class="import-hint">支持 白班 / 夜班 / 休班（休息）/ 请假 / 白班加班 / 夜班加班；日期支持 2026/06/26、2026-6-26、2026年6月26日 等写法，星期与括号内容会自动忽略。也可直接粘贴或选择导出的 JSON 备份 / CSV 文件；导入的班次优先于默认班次。</div>
+        <div class="import-file-row">
+            <input type="file" id="importFile" accept=".json,.csv,.txt,application/json,text/csv,text/plain">
+            <span class="import-hint">或选择之前导出的备份文件</span>
+        </div>
         <div class="modal-foot">
             <span class="import-status" id="importStatus"></span>
             <button class="btn small" id="importCancel" type="button">取消</button>
@@ -830,7 +871,9 @@
             <button class="btn small" id="syncResetBuiltin" type="button">重置为内置配置</button>
         </div>
 
-        <div class="import-hint" style="margin-top:8px">上传会用本机数据覆盖云端；下载会用云端数据覆盖本机，下载前会再次确认。</div>
+        <div class="import-hint" id="syncMetaHint" style="margin-top:8px">尚未同步</div>
+
+        <div class="import-hint" style="margin-top:8px">上传前会先读取云端并确认覆盖，云端在其它设备上更新过时会额外提示；下载会用云端数据覆盖本机，下载前会再次确认。</div>
 
         <div class="modal-foot">
             <span class="import-status" id="syncStatus"></span>
@@ -842,13 +885,50 @@
     </div>
 </div>
 
+<!-- 导出 / 备份弹窗 -->
+<div class="overlay" id="exportOverlay">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title" id="exportTitle">导出 / 备份</div>
+                <div class="modal-sub">JSON 用于完整备份；CSV 可用 Excel 打开；文本可直接回填到导入</div>
+            </div>
+            <button class="btn small" id="exportClose" type="button">关闭</button>
+        </div>
+
+        <div class="sync-form">
+            <label class="sync-row">
+                <span>导出范围</span>
+                <select id="exportRange">
+                    <option value="period">本期</option>
+                    <option value="all">全部排班</option>
+                </select>
+            </label>
+        </div>
+
+        <div class="export-actions">
+            <button class="btn small primary" id="exportJson" type="button">导出 JSON</button>
+            <button class="btn small" id="exportCsv" type="button">导出 CSV</button>
+            <button class="btn small" id="exportText" type="button">复制文本</button>
+        </div>
+
+        <div class="sync-reset-row">
+            <span class="import-hint" id="backupHint">自动备份：—</span>
+            <button class="btn small" id="restoreBackup" type="button" disabled>恢复自动备份</button>
+        </div>
+
+        <div class="import-hint" style="margin-top:8px">JSON 备份包含排班与「默认班次 / 倒转」开关；CSV 与文本只含排班。</div>
+        <div class="import-status" id="exportStatus" style="margin-top:10px"></div>
+    </div>
+</div>
+
 <!-- 覆盖确认弹窗 -->
 <div class="overlay" id="confirmOverlay">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmSub">
         <div class="modal-head">
             <div>
                 <div class="modal-title" id="confirmTitle">覆盖本地数据？</div>
-                <div class="modal-sub">下载后，云端数据将覆盖当前设备上的所有排班，此操作无法撤销。</div>
+                <div class="modal-sub" id="confirmSub">下载后，云端数据将覆盖当前设备上的所有排班，此操作无法撤销。</div>
             </div>
         </div>
         <div class="modal-foot">
@@ -915,8 +995,10 @@
     const STORE_KEY = 'shift_calendar_v1';
     const DEFAULT_KEY = 'shift_calendar_default_v1';
     const INVERT_KEY = 'shift_calendar_invert_v1';
+    const BACKUP_KEY = 'shift_calendar_backup_v1';
+    const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-    /* 统计周期：视图月 26 号 ~ 次月 25 号（含首尾） */
+    /* 统计周期：上月 26 号 ~ 本月 25 号（含首尾，覆盖本月 1 号所在周期） */
     const PERIOD_START_DAY = 26;
     const PERIOD_END_DAY = 25;
 
@@ -951,6 +1033,7 @@
 
     const syncOverlay    = $('syncOverlay');
     const confirmOverlay = $('confirmOverlay');
+    const exportOverlay  = $('exportOverlay');
 
     const todayDateText   = $('todayDateText');
     const todayDayNum     = $('todayDayNum');
@@ -980,6 +1063,41 @@
         t.classList.add('show');
         clearTimeout(toastTimer);
         toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+    }
+
+    function formatTs(ts) {
+        if (!ts) return '—';
+        const d = new Date(ts);
+        return d.getFullYear() + '/' + pad2(d.getMonth() + 1) + '/' + pad2(d.getDate()) +
+            ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    }
+
+    function formatRangeText(range) {
+        const sy = range.start.getFullYear();
+        const sm = range.start.getMonth() + 1;
+        const sd = range.start.getDate();
+        const ey = range.end.getFullYear();
+        const em = range.end.getMonth() + 1;
+        const ed = range.end.getDate();
+
+        if (sy !== ey) {
+            return sy + '年' + sm + '月' + sd + '日 - ' + ey + '年' + em + '月' + ed + '日';
+        }
+        if (sm !== em) {
+            return sm + '月' + sd + '日 - ' + em + '月' + ed + '日';
+        }
+        return sm + '月' + sd + '日 - ' + ed + '日';
+    }
+
+    /* 任一模态打开时锁定页面滚动，避免关闭一个弹窗后背景被误解锁 */
+    function anyOverlayOpen() {
+        return [overlay, importOverlay, syncOverlay, confirmOverlay, exportOverlay].some(function (el) {
+            return el && el.classList.contains('open');
+        });
+    }
+
+    function syncBodyLock() {
+        document.body.style.overflow = anyOverlayOpen() ? 'hidden' : '';
     }
 
     /* ============================================================
@@ -1097,27 +1215,69 @@
     /* ============================================================
        持久化
        ============================================================ */
+    /* 只保留合法日期键与已知班次，供本地读取、云端下载、JSON 恢复共用 */
+    function sanitizeStore(data) {
+        const out = {};
+        if (!data || typeof data !== 'object') return out;
+        Object.keys(data).forEach(function (k) {
+            if (DATE_KEY_RE.test(k) && SHIFT_MAP[data[k]]) {
+                out[k] = data[k];
+            }
+        });
+        return out;
+    }
+
     function loadStore() {
         try {
             const raw = localStorage.getItem(STORE_KEY);
             if (!raw) return {};
-            const data = JSON.parse(raw);
-            if (!data || typeof data !== 'object') return {};
-            const out = {};
-            Object.keys(data).forEach(function (k) {
-                if (/^\d{4}-\d{2}-\d{2}$/.test(k) && SHIFT_MAP[data[k]]) {
-                    out[k] = data[k];
-                }
-            });
-            return out;
+            return sanitizeStore(JSON.parse(raw));
         } catch (e) {
             return {};
         }
     }
 
     function saveStore() {
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); }
-        catch (e) { /* 存储不可用时静默失败 */ }
+        try {
+            localStorage.setItem(STORE_KEY, JSON.stringify(store));
+        } catch (e) {
+            showToast('本地保存失败，请尽快导出备份');
+        }
+    }
+
+    /* 覆盖性操作前的本地快照，可在「导出 / 备份」中恢复 */
+    function backupStore(reason) {
+        if (!Object.keys(store).length) return;
+        try {
+            localStorage.setItem(BACKUP_KEY, JSON.stringify({
+                store: store,
+                settings: {
+                    defaultEnabled: defaultEnabled,
+                    inverted: inverted
+                },
+                savedAt: Date.now(),
+                reason: reason || ''
+            }));
+        } catch (e) { /* 容量不足时忽略，手动导出仍可用 */ }
+    }
+
+    function loadBackup() {
+        try {
+            const raw = localStorage.getItem(BACKUP_KEY);
+            if (!raw) return null;
+            const b = JSON.parse(raw);
+            if (!b || typeof b !== 'object') return null;
+            const clean = sanitizeStore(b.store);
+            if (!Object.keys(clean).length) return null;
+            return {
+                store: clean,
+                settings: (b.settings && typeof b.settings === 'object') ? b.settings : null,
+                savedAt: Number(b.savedAt) || 0,
+                reason: typeof b.reason === 'string' ? b.reason : ''
+            };
+        } catch (e) {
+            return null;
+        }
     }
 
     function loadDefaultEnabled() {
@@ -1142,6 +1302,8 @@
        云同步（手动上传 / 下载，配置优先读取硬编码默认值）
        ============================================================ */
     const SYNC_CFG_KEY = 'shift_calendar_sync_v1';
+    const SYNC_META_KEY = 'shift_calendar_sync_meta_v1';
+    const SYNC_TIMEOUT_MS = 12000;
 
     function hasBuiltinCfg() {
         return SYNC_DEFAULT.binId !== SYNC_PLACEHOLDER_BIN
@@ -1174,6 +1336,39 @@
     }
 
     let syncCfg = loadSyncCfg();
+
+    /* 上次成功同步的时间，用于判断云端是否在其它设备上被更新过。
+       JSONBin 不提供服务器端更新时间，这里用写入端自带的 updatedAt，
+       跨设备时钟偏差可能影响判断，因此只作为「额外提示」而非拦截条件。 */
+    function loadSyncMeta() {
+        try {
+            const raw = localStorage.getItem(SYNC_META_KEY);
+            if (!raw) return { lastSyncAt: 0, lastAction: '' };
+            const m = JSON.parse(raw);
+            return {
+                lastSyncAt: Number(m && m.lastSyncAt) || 0,
+                lastAction: m && typeof m.lastAction === 'string' ? m.lastAction : ''
+            };
+        } catch (e) {
+            return { lastSyncAt: 0, lastAction: '' };
+        }
+    }
+
+    let syncMeta = loadSyncMeta();
+
+    function saveSyncMeta(ts, action) {
+        syncMeta = { lastSyncAt: Number(ts) || Date.now(), lastAction: action || '' };
+        try { localStorage.setItem(SYNC_META_KEY, JSON.stringify(syncMeta)); } catch (e) {}
+        renderSyncMeta();
+    }
+
+    function renderSyncMeta() {
+        const el = $('syncMetaHint');
+        if (!el) return;
+        el.textContent = syncMeta.lastSyncAt
+            ? '上次同步：' + formatTs(syncMeta.lastSyncAt) + (syncMeta.lastAction ? ' · ' + syncMeta.lastAction : '')
+            : '尚未同步';
+    }
 
     function syncConfigured() {
         return !!(syncCfg && syncCfg.binId && syncCfg.key);
@@ -1215,94 +1410,191 @@
         $('syncDownload').disabled = disabled;
     }
 
-    async function pushJsonbin(payload) {
+    function httpErrorText(status) {
+        if (status === 401 || status === 403) return 'Key 无效或无权限（HTTP ' + status + '）';
+        if (status === 404) return 'Bin 不存在（HTTP 404）';
+        if (status === 413) return '数据超出 Bin 容量（HTTP 413）';
+        if (status === 429) return '请求过于频繁，请稍后重试（HTTP 429）';
+        if (status >= 500) return 'JSONBin 服务端错误（HTTP ' + status + '）';
+        return 'HTTP ' + status;
+    }
+
+    function requestSignal() {
+        const ctrl = new AbortController();
+        const timer = setTimeout(function () { ctrl.abort(); }, SYNC_TIMEOUT_MS);
+        return {
+            signal: ctrl.signal,
+            done: function () { clearTimeout(timer); }
+        };
+    }
+
+    function netErrorText(e) {
+        if (e && e.name === 'AbortError') {
+            return '请求超时（' + Math.round(SYNC_TIMEOUT_MS / 1000) + ' 秒）';
+        }
+        return (e && e.message) ? e.message : '网络错误';
+    }
+
+    async function pushJsonbin(cfg, payload, signal) {
         const r = await fetch(
-            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(syncCfg.binId),
+            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(cfg.binId),
             {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Access-Key': syncCfg.key
+                    'X-Access-Key': cfg.key
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: signal,
+                cache: 'no-store'
             }
         );
-        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (!r.ok) throw new Error(httpErrorText(r.status));
         return r.json();
     }
 
-    async function pullJsonbin() {
+    async function pullJsonbin(cfg, signal) {
         const r = await fetch(
-            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(syncCfg.binId) + '/latest',
-            { headers: { 'X-Access-Key': syncCfg.key } }
+            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(cfg.binId) + '/latest',
+            {
+                headers: { 'X-Access-Key': cfg.key },
+                signal: signal,
+                cache: 'no-store'
+            }
         );
-        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (!r.ok) throw new Error(httpErrorText(r.status));
         const j = await r.json();
         return j.record || null;
     }
 
+    /* 上传前先读云端，确认覆盖并提示跨设备冲突 */
     async function doUpload() {
         const cfg = collectSyncCfgFromForm();
         if (!cfg.binId || !cfg.key) {
             setSyncStatus('请先填写 Bin ID 和 Access Key', true);
             return;
         }
-        syncCfg = cfg;
-        persistSyncCfg();
-        updateSyncBadge();
+
+        setSyncStatus('正在检查云端…', false);
+        setSyncButtonsDisabled(true);
+        const t = requestSignal();
+        let remote;
+        try {
+            remote = await pullJsonbin(cfg, t.signal);
+        } catch (e) {
+            setSyncStatus('无法读取云端：' + netErrorText(e), true);
+            showToast('无法读取云端，已取消上传');
+            return;
+        } finally {
+            t.done();
+            setSyncButtonsDisabled(false);
+        }
+
+        const remoteStore = sanitizeStore(remote && remote.store);
+        const remoteCount = Object.keys(remoteStore).length;
+        const remoteTs = Number(remote && remote.updatedAt) || 0;
+        const localCount = Object.keys(store).length;
+        const remoteNewer = remoteCount > 0 && remoteTs > (syncMeta.lastSyncAt || 0);
+        const localEmpty = localCount === 0 && remoteCount > 0;
+
+        const lines = [];
+        lines.push('本机 ' + localCount + ' 条排班；云端 ' + remoteCount + ' 条' +
+            (remoteTs ? '（更新于 ' + formatTs(remoteTs) + '）' : '') + '。');
+        lines.push('上传会用本机数据整体替换云端。');
+        if (localEmpty) {
+            lines.push('注意：本机没有任何排班，上传会清空云端数据。');
+        }
+        if (remoteNewer) {
+            lines.push('注意：云端在上次同步后已更新，可能来自其他设备。');
+        }
+
+        openConfirm({
+            title: localEmpty
+                ? '本机为空，仍要清空云端？'
+                : (remoteNewer ? '云端数据更新，仍要覆盖？' : '覆盖云端数据？'),
+            sub: lines.join(' '),
+            okText: '确认上传',
+            onOk: function () { performUpload(cfg); }
+        });
+    }
+
+    async function performUpload(cfg) {
         setSyncStatus('上传中…', false);
         setSyncButtonsDisabled(true);
+        const t = requestSignal();
         try {
             const payload = { store: store, updatedAt: Date.now() };
-            await pushJsonbin(payload);
-            setSyncStatus('上传成功 · ' + new Date().toLocaleTimeString(), false);
+            await pushJsonbin(cfg, payload, t.signal);
+            syncCfg = cfg;
+            persistSyncCfg();
+            updateSyncBadge();
+            saveSyncMeta(payload.updatedAt, '上传');
+            setSyncStatus('上传成功 · ' + formatTs(payload.updatedAt), false);
             showToast('已上传到云端');
         } catch (e) {
-            setSyncStatus('上传失败：' + e.message, true);
+            setSyncStatus('上传失败：' + netErrorText(e), true);
             showToast('上传失败');
         } finally {
+            t.done();
             setSyncButtonsDisabled(false);
         }
     }
 
+    /* 下载前先读云端，空数据直接取消，非空才弹出覆盖确认 */
     async function doDownload() {
         const cfg = collectSyncCfgFromForm();
         if (!cfg.binId || !cfg.key) {
             setSyncStatus('请先填写 Bin ID 和 Access Key', true);
             return;
         }
+
+        setSyncStatus('正在读取云端…', false);
+        setSyncButtonsDisabled(true);
+        const t = requestSignal();
+        let remote;
+        try {
+            remote = await pullJsonbin(cfg, t.signal);
+        } catch (e) {
+            setSyncStatus('读取失败：' + netErrorText(e), true);
+            showToast('读取失败');
+            return;
+        } finally {
+            t.done();
+            setSyncButtonsDisabled(false);
+        }
+
+        const remoteStore = sanitizeStore(remote && remote.store);
+        const count = Object.keys(remoteStore).length;
+        if (!count) {
+            setSyncStatus('云端暂无排班数据，已取消下载', true);
+            showToast('云端暂无数据');
+            return;
+        }
+
+        const remoteTs = Number(remote && remote.updatedAt) || 0;
+        const localCount = Object.keys(store).length;
+
+        openConfirm({
+            title: '覆盖本地数据？',
+            sub: '云端 ' + count + ' 条排班' + (remoteTs ? '（更新于 ' + formatTs(remoteTs) + '）' : '') +
+                 '将覆盖本机 ' + localCount + ' 条排班，此操作无法撤销。',
+            okText: '确认覆盖',
+            onOk: function () { applyDownload(cfg, remoteStore, remoteTs); }
+        });
+    }
+
+    function applyDownload(cfg, remoteStore, remoteTs) {
+        backupStore('下载覆盖前');
+        store = remoteStore;
+        saveStore();
+        render();
         syncCfg = cfg;
         persistSyncCfg();
         updateSyncBadge();
-        setSyncStatus('下载中…', false);
-        setSyncButtonsDisabled(true);
-        try {
-            const remote = await pullJsonbin();
-            if (!remote || !remote.store || typeof remote.store !== 'object') {
-                setSyncStatus('云端暂无排班数据', true);
-                return;
-            }
-            const clean = {};
-            Object.keys(remote.store).forEach(function (k) {
-                if (/^\d{4}-\d{2}-\d{2}$/.test(k) && SHIFT_MAP[remote.store[k]]) {
-                    clean[k] = remote.store[k];
-                }
-            });
-            store = clean;
-            saveStore();
-            render();
-            const ts = Number(remote.updatedAt) || 0;
-            setSyncStatus(
-                '下载成功 · ' + (ts ? new Date(ts).toLocaleString() : new Date().toLocaleString()),
-                false
-            );
-            showToast('已从云端下载并覆盖本地数据');
-        } catch (e) {
-            setSyncStatus('下载失败：' + e.message, true);
-            showToast('下载失败');
-        } finally {
-            setSyncButtonsDisabled(false);
-        }
+        const ts = remoteTs || Date.now();
+        saveSyncMeta(ts, '下载');
+        setSyncStatus('下载成功 · ' + formatTs(ts), false);
+        showToast('已从云端下载并覆盖本地数据');
     }
 
     function openSyncSettings() {
@@ -1312,24 +1604,42 @@
         } else {
             $('syncBuiltinHint').textContent = '未内置配置，请手动填写。';
         }
+        renderSyncMeta();
         setSyncStatus(syncConfigured() ? '已配置，可直接上传或下载' : '');
         syncOverlay.classList.add('open');
-        document.body.style.overflow = 'hidden';
+        syncBodyLock();
     }
     function closeSyncSettings() {
         syncOverlay.classList.remove('open');
-        if (!confirmOverlay.classList.contains('open')) {
-            document.body.style.overflow = '';
-        }
+        syncBodyLock();
     }
-    function openConfirm() {
+
+    let confirmAction = null;
+    let confirmReturnFocus = null;
+
+    function openConfirm(opts) {
+        opts = opts || {};
+        $('confirmTitle').textContent = opts.title || '确认操作？';
+        $('confirmSub').textContent = opts.sub || '';
+        const ok = $('confirmOk');
+        ok.textContent = opts.okText || '确认';
+        ok.className = 'btn small danger';
+        confirmAction = typeof opts.onOk === 'function' ? opts.onOk : null;
+        confirmReturnFocus = document.activeElement;
         confirmOverlay.classList.add('open');
+        syncBodyLock();
+        /* 破坏性操作默认聚焦「取消」，避免回车误确认 */
+        $('confirmCancel').focus();
     }
+
     function closeConfirm() {
         confirmOverlay.classList.remove('open');
-        if (!syncOverlay.classList.contains('open')) {
-            document.body.style.overflow = '';
+        confirmAction = null;
+        syncBodyLock();
+        if (confirmReturnFocus && typeof confirmReturnFocus.focus === 'function') {
+            confirmReturnFocus.focus();
         }
+        confirmReturnFocus = null;
     }
 
     /* ============================================================
@@ -1447,11 +1757,12 @@
     }
 
     /* ============================================================
-       统计周期：视图月 26 号 ~ 次月 25 号（含首尾）
+       统计周期：视图月 1 号所在班次周期（上月 26 号 ~ 本月 25 号）
+       例：查看 2026 年 10 月 => 9/26 ~ 10/25；10/26 起计入 11 月周期
        ============================================================ */
     function getPeriodRange() {
-        const start = new Date(viewYear, viewMonth, PERIOD_START_DAY);
-        const end = new Date(viewYear, viewMonth + 1, PERIOD_END_DAY);
+        const start = new Date(viewYear, viewMonth - 1, PERIOD_START_DAY);
+        const end = new Date(viewYear, viewMonth, PERIOD_END_DAY);
         return { start: start, end: end };
     }
 
@@ -1475,22 +1786,7 @@
             cursor.setDate(cursor.getDate() + 1);
         }
 
-        const sy = range.start.getFullYear();
-        const sm = range.start.getMonth() + 1;
-        const sd = range.start.getDate();
-        const ey = range.end.getFullYear();
-        const em = range.end.getMonth() + 1;
-        const ed = range.end.getDate();
-
-        let rangeText;
-        if (sy !== ey) {
-            rangeText = sy + '年' + sm + '月' + sd + '日 - ' + ey + '年' + em + '月' + ed + '日';
-        } else if (sm !== em) {
-            rangeText = sm + '月' + sd + '日 - ' + em + '月' + ed + '日';
-        } else {
-            rangeText = sm + '月' + sd + '日 - ' + ed + '日';
-        }
-        periodLabel.textContent = '班次统计 · ' + rangeText;
+        periodLabel.textContent = '本期统计 · ' + formatRangeText(range);
 
         statsEl.innerHTML = '';
 
@@ -1760,13 +2056,13 @@
 
         renderShiftOptions();
         overlay.classList.add('open');
-        document.body.style.overflow = 'hidden';
+        syncBodyLock();
         $('modalClose').focus();
     }
 
     function closeEditor() {
         overlay.classList.remove('open');
-        document.body.style.overflow = '';
+        syncBodyLock();
         editingDate = null;
     }
 
@@ -1803,6 +2099,8 @@
             let line = rawLine.trim();
             if (!line) return;
             if (line.charAt(0) === '#' || line.slice(0, 2) === '//') return;
+            /* 跳过 CSV 表头 */
+            if (line.indexOf('日期') === 0 || /^date\b/i.test(line)) return;
 
             line = line.replace(/[年月]/g, '/').replace(/[日号]/g, ' ');
 
@@ -1822,8 +2120,15 @@
             let rest = line.slice(m.index + m[0].length);
             rest = rest.replace(/^[\s:：,，\-–—|/]+/, '');
 
-            const parts = rest.split(/[:：]/);
-            const namePart = parts.length > 1 ? parts[parts.length - 1] : rest;
+            let namePart;
+            if (rest.indexOf(',') !== -1 || rest.indexOf('，') !== -1) {
+                /* CSV：日期,星期,班次 —— 取最后一列 */
+                const cols = rest.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+                namePart = cols.length ? cols[cols.length - 1] : rest;
+            } else {
+                const parts = rest.split(/[:：]/);
+                namePart = parts.length > 1 ? parts[parts.length - 1] : rest;
+            }
 
             const shiftId = normalizeShiftName(namePart);
             if (!shiftId) { failed.push(rawLine.trim()); return; }
@@ -1834,10 +2139,40 @@
         return { entries: entries, failed: failed };
     }
 
-    function applyImport(entries) {
+    /* JSON 备份：兼容 { store, settings } 与直接导出日期映射两种结构 */
+    function parseJsonBackup(text) {
+        let obj;
+        try { obj = JSON.parse(text); } catch (e) { return null; }
+        if (!obj || typeof obj !== 'object') return null;
+
+        const src = (obj.store && typeof obj.store === 'object') ? obj.store : obj;
+        const clean = sanitizeStore(src);
+        if (!Object.keys(clean).length) return null;
+
+        return {
+            store: clean,
+            settings: (obj.settings && typeof obj.settings === 'object') ? obj.settings : null
+        };
+    }
+
+    function applyImport(entries, settings) {
         const map = {};
         entries.forEach(function (e) { map[e.key] = e.shift; });
+
+        backupStore('导入前');
         Object.keys(map).forEach(function (k) { store[k] = map[k]; });
+
+        if (settings) {
+            if (typeof settings.defaultEnabled === 'boolean') {
+                defaultEnabled = settings.defaultEnabled;
+                saveDefaultEnabled();
+            }
+            if (typeof settings.inverted === 'boolean') {
+                inverted = settings.inverted;
+                saveInverted();
+            }
+        }
+
         saveStore();
 
         const firstKey = entries[0].key;
@@ -1852,14 +2187,16 @@
         importText.value = '';
         importStatus.textContent = '';
         importStatus.className = 'import-status';
+        const fileInput = $('importFile');
+        if (fileInput) fileInput.value = '';
         importOverlay.classList.add('open');
-        document.body.style.overflow = 'hidden';
+        syncBodyLock();
         setTimeout(function () { importText.focus(); }, 60);
     }
 
     function closeImport() {
         importOverlay.classList.remove('open');
-        document.body.style.overflow = '';
+        syncBodyLock();
     }
 
     function doImport() {
@@ -1870,23 +2207,267 @@
             return;
         }
 
-        const result = parseImport(text);
+        const trimmed = text.trim();
+        let entries = [];
+        let settings = null;
+        let failed = [];
 
-        if (!result.entries.length) {
-            importStatus.textContent = '未识别到有效数据，请检查格式';
-            importStatus.className = 'import-status error';
+        if (trimmed.charAt(0) === '{') {
+            const backup = parseJsonBackup(trimmed);
+            if (!backup) {
+                importStatus.textContent = 'JSON 备份格式不正确，或其中没有有效排班';
+                importStatus.className = 'import-status error';
+                return;
+            }
+            entries = Object.keys(backup.store).map(function (k) {
+                return { key: k, shift: backup.store[k] };
+            });
+            settings = backup.settings;
+        } else {
+            const result = parseImport(text);
+            entries = result.entries;
+            failed = result.failed;
+            if (!entries.length) {
+                importStatus.textContent = '未识别到有效数据，请检查格式';
+                importStatus.className = 'import-status error';
+                return;
+            }
+        }
+
+        const overwrite = entries.filter(function (e) {
+            return store[e.key] && store[e.key] !== e.shift;
+        }).length;
+
+        const commit = function () {
+            applyImport(entries, settings);
+            if (failed.length) {
+                showToast('已导入 ' + entries.length + ' 条，' + failed.length + ' 行无法识别');
+            } else {
+                showToast('已导入 ' + entries.length + ' 条排班' + (settings ? '，并恢复默认班次设置' : ''));
+            }
+            closeImport();
+        };
+
+        if (overwrite > 0) {
+            openConfirm({
+                title: '覆盖已有排班？',
+                sub: '共导入 ' + entries.length + ' 条，其中 ' + overwrite +
+                     ' 条会覆盖本机已有班次。导入前会自动生成本地备份。',
+                okText: '确认导入',
+                onOk: commit
+            });
+        } else {
+            commit();
+        }
+    }
+
+    /* ============================================================
+       导出 / 备份
+       ============================================================ */
+    function getPeriodKeys() {
+        const range = getPeriodRange();
+        const startKey = keyOf(range.start.getFullYear(), range.start.getMonth(), range.start.getDate());
+        const endKey = keyOf(range.end.getFullYear(), range.end.getMonth(), range.end.getDate());
+        return Object.keys(store).filter(function (k) {
+            return k >= startKey && k <= endKey;
+        }).sort();
+    }
+
+    function getExportKeys(range) {
+        return range === 'all' ? Object.keys(store).sort() : getPeriodKeys();
+    }
+
+    function buildCsv(keys) {
+        const lines = ['日期,星期,班次'];
+        keys.forEach(function (k) {
+            const p = parseKey(k);
+            const dt = new Date(p.y, p.m, p.d);
+            lines.push(k + ',周' + WEEK_SHORT[dt.getDay()] + ',' + SHIFT_MAP[store[k]].name);
+        });
+        return '\ufeff' + lines.join('\r\n') + '\r\n';
+    }
+
+    function buildPlainText(keys) {
+        return keys.map(function (k) {
+            const p = parseKey(k);
+            const dt = new Date(p.y, p.m, p.d);
+            return p.y + '/' + pad2(p.m + 1) + '/' + pad2(p.d) +
+                ' (周' + WEEK_SHORT[dt.getDay()] + '): ' + SHIFT_MAP[store[k]].name;
+        }).join('\n');
+    }
+
+    function buildJsonBackup(keys) {
+        const subset = {};
+        keys.forEach(function (k) { subset[k] = store[k]; });
+        return JSON.stringify({
+            app: 'shift-calendar',
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            settings: {
+                defaultEnabled: defaultEnabled,
+                inverted: inverted
+            },
+            store: subset
+        }, null, 2);
+    }
+
+    function downloadText(filename, mime, text) {
+        const blob = new Blob([text], { type: mime + ';charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    }
+
+    function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                return navigator.clipboard.writeText(text).then(function () {
+                    return true;
+                }).catch(function () {
+                    return fallbackCopy(text);
+                });
+            } catch (e) {
+                return Promise.resolve(fallbackCopy(text));
+            }
+        }
+        return Promise.resolve(fallbackCopy(text));
+    }
+
+    function fallbackCopy(text) {
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            const ok = document.execCommand('copy');
+            ta.remove();
+            return ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function stampForFile() {
+        const d = new Date();
+        return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) +
+            '-' + pad2(d.getHours()) + pad2(d.getMinutes());
+    }
+
+    function setExportStatus(msg, isError) {
+        const el = $('exportStatus');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.className = 'import-status' + (isError ? ' error' : '');
+    }
+
+    function renderBackupHint() {
+        const hint = $('backupHint');
+        const btn = $('restoreBackup');
+        if (!hint || !btn) return;
+        const b = loadBackup();
+        if (!b) {
+            hint.textContent = '自动备份：尚无（覆盖下载或导入前会自动生成）';
+            btn.disabled = true;
+            return;
+        }
+        hint.textContent = '自动备份：' + formatTs(b.savedAt) + ' · ' +
+            Object.keys(b.store).length + ' 条' + (b.reason ? ' · ' + b.reason : '');
+        btn.disabled = false;
+    }
+
+    function openExport() {
+        const range = getPeriodRange();
+        const periodCount = getPeriodKeys().length;
+        const allCount = Object.keys(store).length;
+        const sel = $('exportRange');
+
+        if (sel && sel.options.length >= 2) {
+            sel.options[0].textContent = '本期（' + formatRangeText(range) + '，' + periodCount + ' 条）';
+            sel.options[1].textContent = '全部排班（' + allCount + ' 条）';
+            sel.value = (!periodCount && allCount) ? 'all' : 'period';
+        }
+
+        setExportStatus('');
+        renderBackupHint();
+        exportOverlay.classList.add('open');
+        syncBodyLock();
+        $('exportClose').focus();
+    }
+
+    function closeExport() {
+        exportOverlay.classList.remove('open');
+        syncBodyLock();
+    }
+
+    function runExport(kind) {
+        const range = $('exportRange').value === 'all' ? 'all' : 'period';
+        const keys = getExportKeys(range);
+        if (!keys.length) {
+            setExportStatus('当前范围没有排班数据', true);
             return;
         }
 
-        applyImport(result.entries);
+        const tag = range === 'all' ? 'all' : viewYear + '-' + pad2(viewMonth + 1);
+        const base = 'shift-calendar-' + tag + '-' + stampForFile();
 
-        if (result.failed.length) {
-            showToast('已导入 ' + result.entries.length + ' 条，' + result.failed.length + ' 行无法识别');
+        if (kind === 'json') {
+            downloadText(base + '.json', 'application/json', buildJsonBackup(keys));
+            setExportStatus('已导出 ' + keys.length + ' 条（JSON）', false);
+        } else if (kind === 'csv') {
+            downloadText(base + '.csv', 'text/csv', buildCsv(keys));
+            setExportStatus('已导出 ' + keys.length + ' 条（CSV）', false);
         } else {
-            showToast('已成功导入 ' + result.entries.length + ' 条排班');
+            copyText(buildPlainText(keys)).then(function (ok) {
+                setExportStatus(
+                    ok ? '已复制 ' + keys.length + ' 条文本' : '复制失败，请改用导出文件',
+                    !ok
+                );
+                if (ok) showToast('已复制 ' + keys.length + ' 条排班文本');
+            });
         }
+    }
 
-        closeImport();
+    function doRestoreBackup() {
+        const b = loadBackup();
+        if (!b) {
+            setExportStatus('没有可用的自动备份', true);
+            return;
+        }
+        openConfirm({
+            title: '恢复自动备份？',
+            sub: '备份时间 ' + formatTs(b.savedAt) + '，共 ' + Object.keys(b.store).length +
+                 ' 条。恢复后将替换当前 ' + Object.keys(store).length + ' 条排班。',
+            okText: '确认恢复',
+            onOk: function () {
+                store = b.store;
+                saveStore();
+
+                if (b.settings) {
+                    if (typeof b.settings.defaultEnabled === 'boolean') {
+                        defaultEnabled = b.settings.defaultEnabled;
+                        saveDefaultEnabled();
+                    }
+                    if (typeof b.settings.inverted === 'boolean') {
+                        inverted = b.settings.inverted;
+                        saveInverted();
+                    }
+                }
+
+                render();
+                renderBackupHint();
+                setExportStatus('已恢复 ' + Object.keys(store).length + ' 条', false);
+                showToast('已恢复自动备份');
+            }
+        });
     }
 
     /* ============================================================
@@ -1992,6 +2573,38 @@
             doImport();
         }
     });
+    $('importFile').addEventListener('change', function () {
+        const file = this.files && this.files[0];
+        if (!file) return;
+        if (file.size > 4 * 1024 * 1024) {
+            importStatus.textContent = '文件过大（上限 4 MB）';
+            importStatus.className = 'import-status error';
+            this.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function () {
+            importText.value = String(reader.result || '');
+            importStatus.textContent = '已载入 ' + file.name + '，确认后点导入';
+            importStatus.className = 'import-status';
+        };
+        reader.onerror = function () {
+            importStatus.textContent = '文件读取失败';
+            importStatus.className = 'import-status error';
+        };
+        reader.readAsText(file, 'utf-8');
+    });
+
+    /* 导出 / 备份 */
+    $('exportBtn').addEventListener('click', openExport);
+    $('exportClose').addEventListener('click', closeExport);
+    exportOverlay.addEventListener('click', function (e) {
+        if (e.target === exportOverlay) closeExport();
+    });
+    $('exportJson').addEventListener('click', function () { runExport('json'); });
+    $('exportCsv').addEventListener('click', function () { runExport('csv'); });
+    $('exportText').addEventListener('click', function () { runExport('text'); });
+    $('restoreBackup').addEventListener('click', doRestoreBackup);
 
     /* 云同步 */
     $('syncBtn').addEventListener('click', openSyncSettings);
@@ -2001,15 +2614,7 @@
     });
 
     $('syncUpload').addEventListener('click', doUpload);
-
-    $('syncDownload').addEventListener('click', function () {
-        const cfg = collectSyncCfgFromForm();
-        if (!cfg.binId || !cfg.key) {
-            setSyncStatus('请先填写 Bin ID 和 Access Key', true);
-            return;
-        }
-        openConfirm();
-    });
+    $('syncDownload').addEventListener('click', doDownload);
 
     /* 重置为内置配置 */
     $('syncResetBuiltin').addEventListener('click', function () {
@@ -2029,8 +2634,9 @@
         if (e.target === confirmOverlay) closeConfirm();
     });
     $('confirmOk').addEventListener('click', function () {
+        const fn = confirmAction;
         closeConfirm();
-        doDownload();
+        if (fn) fn();
     });
 
     /* 全局 ESC */
@@ -2040,13 +2646,32 @@
         if (overlay.classList.contains('open')) closeEditor();
         else if (importOverlay.classList.contains('open')) closeImport();
         else if (syncOverlay.classList.contains('open')) closeSyncSettings();
+        else if (exportOverlay.classList.contains('open')) closeExport();
     });
 
     /* ============================================================
        初始化
        ============================================================ */
     updateSyncBadge();
+    renderSyncMeta();
     render();
+
+    /* 页面常开跨天时刷新「今日」面板、今日高亮与未来 7 天 */
+    let lastTodayKey = keyOf(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+
+    function checkDateRollover() {
+        const now = new Date();
+        const k = keyOf(now.getFullYear(), now.getMonth(), now.getDate());
+        if (k === lastTodayKey) return;
+        lastTodayKey = k;
+        render();
+        renderSyncMeta();
+    }
+
+    setInterval(checkDateRollover, 60 * 1000);
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) checkDateRollover();
+    });
 })();
 
 /* ============ 主题切换：与站内其他页面共用 cipher_theme_v2 ============ */
