@@ -64,6 +64,28 @@
     .header-subtitle { font-size: 12px; color: var(--text-tertiary); }
     .dtp-theme-toggle { align-self: center; margin-left: auto; padding: 6px 12px; font-size: 11px; }
 
+    /* ---------- 云同步状态徽标 ---------- */
+    .sync-state {
+        font-size: 11px;
+        letter-spacing: .02em;
+        padding: 2px 8px;
+        border-radius: 3px;
+        border: 1px solid var(--border);
+        color: var(--text-tertiary);
+        background: var(--surface);
+        align-self: center;
+        white-space: nowrap;
+    }
+    .sync-state[data-state="ok"] {
+        color: var(--ok);
+        border-color: rgba(35, 122, 56, .32);
+        background: rgba(35, 122, 56, .08);
+    }
+    [data-theme="dark"] .sync-state[data-state="ok"] {
+        border-color: rgba(123, 216, 143, .34);
+        background: rgba(123, 216, 143, .10);
+    }
+
     /* ---------- 两栏布局 ---------- */
     .layout {
         display: grid;
@@ -521,6 +543,32 @@
     .import-status { margin-right: auto; font-size: 11px; color: var(--text-tertiary); letter-spacing: .02em; }
     .import-status.error { color: var(--danger); }
 
+    /* ---------- 云同步弹窗 ---------- */
+    .sync-form { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .sync-row { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-tertiary); letter-spacing: .02em; }
+    .sync-row input {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        outline: none;
+        transition: border-color var(--transition);
+        width: 100%;
+    }
+    .sync-row input:focus { border-color: var(--accent); }
+    .sync-actions { display: flex; gap: 8px; margin-left: auto; }
+    .sync-reset-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 4px;
+    }
+    .sync-reset-row .import-hint { margin-top: 0; }
+
     /* ---------- Toast ---------- */
     .toast {
         position: fixed;
@@ -641,6 +689,7 @@
         <span class="header-title">排班日历</span>
         <span class="header-dot"></span>
         <span class="header-subtitle">本地记录 · 数据不上传</span>
+        <span class="sync-state" id="syncState" data-state="off">本地</span>
         <button class="btn dtp-theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色模式" aria-label="切换深色或浅色模式" aria-pressed="false">深色模式</button>
     </div>
 
@@ -659,6 +708,7 @@
                     <button class="btn small" id="defaultBtn" type="button" aria-pressed="false" title="工作2天休息2天，白/夜班每2个班次周期切换">默认班次</button>
                     <button class="btn small" id="invertBtn" type="button" aria-pressed="false" disabled title="临时互换默认的白班与夜班">倒转</button>
                     <button class="btn small" id="importBtn" type="button">导入</button>
+                    <button class="btn small" id="syncBtn" type="button">云同步</button>
                 </div>
             </div>
 
@@ -751,6 +801,63 @@
     </div>
 </div>
 
+<!-- 云同步弹窗 -->
+<div class="overlay" id="syncOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title" id="syncTitle">云同步</div>
+                <div class="modal-sub">JSONBin · 数据只保存在你自己的账号里</div>
+            </div>
+            <button class="btn small" id="syncClose" type="button">关闭</button>
+        </div>
+
+        <div class="sync-form">
+            <label class="sync-row">
+                <span>Bin ID</span>
+                <input id="syncBinId" type="text" autocomplete="off" spellcheck="false"
+                       placeholder="例如 65f1a2b3c4d5e6f7a8b9c0d1">
+            </label>
+            <label class="sync-row">
+                <span>Access Key</span>
+                <input id="syncKey" type="password" autocomplete="off" spellcheck="false"
+                       placeholder="$2b$10$...">
+            </label>
+        </div>
+
+        <div class="sync-reset-row">
+            <span class="import-hint" id="syncBuiltinHint">已内置默认配置，一般无需修改。</span>
+            <button class="btn small" id="syncResetBuiltin" type="button">重置为内置配置</button>
+        </div>
+
+        <div class="import-hint" style="margin-top:8px">上传会用本机数据覆盖云端；下载会用云端数据覆盖本机，下载前会再次确认。</div>
+
+        <div class="modal-foot">
+            <span class="import-status" id="syncStatus"></span>
+            <div class="sync-actions">
+                <button class="btn small" id="syncDownload" type="button">下载</button>
+                <button class="btn small primary" id="syncUpload" type="button">上传</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 覆盖确认弹窗 -->
+<div class="overlay" id="confirmOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title" id="confirmTitle">覆盖本地数据？</div>
+                <div class="modal-sub">下载后，云端数据将覆盖当前设备上的所有排班，此操作无法撤销。</div>
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button class="btn small" id="confirmCancel" type="button">取消</button>
+            <button class="btn small danger" id="confirmOk" type="button">确认覆盖</button>
+        </div>
+    </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -758,6 +865,24 @@
     'use strict';
 
     const $ = function (id) { return document.getElementById(id); };
+
+    /* ============================================================
+            这里保存的只是个人排班数据
+            非敏感内容，公开到仓库并无大碍
+            非敏感内容，公开到仓库并无大碍
+            非敏感内容，公开到仓库并无大碍
+            非敏感内容，公开到仓库并无大碍
+            非敏感内容，公开到仓库并无大碍
+            因此直接将配置写入源码，省去在每台设备上重复填写的麻烦。
+            如果哪天觉得不妥，只需在 JSONBin 后台重建 Access Key 并更新
+            SYNC_DEFAULT.key 即可，Bin ID 不受影响。
+       ============================================================ */
+    const SYNC_DEFAULT = {
+        binId: '6ad307b2ffd5d1605372d051',        // Bin ID
+        key:   '$2a$10$OH.5eWnz3mflLI45mtYKouNkL9nrKIaAveu37K.KKpThlGhjaHdCG'     // Access Key
+    };
+    const SYNC_PLACEHOLDER_BIN = 'PUT_YOUR_BIN_ID_HERE';
+    const SYNC_PLACEHOLDER_KEY = 'PUT_YOUR_ACCESS_KEY_HERE';
 
     /* ============================================================
        班次定义
@@ -823,6 +948,9 @@
     const importOverlay = $('importOverlay');
     const importText    = $('importText');
     const importStatus  = $('importStatus');
+
+    const syncOverlay    = $('syncOverlay');
+    const confirmOverlay = $('confirmOverlay');
 
     const todayDateText   = $('todayDateText');
     const todayDayNum     = $('todayDayNum');
@@ -1008,6 +1136,200 @@
     function saveInverted() {
         try { localStorage.setItem(INVERT_KEY, inverted ? '1' : '0'); }
         catch (e) { /* 忽略 */ }
+    }
+
+    /* ============================================================
+       云同步（手动上传 / 下载，配置优先读取硬编码默认值）
+       ============================================================ */
+    const SYNC_CFG_KEY = 'shift_calendar_sync_v1';
+
+    function hasBuiltinCfg() {
+        return SYNC_DEFAULT.binId !== SYNC_PLACEHOLDER_BIN
+            && SYNC_DEFAULT.key   !== SYNC_PLACEHOLDER_KEY
+            && !!SYNC_DEFAULT.binId && !!SYNC_DEFAULT.key;
+    }
+
+    function loadSyncCfg() {
+        // 1. 优先本地保存的覆盖值（用户手动改过）
+        try {
+            const raw = localStorage.getItem(SYNC_CFG_KEY);
+            if (raw) {
+                const c = JSON.parse(raw);
+                if (c && typeof c === 'object' && c.binId && c.key) {
+                    return { binId: String(c.binId), key: String(c.key) };
+                }
+            }
+        } catch (e) { /* 忽略 */ }
+        // 2. 回退到硬编码默认值
+        if (hasBuiltinCfg()) {
+            return { binId: SYNC_DEFAULT.binId, key: SYNC_DEFAULT.key };
+        }
+        return { binId: '', key: '' };
+    }
+    function persistSyncCfg() {
+        try { localStorage.setItem(SYNC_CFG_KEY, JSON.stringify(syncCfg)); } catch (e) {}
+    }
+    function clearPersistedSyncCfg() {
+        try { localStorage.removeItem(SYNC_CFG_KEY); } catch (e) {}
+    }
+
+    let syncCfg = loadSyncCfg();
+
+    function syncConfigured() {
+        return !!(syncCfg && syncCfg.binId && syncCfg.key);
+    }
+
+    function updateSyncBadge() {
+        const el = $('syncState');
+        if (!el) return;
+        if (syncConfigured()) {
+            el.dataset.state = 'ok';
+            el.textContent = '☁ 已配置';
+        } else {
+            el.dataset.state = 'off';
+            el.textContent = '本地';
+        }
+    }
+
+    function setSyncStatus(msg, isError) {
+        const el = $('syncStatus');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.className = 'import-status' + (isError ? ' error' : '');
+    }
+
+    function collectSyncCfgFromForm() {
+        return {
+            binId: $('syncBinId').value.trim(),
+            key: $('syncKey').value.trim()
+        };
+    }
+
+    function fillSyncForm() {
+        $('syncBinId').value = syncCfg.binId || '';
+        $('syncKey').value = syncCfg.key || '';
+    }
+
+    function setSyncButtonsDisabled(disabled) {
+        $('syncUpload').disabled = disabled;
+        $('syncDownload').disabled = disabled;
+    }
+
+    async function pushJsonbin(payload) {
+        const r = await fetch(
+            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(syncCfg.binId),
+            {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Access-Key': syncCfg.key
+                },
+                body: JSON.stringify(payload)
+            }
+        );
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+    }
+
+    async function pullJsonbin() {
+        const r = await fetch(
+            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(syncCfg.binId) + '/latest',
+            { headers: { 'X-Access-Key': syncCfg.key } }
+        );
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        return j.record || null;
+    }
+
+    async function doUpload() {
+        const cfg = collectSyncCfgFromForm();
+        if (!cfg.binId || !cfg.key) {
+            setSyncStatus('请先填写 Bin ID 和 Access Key', true);
+            return;
+        }
+        syncCfg = cfg;
+        persistSyncCfg();
+        updateSyncBadge();
+        setSyncStatus('上传中…', false);
+        setSyncButtonsDisabled(true);
+        try {
+            const payload = { store: store, updatedAt: Date.now() };
+            await pushJsonbin(payload);
+            setSyncStatus('上传成功 · ' + new Date().toLocaleTimeString(), false);
+            showToast('已上传到云端');
+        } catch (e) {
+            setSyncStatus('上传失败：' + e.message, true);
+            showToast('上传失败');
+        } finally {
+            setSyncButtonsDisabled(false);
+        }
+    }
+
+    async function doDownload() {
+        const cfg = collectSyncCfgFromForm();
+        if (!cfg.binId || !cfg.key) {
+            setSyncStatus('请先填写 Bin ID 和 Access Key', true);
+            return;
+        }
+        syncCfg = cfg;
+        persistSyncCfg();
+        updateSyncBadge();
+        setSyncStatus('下载中…', false);
+        setSyncButtonsDisabled(true);
+        try {
+            const remote = await pullJsonbin();
+            if (!remote || !remote.store || typeof remote.store !== 'object') {
+                setSyncStatus('云端暂无排班数据', true);
+                return;
+            }
+            const clean = {};
+            Object.keys(remote.store).forEach(function (k) {
+                if (/^\d{4}-\d{2}-\d{2}$/.test(k) && SHIFT_MAP[remote.store[k]]) {
+                    clean[k] = remote.store[k];
+                }
+            });
+            store = clean;
+            saveStore();
+            render();
+            const ts = Number(remote.updatedAt) || 0;
+            setSyncStatus(
+                '下载成功 · ' + (ts ? new Date(ts).toLocaleString() : new Date().toLocaleString()),
+                false
+            );
+            showToast('已从云端下载并覆盖本地数据');
+        } catch (e) {
+            setSyncStatus('下载失败：' + e.message, true);
+            showToast('下载失败');
+        } finally {
+            setSyncButtonsDisabled(false);
+        }
+    }
+
+    function openSyncSettings() {
+        fillSyncForm();
+        if (hasBuiltinCfg()) {
+            $('syncBuiltinHint').textContent = '已内置默认配置，一般无需修改。';
+        } else {
+            $('syncBuiltinHint').textContent = '未内置配置，请手动填写。';
+        }
+        setSyncStatus(syncConfigured() ? '已配置，可直接上传或下载' : '');
+        syncOverlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeSyncSettings() {
+        syncOverlay.classList.remove('open');
+        if (!confirmOverlay.classList.contains('open')) {
+            document.body.style.overflow = '';
+        }
+    }
+    function openConfirm() {
+        confirmOverlay.classList.add('open');
+    }
+    function closeConfirm() {
+        confirmOverlay.classList.remove('open');
+        if (!syncOverlay.classList.contains('open')) {
+            document.body.style.overflow = '';
+        }
     }
 
     /* ============================================================
@@ -1276,17 +1598,14 @@
         }
         todayShiftMain.appendChild(badge);
 
+        const note = document.createElement('span');
+        note.className = 'today-shift-note';
         if (info.shift) {
-            const note = document.createElement('span');
-            note.className = 'today-shift-note';
             note.textContent = info.isDefault ? '默认班次 · 点击「修改」可覆盖' : '手动设置';
-            todayShiftMain.appendChild(note);
         } else {
-            const note = document.createElement('span');
-            note.className = 'today-shift-note';
             note.textContent = '尚未排班';
-            todayShiftMain.appendChild(note);
         }
+        todayShiftMain.appendChild(note);
     }
 
     /* ============================================================
@@ -1659,6 +1978,7 @@
         openEditor(keyOf(now.getFullYear(), now.getMonth(), now.getDate()));
     });
 
+    /* 导入 */
     $('importBtn').addEventListener('click', openImport);
     $('importClose').addEventListener('click', closeImport);
     $('importCancel').addEventListener('click', closeImport);
@@ -1673,15 +1993,59 @@
         }
     });
 
+    /* 云同步 */
+    $('syncBtn').addEventListener('click', openSyncSettings);
+    $('syncClose').addEventListener('click', closeSyncSettings);
+    syncOverlay.addEventListener('click', function (e) {
+        if (e.target === syncOverlay) closeSyncSettings();
+    });
+
+    $('syncUpload').addEventListener('click', doUpload);
+
+    $('syncDownload').addEventListener('click', function () {
+        const cfg = collectSyncCfgFromForm();
+        if (!cfg.binId || !cfg.key) {
+            setSyncStatus('请先填写 Bin ID 和 Access Key', true);
+            return;
+        }
+        openConfirm();
+    });
+
+    /* 重置为内置配置 */
+    $('syncResetBuiltin').addEventListener('click', function () {
+        if (!hasBuiltinCfg()) {
+            setSyncStatus('代码中未内置配置，请手动填写', true);
+            return;
+        }
+        clearPersistedSyncCfg();
+        syncCfg = { binId: SYNC_DEFAULT.binId, key: SYNC_DEFAULT.key };
+        fillSyncForm();
+        updateSyncBadge();
+        setSyncStatus('已填入内置配置，点上传或下载生效');
+    });
+
+    $('confirmCancel').addEventListener('click', closeConfirm);
+    confirmOverlay.addEventListener('click', function (e) {
+        if (e.target === confirmOverlay) closeConfirm();
+    });
+    $('confirmOk').addEventListener('click', function () {
+        closeConfirm();
+        doDownload();
+    });
+
+    /* 全局 ESC */
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
+        if (confirmOverlay.classList.contains('open')) { closeConfirm(); return; }
         if (overlay.classList.contains('open')) closeEditor();
         else if (importOverlay.classList.contains('open')) closeImport();
+        else if (syncOverlay.classList.contains('open')) closeSyncSettings();
     });
 
     /* ============================================================
        初始化
        ============================================================ */
+    updateSyncBadge();
     render();
 })();
 
