@@ -519,6 +519,7 @@ placeholder="在这里输入临时内容……
     let pendingCloud   = null;   // 冲突待决时暂存的云端内容
     let readyCloud     = null;   // 进入页面时后台拉取的云端内容（就绪态，尚未应用）
     let syncSeq        = 0;      // 正式同步次数，用于丢弃过期的就绪数据
+    let readyAbort     = null;   // 就绪请求的 AbortController，正式同步时中断
     let conflictTimer  = null;   // 冲突弹窗打开时刷新相对时间的定时器
 
     /* ============================================================
@@ -698,11 +699,12 @@ placeholder="在这里输入临时内容……
     /* ============================================================
        JSONBin 读写
        ============================================================ */
-    async function pullRemote() {
+    async function pullRemote(signal) {
         const r = await fetch(API_BASE + '/latest', {
             method: 'GET',
             headers: { 'X-Access-Key': ACCESS_KEY },
-            cache: 'no-store'
+            cache: 'no-store',
+            signal: signal
         });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const j = await r.json();
@@ -740,32 +742,58 @@ placeholder="在这里输入临时内容……
     async function doSync() {
         if (busy) return;
 
-        /* 快路径：进入页面时已完成云端就绪，且用户未改动文本
-           → 直接应用就绪的云端内容，省去一次网络请求 */
-        if (readyCloud !== null && !dirty) {
+        /* 快路径：就绪态缓存可用 → 先用缓存数据与文本框比对，
+           省去一次网络请求；仅「云端为空且本地有内容」必须上传时，
+           才落入完整逻辑发起请求 */
+        if (readyCloud !== null) {
             const rc = readyCloud;
-            readyCloud = null;
-            syncSeq++;
+            const local = editor.value;
+            const localEmpty = local.trim() === '';
+            const cloudEmpty = rc.text.trim() === '';
 
-            if (editor.value === rc.text) {
-                baseline = editor.value;
+            if (local === rc.text) {
+                /* 两边一致 —— 无需请求 */
+                readyCloud = null;
+                syncSeq++;
+                baseline = local;
                 dirty = false;
                 if (rc.time) cloudUpdatedAt = rc.time;
                 renderMeta();
                 setState('ok', '已同步');
-                toast(rc.text.trim() === '' ? '云端与本地均无内容' : '内容已一致，无需同步');
+                toast(cloudEmpty ? '云端与本地均无内容' : '内容已一致，无需同步');
                 return;
             }
 
-            applyRemote(rc.text, rc.time);
-            setState('ok', '已同步');
-            toast(rc.text.trim() === '' ? '云端暂无内容' : '已从云端载入内容');
-            return;
+            if (!cloudEmpty && !localEmpty) {
+                /* 两边都有内容且不同 —— 直接弹冲突，预览用缓存数据 */
+                readyCloud = null;
+                syncSeq++;
+                pendingCloud = { text: rc.text, time: rc.time };
+                openConflict(rc.text, local, rc.time);
+                setState('off', '待选择');
+                return;
+            }
+
+            if (!cloudEmpty && localEmpty) {
+                /* 本地空白、云端有内容 —— 直接应用缓存 */
+                readyCloud = null;
+                syncSeq++;
+                applyRemote(rc.text, rc.time);
+                setState('ok', '已同步');
+                toast('已从云端载入内容');
+                return;
+            }
+
+            /* 云端为空且本地有内容 —— 必须上传，落入完整逻辑 */
         }
 
-        /* 完整同步逻辑：就绪数据可能已过期，丢弃后按既有规则处理 */
+        /* 完整同步逻辑：中断就绪请求，丢弃可能已过期的就绪数据 */
         readyCloud = null;
         syncSeq++;
+        if (readyAbort) {
+            try { readyAbort.abort(); } catch (e) { /* 忽略 */ }
+            readyAbort = null;
+        }
 
         busy = true;
         setBusy(true);
@@ -960,16 +988,22 @@ placeholder="在这里输入临时内容……
 
     /* ============================================================
        进入页面即后台就绪：立即拉取一次云端内容，仅缓存、不覆盖
-       文本框，状态置为「已就绪」。用户此时点击云同步可直接应用
-       缓存内容，无需再次请求；若用户已改动文本，或期间发生过
-       正式同步（如 Ctrl+Enter），则丢弃本次结果，点击时按既有
-       完整逻辑处理。
+       文本框，状态置为「已就绪」。就绪期间按钮保持可点击——此时
+       点击云同步会中断就绪请求、重新发起一次同步并等待响应。
+       就绪完成后，点击云同步优先用缓存数据与文本框比对：一致则
+       提示无需同步；两边均有内容且不同则直接弹「内容不一致」；
+       本地空白则直接应用缓存；仅「云端为空且本地有内容」需上传
+       时才发起请求。若期间发生过正式同步，则丢弃就绪数据，按
+       既有完整逻辑处理。
        ============================================================ */
     (function initReady() {
-        syncBtn.disabled = true;
         setState('busy', '就绪中…');
 
-        pullRemote()
+        readyAbort = (typeof AbortController !== 'undefined')
+            ? new AbortController()
+            : null;
+
+        pullRemote(readyAbort ? readyAbort.signal : undefined)
             .then(function (remote) {
                 /* 期间用户已触发过正式同步 → 本次结果已过期 */
                 if (syncSeq !== 0) return;
@@ -978,17 +1012,18 @@ placeholder="在这里输入临时内容……
                 const cloudTime = (remote && Number(remote.updatedAt)) || 0;
 
                 readyCloud = { text: cloudText, time: cloudTime };
+                readyAbort = null;
                 cloudUpdatedAt = cloudTime;
                 renderMeta();
                 setState('ok', '已就绪');
             })
-            .catch(function () {
+            .catch(function (err) {
+                readyAbort = null;
+                /* 被正式同步主动打断 → 状态由该同步接管，不改变 */
+                if (err && err.name === 'AbortError') return;
                 /* 就绪失败不打扰用户，保持未同步，点击时走完整逻辑 */
                 if (syncSeq !== 0) return;
                 setState('off', '未同步');
-            })
-            .then(function () {
-                if (!busy) syncBtn.disabled = false;
             });
     })();
 })();
