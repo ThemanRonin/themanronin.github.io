@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyncText</title>
+<script>
+    (function () {
+        try {
+            var t = localStorage.getItem('cipher_theme_v2');
+            if (t === 'dark' || t === 'light') { document.documentElement.setAttribute('data-theme', t); return; }
+        } catch (e) { /* 忽略 */ }
+        try {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        } catch (e) { /* 忽略 */ }
+    })();
+</script>
+<style>
+    :root {
+        --bg: #fafafa;
+        --surface: #fff;
+        --text: #1a1a1a;
+        --text-secondary: #6e6e6e;
+        --text-tertiary: #999;
+        --border: #e0e0e0;
+        --border-light: #eee;
+        --accent: #1a1a1a;
+        --accent-hover: #3a3a3a;
+        --danger: #c0392b;
+        --ok: #237a38;
+        --radius: 4px;
+        --shadow: 0 14px 44px rgba(0, 0, 0, .16);
+        --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', 'Menlo', monospace;
+        --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        --font-editor: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Hiragino Sans GB', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        --transition: 120ms ease;
+        color-scheme: light;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: var(--font-sans);
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 28px 16px 44px;
+    }
+
+    .app {
+        width: 100%;
+        max-width: 920px;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    /* ---------- 顶部标题 ---------- */
+    .header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .header-title {
+        font-family: var(--font-mono);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+    .header-dot {
+        color: var(--text-tertiary);
+        font-size: 14px;
+        line-height: 1;
+        flex-shrink: 0;
+        user-select: none;
+    }
+    .header-subtitle { font-size: 12px; color: var(--text-tertiary); }
+    .dtp-theme-toggle { margin-left: auto; padding: 6px 12px; font-size: 11px; }
+
+    /* ---------- 同步状态徽标 ---------- */
+    .sync-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: .03em;
+        padding: 3px 11px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--text-tertiary);
+        background: var(--surface);
+        white-space: nowrap;
+        transition: color var(--transition), border-color var(--transition),
+                    background var(--transition), box-shadow var(--transition);
+    }
+    .sync-state::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: .5;
+        flex-shrink: 0;
+        transition: opacity var(--transition);
+    }
+
+    /* 已同步：柔和渐变底 + 呼吸圆点 + 外圈光晕 */
+    .sync-state[data-state="ok"] {
+        color: var(--ok);
+        border-color: rgba(35, 122, 56, .30);
+        background: linear-gradient(180deg, rgba(35, 122, 56, .11), rgba(35, 122, 56, .055));
+        box-shadow: 0 0 0 3px rgba(35, 122, 56, .06);
+    }
+    .sync-state[data-state="ok"]::before {
+        opacity: 1;
+        animation: syncPulse 2.2s ease-out infinite;
+    }
+
+    /* 同步中：圆点闪烁 */
+    .sync-state[data-state="busy"] {
+        color: var(--text-secondary);
+        border-color: var(--border);
+        background: var(--surface);
+    }
+    .sync-state[data-state="busy"]::before {
+        opacity: 1;
+        animation: syncBlink 1s ease-in-out infinite;
+    }
+
+    /* 失败 */
+    .sync-state[data-state="err"] {
+        color: var(--danger);
+        border-color: rgba(192, 57, 43, .32);
+        background: rgba(192, 57, 43, .08);
+    }
+    .sync-state[data-state="err"]::before { opacity: 1; }
+
+    @keyframes syncPulse {
+        0%   { box-shadow: 0 0 0 0 rgba(35, 122, 56, .45); }
+        70%  { box-shadow: 0 0 0 5px rgba(35, 122, 56, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(35, 122, 56, 0); }
+    }
+    @keyframes syncBlink {
+        0%, 100% { opacity: .25; }
+        50%      { opacity: 1; }
+    }
+
+    [data-theme="dark"] .sync-state[data-state="ok"] {
+        color: var(--ok);
+        border-color: rgba(123, 216, 143, .34);
+        background: linear-gradient(180deg, rgba(123, 216, 143, .14), rgba(123, 216, 143, .07));
+        box-shadow: 0 0 0 3px rgba(123, 216, 143, .07);
+    }
+    [data-theme="dark"] .sync-state[data-state="ok"]::before {
+        animation-name: syncPulseDark;
+    }
+    @keyframes syncPulseDark {
+        0%   { box-shadow: 0 0 0 0 rgba(123, 216, 143, .50); }
+        70%  { box-shadow: 0 0 0 5px rgba(123, 216, 143, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(123, 216, 143, 0); }
+    }
+    [data-theme="dark"] .sync-state[data-state="err"] {
+        border-color: rgba(229, 72, 77, .34);
+        background: rgba(229, 72, 77, .10);
+    }
+
+    /* ---------- 按钮 ---------- */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 16px;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        transition: all var(--transition);
+        font-family: var(--font-sans);
+        white-space: nowrap;
+        outline: none;
+        user-select: none;
+    }
+    .btn:hover { background: #f4f4f4; border-color: #c0c0c0; }
+    .btn:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(26,26,26,.12); }
+    .btn.small { padding: 5px 10px; font-size: 11px; }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn:disabled { opacity: .42; cursor: not-allowed; }
+    .btn:disabled:hover { background: var(--surface); border-color: var(--border); color: var(--text); }
+    .btn.primary:disabled:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ---------- 编辑区 ---------- */
+    .editor {
+        display: block;
+        width: 100%;
+        resize: none;
+        padding: 16px 18px;
+        font-family: var(--font-editor);
+        font-size: 13.5px;
+        line-height: 1.8;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        outline: none;
+        transition: border-color var(--transition);
+        tab-size: 4;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .editor:hover { border-color: #d4d4d4; }
+    .editor:focus { border-color: var(--accent); }
+    .editor::placeholder { color: var(--text-tertiary); }
+
+    /* ---------- 拖拽手柄 ---------- */
+    .resize-handle {
+        height: 16px;
+        margin-top: -4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: ns-resize;
+        touch-action: none;
+        user-select: none;
+        outline: none;
+        border-radius: var(--radius);
+        transition: background var(--transition);
+    }
+    .resize-handle::before {
+        content: '';
+        width: 44px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--border);
+        transition: background var(--transition), width var(--transition);
+    }
+    .resize-handle:hover::before,
+    .resize-handle:focus-visible::before {
+        background: var(--text-tertiary);
+        width: 62px;
+    }
+    .resize-handle:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+    body.is-resizing { cursor: ns-resize; }
+    body.is-resizing * { user-select: none !important; }
+    body.is-resizing .resize-handle::before { background: var(--accent); width: 62px; }
+    [data-theme="dark"] body.is-resizing .resize-handle::before { background: var(--accent); }
+
+    /* ---------- 底栏 ---------- */
+    .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+    .footer-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .meta {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-tertiary);
+        letter-spacing: .02em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .btn-sync {
+        padding: 11px 34px;
+        min-width: 168px;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: .06em;
+    }
+
+    /* ---------- 弹窗 ---------- */
+    .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(0, 0, 0, .34);
+        -webkit-backdrop-filter: blur(2px);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 160ms ease, visibility 160ms ease;
+    }
+    .overlay.open { opacity: 1; visibility: visible; }
+
+    .modal {
+        width: 100%;
+        max-width: 460px;
+        max-height: 88vh;
+        overflow: auto;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 18px;
+        box-shadow: var(--shadow);
+        transform: translateY(10px) scale(.985);
+        transition: transform 180ms cubic-bezier(.2, .8, .3, 1);
+    }
+    .overlay.open .modal { transform: none; }
+
+    .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .modal-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+    .modal-sub { font-size: 11px; color: var(--text-tertiary); letter-spacing: .03em; margin-top: 3px; line-height: 1.6; }
+
+    .preview-label {
+        font-size: 11px;
+        color: var(--text-tertiary);
+        letter-spacing: .04em;
+        margin-bottom: 5px;
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .preview-time { font-family: var(--font-mono); font-size: 10.5px; opacity: .85; }
+    .preview-body {
+        max-height: 20vh;
+        overflow: auto;
+        padding: 9px 11px;
+        font-family: var(--font-editor);
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .modal-foot {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    /* ---------- Toast ---------- */
+    .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 28px;
+        z-index: 200;
+        padding: 9px 16px;
+        font-size: 12px;
+        letter-spacing: .02em;
+        color: var(--surface);
+        background: var(--text);
+        border-radius: var(--radius);
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, 12px);
+        transition: opacity 180ms ease, transform 180ms ease;
+        max-width: calc(100vw - 32px);
+        text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    ::selection { background: var(--text); color: var(--bg); }
+
+    /* ---------- 深色模式 ---------- */
+    [data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0d0d0f;
+        --surface: #17171a;
+        --text: #e9e9ec;
+        --text-secondary: #a1a1a8;
+        --text-tertiary: #71717a;
+        --border: #2c2c31;
+        --border-light: #222227;
+        --accent: #e9e9ec;
+        --accent-hover: #ffffff;
+        --danger: #e5484d;
+        --ok: #7bd88f;
+        --shadow: 0 14px 44px rgba(0, 0, 0, .62);
+    }
+    [data-theme="dark"] .btn:hover { background: #232328; border-color: #45454d; }
+    [data-theme="dark"] .btn:focus-visible { box-shadow: 0 0 0 1px rgba(255,255,255,.16); }
+    [data-theme="dark"] .btn.primary { color: #101013; }
+    [data-theme="dark"] .btn.primary:hover { background: #ffffff; border-color: #ffffff; }
+    [data-theme="dark"] .btn:disabled:hover { background: var(--surface); border-color: var(--border); color: var(--text); }
+    [data-theme="dark"] .btn.primary:disabled:hover { background: var(--accent); border-color: var(--accent); color: #101013; }
+    [data-theme="dark"] .editor:hover { border-color: #45454d; }
+    [data-theme="dark"] .resize-handle:hover::before,
+    [data-theme="dark"] .resize-handle:focus-visible::before { background: var(--text-secondary); }
+    [data-theme="dark"] .overlay { background: rgba(0, 0, 0, .58); }
+
+    /* ---------- 响应式 ---------- */
+    @media (max-width: 640px) {
+        body { padding: 16px 10px 32px; }
+        .header { gap: 8px; }
+        .header-subtitle { display: none; }
+        .editor { font-size: 12.5px; padding: 12px 13px; line-height: 1.75; }
+        .footer { gap: 10px; }
+        .btn-sync { flex: 1 1 100%; min-width: 0; padding: 12px 20px; }
+        .preview-body { max-height: 18vh; }
+    }
+</style>
+</head>
+<body>
+
+<div class="app">
+    <div class="header">
+        <span class="header-title">SyncText</span>
+        <span class="header-dot" aria-hidden="true">·</span>
+        <span class="header-subtitle">刷新即清空 · 仅云端留存</span>
+        <span class="sync-state" id="syncState" data-state="off">未同步</span>
+        <button class="btn dtp-theme-toggle" id="themeToggle" type="button"
+                title="切换深色 / 浅色模式" aria-label="切换深色或浅色模式" aria-pressed="false">深色模式</button>
+    </div>
+
+    <textarea class="editor" id="editor" spellcheck="false" autocomplete="off"
+placeholder="在这里输入临时内容……
+
+点击「云同步」时：
+· 云端为空 → 上传本地内容
+· 本地空白或未改动 → 拉取云端内容
+· 两边都有不同内容 → 弹窗让你选择保留哪一份
+· 两边内容相同 → 什么都不做"></textarea>
+
+    <div class="resize-handle" id="resizeHandle" role="separator" aria-orientation="horizontal"
+         tabindex="0" title="拖拽调整高度，双击恢复默认" aria-label="拖拽调整文本框高度"></div>
+
+    <div class="footer">
+        <div class="footer-left">
+            <span class="meta" id="metaText">0 字符 · 0 行</span>
+            <span class="meta" id="cloudMeta"></span>
+        </div>
+        <button class="btn primary btn-sync" id="syncBtn" type="button">云同步</button>
+    </div>
+</div>
+
+<!-- 冲突选择弹窗 -->
+<div class="overlay" id="conflictOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="conflictTitle">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title" id="conflictTitle">内容不一致</div>
+                <div class="modal-sub">云端和本地都有内容，且互不相同。请选择保留哪一份，另一份会被覆盖。</div>
+            </div>
+        </div>
+
+        <div style="margin-top:14px">
+            <div class="preview-label">云端<span class="preview-time" id="cloudTime"></span></div>
+            <div class="preview-body" id="cloudPreview"></div>
+        </div>
+        <div style="margin-top:10px">
+            <div class="preview-label">本地 · 当前文本框</div>
+            <div class="preview-body" id="localPreview"></div>
+        </div>
+
+        <div class="modal-foot">
+            <button class="btn small" id="conflictCancel" type="button">取消</button>
+            <button class="btn small" id="useCloudBtn" type="button">用云端覆盖本地</button>
+            <button class="btn small primary" id="useLocalBtn" type="button">用本地覆盖云端</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+    'use strict';
+
+    const $ = function (id) { return document.getElementById(id); };
+
+    /* ============================================================
+       云配置（与 index.html 同一 Bin，沿用同一 Access Key）
+       ============================================================ */
+    const BIN_ID     = '6ad3130dac6210605a392fc1';
+    const ACCESS_KEY = '$2a$10$OH.5eWnz3mflLI45mtYKouNkL9nrKIaAveu37K.KKpThlGhjaHdCG';
+    const API_BASE   = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
+
+    /* ============================================================
+       DOM
+       ============================================================ */
+    const editor          = $('editor');
+    const resizeHandle    = $('resizeHandle');
+    const syncBtn         = $('syncBtn');
+    const metaText        = $('metaText');
+    const cloudMeta       = $('cloudMeta');
+    const syncState       = $('syncState');
+    const conflictOverlay = $('conflictOverlay');
+
+    /* ============================================================
+       会话内状态 —— 全部只存在内存，刷新即失效，不做任何数据持久化
+       ============================================================ */
+    let baseline       = null;   // 最近一次与云端达成一致时的内容
+    let dirty          = false;  // 自最近一次同步后用户是否改动过
+    let busy           = false;
+    let cloudUpdatedAt = 0;      // 云端记录的最后更新时间戳
+    let pendingCloud   = null;   // 冲突待决时暂存的云端内容
+
+    /* ============================================================
+       小工具
+       ============================================================ */
+    let toastTimer = null;
+    function toast(msg) {
+        const t = $('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+    }
+
+    function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+    /* 统一时间格式：yyyy-MM-dd HH:mm:ss */
+    function fmtTime(ts) {
+        if (!ts) return '';
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return '';
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+               ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+    }
+
+    function setState(kind, text) {
+        syncState.dataset.state = kind;
+        syncState.textContent = text;
+    }
+
+    function setBusy(on) {
+        syncBtn.disabled = on;
+        syncBtn.textContent = on ? '同步中…' : '云同步';
+    }
+
+    function renderMeta() {
+        const v = editor.value;
+        const chars = v.length;
+        const lines = v ? v.split(/\r?\n/).length : 0;
+        metaText.textContent = chars + ' 字符 · ' + lines + ' 行';
+        cloudMeta.textContent = cloudUpdatedAt
+            ? '云端更新于 ' + fmtTime(cloudUpdatedAt)
+            : '云端尚无记录';
+    }
+
+    function previewText(t) {
+        const MAX = 420;
+        if (t.length <= MAX) return t || '（空）';
+        return t.slice(0, MAX) + '\n…（共 ' + t.length + ' 字符）';
+    }
+
+    /* ============================================================
+       文本框高度：默认约视口一半，可拖拽，仅高度做本地记忆
+       ============================================================ */
+    const HEIGHT_KEY = 'synctext_height_v1';
+    const MIN_H = 120;
+
+    function maxHeight() {
+        return Math.max(220, window.innerHeight - 210);
+    }
+    function clampHeight(h) {
+        return Math.round(Math.min(Math.max(h, MIN_H), maxHeight()));
+    }
+    function defaultHeight() {
+        return clampHeight(Math.max(Math.round(window.innerHeight * 0.42), 180));
+    }
+    function applyHeight(h, persist) {
+        const v = clampHeight(h);
+        editor.style.height = v + 'px';
+        if (persist) {
+            try { localStorage.setItem(HEIGHT_KEY, String(v)); } catch (e) { /* 忽略 */ }
+        }
+    }
+
+    (function initHeight() {
+        let saved = null;
+        try {
+            const raw = localStorage.getItem(HEIGHT_KEY);
+            if (raw) {
+                const n = parseInt(raw, 10);
+                if (isFinite(n)) saved = n;
+            }
+        } catch (e) { /* 忽略 */ }
+        applyHeight(saved !== null ? saved : defaultHeight(), false);
+    })();
+
+    let dragging = false;
+    let dragStartY = 0;
+    let dragStartH = 0;
+
+    resizeHandle.addEventListener('pointerdown', function (e) {
+        if (e.button !== undefined && e.button !== 0) return;
+        dragging = true;
+        dragStartY = e.clientY;
+        dragStartH = editor.offsetHeight;
+        document.body.classList.add('is-resizing');
+        try { resizeHandle.setPointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
+        e.preventDefault();
+    });
+
+    resizeHandle.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        applyHeight(dragStartH + (e.clientY - dragStartY), false);
+    });
+
+    function endDrag(e) {
+        if (!dragging) return;
+        dragging = false;
+        document.body.classList.remove('is-resizing');
+        try { resizeHandle.releasePointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
+        applyHeight(editor.offsetHeight, true);
+    }
+    resizeHandle.addEventListener('pointerup', endDrag);
+    resizeHandle.addEventListener('pointercancel', endDrag);
+
+    /* 键盘调整 */
+    resizeHandle.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        const delta = e.key === 'ArrowUp' ? -24 : 24;
+        applyHeight(editor.offsetHeight + delta, true);
+    });
+
+    /* 双击恢复默认高度 */
+    resizeHandle.addEventListener('dblclick', function () {
+        applyHeight(defaultHeight(), true);
+        toast('已恢复默认高度');
+    });
+
+    /* 窗口尺寸变化时仅做钳制，不覆盖用户的记忆值 */
+    window.addEventListener('resize', function () {
+        if (dragging) return;
+        applyHeight(editor.offsetHeight, false);
+    });
+
+    /* ============================================================
+       JSONBin 读写
+       ============================================================ */
+    async function pullRemote() {
+        const r = await fetch(API_BASE + '/latest', {
+            method: 'GET',
+            headers: { 'X-Access-Key': ACCESS_KEY },
+            cache: 'no-store'
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        return (j && j.record) ? j.record : null;
+    }
+
+    async function pushRemote(text) {
+        const r = await fetch(API_BASE, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Access-Key': ACCESS_KEY
+            },
+            body: JSON.stringify({ text: text, updatedAt: Date.now() })
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+    }
+
+    /* ============================================================
+       应用云端内容到编辑区
+       ============================================================ */
+    function applyRemote(text, ts) {
+        editor.value = text;
+        baseline = text;
+        dirty = false;
+        cloudUpdatedAt = ts || Date.now();
+        editor.scrollTop = 0;
+        renderMeta();
+    }
+
+    /* ============================================================
+       核心：一次同步 = 自动判断该拉还是该推
+       ============================================================ */
+    async function doSync() {
+        if (busy) return;
+        busy = true;
+        setBusy(true);
+        setState('busy', '同步中…');
+
+        try {
+            const local     = editor.value;
+            const remote    = await pullRemote();
+            const cloudText = (remote && typeof remote.text === 'string') ? remote.text : '';
+            const cloudTime = (remote && Number(remote.updatedAt)) || 0;
+
+            const localEmpty = local.trim() === '';
+            const cloudEmpty = cloudText.trim() === '';
+
+            /* ① 两边完全一致 —— 无事可做，只刷新基线 */
+            if (local === cloudText) {
+                baseline = local;
+                dirty = false;
+                if (cloudTime) cloudUpdatedAt = cloudTime;
+                renderMeta();
+                setState('ok', '已同步');
+                toast(cloudEmpty ? '云端与本地均无内容' : '内容已一致，无需同步');
+                return;
+            }
+
+            /* ② 云端为空 —— 把本地内容推上去 */
+            if (cloudEmpty) {
+                if (localEmpty && !dirty) {
+                    setState('off', '云端为空');
+                    toast('云端暂无内容');
+                    return;
+                }
+                await pushRemote(local);
+                baseline = local;
+                dirty = false;
+                cloudUpdatedAt = Date.now();
+                renderMeta();
+                setState('ok', '已同步');
+                toast('已上传到云端');
+                return;
+            }
+
+            /* ③ 本地刚打开（空白）或自上次同步后未改动 —— 以云端为准 */
+            const localUntouched =
+                (localEmpty && !dirty) ||
+                (baseline !== null && local === baseline);
+
+            if (localUntouched) {
+                applyRemote(cloudText, cloudTime);
+                setState('ok', '已同步');
+                toast('已从云端载入内容');
+                return;
+            }
+
+            /* ④ 云端自上次同步后未改动 —— 以本地为准 */
+            if (baseline !== null && cloudText === baseline) {
+                await pushRemote(local);
+                baseline = local;
+                dirty = false;
+                cloudUpdatedAt = Date.now();
+                renderMeta();
+                setState('ok', '已同步');
+                toast('已上传到云端');
+                return;
+            }
+
+            /* ⑤ 双方都改动过 —— 无法自动判断，交给用户 */
+            pendingCloud = { text: cloudText, time: cloudTime };
+            openConflict(cloudText, local, cloudTime);
+            setState('off', '待选择');
+
+        } catch (err) {
+            setState('err', '同步失败');
+            toast('同步失败：' + (err && err.message ? err.message : err));
+        } finally {
+            busy = false;
+            setBusy(false);
+        }
+    }
+
+    /* ============================================================
+       冲突弹窗
+       ============================================================ */
+    function openConflict(cloudText, localText, ts) {
+        $('cloudTime').textContent = ts ? '· 更新于 ' + fmtTime(ts) : '';
+        $('cloudPreview').textContent = previewText(cloudText);
+        $('localPreview').textContent = previewText(localText);
+        conflictOverlay.classList.add('open');
+    }
+
+    function closeConflict() {
+        conflictOverlay.classList.remove('open');
+    }
+
+    $('conflictCancel').addEventListener('click', function () {
+        pendingCloud = null;
+        closeConflict();
+        setState('off', '未同步');
+    });
+
+    $('useCloudBtn').addEventListener('click', function () {
+        if (!pendingCloud) { closeConflict(); return; }
+        const c = pendingCloud;
+        pendingCloud = null;
+        closeConflict();
+        applyRemote(c.text, c.time);
+        setState('ok', '已同步');
+        toast('已用云端内容覆盖本地');
+    });
+
+    $('useLocalBtn').addEventListener('click', async function () {
+        if (!pendingCloud) { closeConflict(); return; }
+        pendingCloud = null;
+        closeConflict();
+
+        busy = true;
+        setBusy(true);
+        setState('busy', '上传中…');
+        try {
+            const local = editor.value;
+            await pushRemote(local);
+            baseline = local;
+            dirty = false;
+            cloudUpdatedAt = Date.now();
+            renderMeta();
+            setState('ok', '已同步');
+            toast('已用本地内容覆盖云端');
+        } catch (err) {
+            setState('err', '同步失败');
+            toast('上传失败：' + (err && err.message ? err.message : err));
+        } finally {
+            busy = false;
+            setBusy(false);
+        }
+    });
+
+    conflictOverlay.addEventListener('click', function (e) {
+        if (e.target === conflictOverlay) {
+            pendingCloud = null;
+            closeConflict();
+            setState('off', '未同步');
+        }
+    });
+
+    /* ============================================================
+       事件绑定
+       ============================================================ */
+    editor.addEventListener('input', function () {
+        dirty = true;
+        renderMeta();
+    });
+
+    syncBtn.addEventListener('click', doSync);
+
+    /* Ctrl / Cmd + Enter 直接同步 */
+    editor.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            doSync();
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && conflictOverlay.classList.contains('open')) {
+            pendingCloud = null;
+            closeConflict();
+            setState('off', '未同步');
+        }
+    });
+
+    /* ============================================================
+       初始化
+       ============================================================ */
+    setState('off', '未同步');
+    renderMeta();
+    try {
+        if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) editor.focus();
+    } catch (e) { /* 忽略 */ }
+})();
+
+/* ============ 主题切换：与站内其他页面共用 cipher_theme_v2 ============ */
+var THEME_KEY = 'cipher_theme_v2';
+function applyTheme(theme, persist) {
+    var normalized = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', normalized);
+    var isDark = normalized === 'dark';
+    var btn = document.getElementById('themeToggle');
+    if (btn) {
+        btn.textContent = isDark ? '☀ 浅色模式' : '🌙 深色模式';
+        btn.setAttribute('aria-pressed', String(isDark));
+        btn.setAttribute('aria-label', isDark ? '切换到浅色模式' : '切换到深色模式');
+    }
+    if (persist !== false) {
+        try { localStorage.setItem(THEME_KEY, normalized); } catch (e) { /* 忽略 */ }
+    }
+}
+applyTheme(document.documentElement.getAttribute('data-theme') || 'light', false);
+document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
+</script>
+
+</body>
+</html>
