@@ -12,3 +12,5 @@
 - [Calendar](https://themanronin.github.io/Calendar/) — 排班日历。月视图排班，支持白班 / 夜班 / 休班 / 请假 / 加班，内置默认班次规则，支持文本导入与周期统计。
 
 - [WebhookForwarder](https://themanronin.github.io/WebhookForwarder/) — Webhook 发送器。企业微信群机器人文本消息发送，支持代理转发（`{url}` 占位符）、请求预览、响应查看与发送记录。
+
+- [SyncText](https://themanronin.github.io/SyncText/) — 云同步临时记事本。基于 JSONBin 云端存储，内容刷新即清空、仅云端留存；云端为空时上传本地内容，本地空白或未改动时拉取云端内容，两边不一致时弹窗选择保留哪一份。支持字符 / 行数统计、高度拖拽调整与深色模式。
