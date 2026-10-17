@@ -115,6 +115,12 @@
             user-select: none;
         }
         .tab-secondary.active { color: var(--text); border-color: var(--border); background: var(--surface); font-weight: 500; }
+        /* 标签原本统一 outline:none，键盘用户看不到焦点位置；只对键盘聚焦显示描边，鼠标点击不出现。 */
+        .tab-primary:focus-visible, .tab-secondary:focus-visible {
+            outline: 2px solid var(--text);
+            outline-offset: 2px;
+            border-radius: var(--radius);
+        }
         .panel { display: none; animation: fadeIn 150ms ease; }
         .panel.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
@@ -698,7 +704,7 @@
         <div class="section-label mt-md mb-sm" id="hashAlgoLabel">MD5</div>
         <div class="result-mono" id="hashResult">—</div>
         <div class="row mt-sm gap-sm">
-            <button class="btn small copy-btn" data-target="hashResultText">复制哈希</button>
+            <button class="btn small copy-btn" data-target="hashResult" data-copy-prop="text">复制哈希</button>
             <button class="btn small" id="hashVerify">校验预期摘要</button>
             <span class="note" id="hashNote"></span>
             <span class="note" id="hashVerifyFeedback"></span>
@@ -856,7 +862,7 @@
             <div class="result-mono" id="uuidResult">—</div>
             <div class="row mt-sm gap-sm">
                 <button class="btn primary" id="uuidGen">生成 UUID</button>
-                <button class="btn small copy-btn" data-target="uuidResultText">复制</button>
+                <button class="btn small copy-btn" data-target="uuidResult" data-copy-prop="text">复制</button>
             </div>
             <hr class="divider">
             <div class="section-label mb-sm">批量生成</div>
@@ -884,7 +890,7 @@
             <span class="note" id="pwdStrengthLabel"></span>
             <div class="row mt-sm gap-sm">
                 <button class="btn primary" id="pwdGen">生成</button>
-                <button class="btn small copy-btn" data-target="pwdResultText">复制</button>
+                <button class="btn small copy-btn" data-target="pwdResult" data-copy-prop="text">复制</button>
             </div>
         </div>
         <div class="panel" id="sub-gen-randomstr">
@@ -905,7 +911,7 @@
             <div class="result-mono" id="randStrResult">—</div>
             <div class="row mt-sm gap-sm">
                 <button class="btn primary" id="randStrGen">生成</button>
-                <button class="btn small copy-btn" data-target="randStrResultText">复制</button>
+                <button class="btn small copy-btn" data-target="randStrResult" data-copy-prop="text">复制</button>
             </div>
         </div>
         <div class="panel" id="sub-gen-mock">
@@ -1016,7 +1022,7 @@
                 </div>
             </div>
             <div class="result-mono">当前毫秒时间戳：<span id="tsNow">—</span></div>
-            <button class="btn small mt-sm copy-btn" data-target="tsNowText">复制当前时间戳</button>
+            <button class="btn small mt-sm copy-btn" data-target="tsNow" data-copy-prop="text">复制当前时间戳</button>
         </div>
         <div class="panel" id="sub-convert-jsonfmt">
             <textarea id="jsonInput" placeholder="粘贴JSON..."></textarea>
@@ -2752,71 +2758,110 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         } else fallbackCopy();
     }
 
-    // ============ Tab系统 ============
-    function setupTabs(containerId, panelPrefix) {
+    // ============ Tab系统：点击 / 方向键切换，同时维护 tablist · tab · tabpanel 语义 ============
+    function dtpTabList(container, attr) {
+        return Array.prototype.slice.call(container.querySelectorAll('[' + attr + ']'));
+    }
+    /* 单一入口负责切换与语义同步：active 类、aria-selected、roving tabindex、tabpanel 关联。
+       键盘用户因此只需在标签组内用方向键或 Home / End 移动，不必逐个 Tab 穿越全部分类。 */
+    function dtpSetupTabGroup(containerId, attr, panelPrefix, options) {
         var container = getById(containerId);
         if (!container) return;
-        container.addEventListener('click', function(e) {
-            var tab = e.target.closest('[data-tab]');
-            if (!tab) return;
-            var tabs = container.querySelectorAll('[data-tab]');
-            for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
-            tab.classList.add('active');
-            var panelId = panelPrefix + tab.getAttribute('data-tab');
-            var target = getById(panelId);
+        var opts = options || {};
+        var selector = '[' + attr + ']';
+        container.setAttribute('role', 'tablist');
+        if (!container.getAttribute('aria-label')) {
+            container.setAttribute('aria-label', opts.primary ? '工具分类' : '工具列表');
+        }
+        /* 一级分类在宽屏是纵向侧栏、窄屏是横向滚动，方向键语义随断点同步。 */
+        if (opts.primary) {
+            var mq = window.matchMedia ? window.matchMedia('(min-width: 1080px)') : null;
+            var syncOrientation = function () {
+                container.setAttribute('aria-orientation', mq && mq.matches ? 'vertical' : 'horizontal');
+            };
+            syncOrientation();
+            if (mq) {
+                if (mq.addEventListener) mq.addEventListener('change', syncOrientation);
+                else if (mq.addListener) mq.addListener(syncOrientation);
+            }
+        }
+        function activate(tab, moveFocus) {
+            dtpTabList(container, attr).forEach(function (btn) {
+                var on = btn === tab;
+                btn.classList.toggle('active', on);
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-selected', on ? 'true' : 'false');
+                btn.tabIndex = on ? 0 : -1;
+            });
+            var key = tab.getAttribute(attr);
+            var target = getById(panelPrefix + key);
+            if (!tab.id) tab.id = 'dtp-tab-' + panelPrefix + key;
             if (target) {
-                var parentPanel = container.closest('.panel') || document;
-                var panels = parentPanel.querySelectorAll('[id^="' + panelPrefix + '"]');
+                var scope = container.closest('.panel') || document;
+                var panels = scope.querySelectorAll('[id^="' + panelPrefix + '"]');
                 for (var j = 0; j < panels.length; j++) panels[j].classList.remove('active');
                 target.classList.add('active');
+                tab.setAttribute('aria-controls', target.id);
+                target.setAttribute('role', 'tabpanel');
+                target.setAttribute('aria-labelledby', tab.id);
+                target.tabIndex = 0;
+            } else if (opts.sharedPanel) {
+                /* 哈希页 13 个算法共用一块面板，没有一一对应的 tabpanel，用 aria-controls 指向共享面板。 */
+                tab.setAttribute('aria-controls', opts.sharedPanel);
             }
-        });
-    }
-    function setupSubTabs(containerId, prefix) {
-        var container = getById(containerId);
-        if (!container) return;
-        container.addEventListener('click', function(e) {
-            var tab = e.target.closest('[data-sub]');
+            if (moveFocus) tab.focus();
+        }
+        container.addEventListener('click', function (e) {
+            var tab = e.target.closest(selector);
             if (!tab) return;
-            var tabs = container.querySelectorAll('[data-sub]');
-            for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
-            tab.classList.add('active');
-            var panelId = 'sub-' + prefix + '-' + tab.getAttribute('data-sub');
-            var scope = container.closest('.panel');
-            if (scope) {
-                var subPanels = scope.querySelectorAll('[id^="sub-' + prefix + '-"]');
-                for (var j = 0; j < subPanels.length; j++) subPanels[j].classList.remove('active');
-            }
-            var target = getById(panelId);
-            if (target) target.classList.add('active');
-            // 哈希切换时重新计算
-            if (prefix === 'hash') computeHash();
+            activate(tab, false);
+            if (typeof opts.onChange === 'function') opts.onChange();
         });
+        container.addEventListener('keydown', function (e) {
+            if (e.altKey || e.ctrlKey || e.metaKey) return;
+            var items = dtpTabList(container, attr);
+            var cur = e.target.closest(selector);
+            if (!cur || items.length === 0) return;
+            var idx = items.indexOf(cur), next = -1;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1) % items.length;
+            else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + items.length) % items.length;
+            else if (e.key === 'Home') next = 0;
+            else if (e.key === 'End') next = items.length - 1;
+            else return;
+            e.preventDefault();
+            activate(items[next], true);
+            if (typeof opts.onChange === 'function') opts.onChange();
+        });
+        var initial = container.querySelector(selector + '.active') || dtpTabList(container, attr)[0];
+        if (initial) activate(initial, false);
     }
 
-    setupTabs('tabsPrimary', 'panel-');
-    setupSubTabs('tabsEncodeSub', 'encode');
-    setupSubTabs('tabsHashSub', 'hash');
-    setupSubTabs('tabsCipherSub', 'cipher');
-    setupSubTabs('tabsGenSub', 'gen');
-    setupSubTabs('tabsConvertSub', 'convert');
-    setupSubTabs('tabsExtrasSub', 'extras');
-    setupSubTabs('tabsWorkbenchSub', 'workbench');
-    setupSubTabs('tabsUtilitySub', 'utility');
+    dtpSetupTabGroup('tabsPrimary', 'data-tab', 'panel-', { primary: true });
+    dtpSetupTabGroup('tabsEncodeSub', 'data-sub', 'sub-encode-');
+    dtpSetupTabGroup('tabsHashSub', 'data-sub', 'sub-hash-', { onChange: computeHash, sharedPanel: 'panel-hash' });
+    dtpSetupTabGroup('tabsCipherSub', 'data-sub', 'sub-cipher-');
+    dtpSetupTabGroup('tabsGenSub', 'data-sub', 'sub-gen-');
+    dtpSetupTabGroup('tabsConvertSub', 'data-sub', 'sub-convert-');
+    dtpSetupTabGroup('tabsExtrasSub', 'data-sub', 'sub-extras-');
+    dtpSetupTabGroup('tabsWorkbenchSub', 'data-sub', 'sub-workbench-');
+    dtpSetupTabGroup('tabsUtilitySub', 'data-sub', 'sub-utility-');
 
     // ============ 复制按钮事件委托 ============
+    /* 取值来源显式声明：data-copy-prop="value|text"；未声明时按元素类型推断，
+       不再依赖 id 以 Text 结尾的隐式约定（写错会静默复制空内容）。 */
     document.addEventListener('click', function(e) {
         var btn = e.target.closest('.copy-btn');
         if (!btn) return;
-        var targetId = btn.getAttribute('data-target');
-        var text = '';
-        if (targetId && targetId.endsWith('Text')) {
-            var el = getById(targetId.replace('Text', ''));
-            if (el) text = el.value || el.textContent || '';
-        } else if (targetId) {
-            var el = getById(targetId);
-            if (el) text = el.value || el.textContent || '';
-        }
+        var targetId = btn.getAttribute('data-target') || btn.getAttribute('data-copy-from');
+        if (!targetId) return;
+        var el = getById(targetId);
+        if (!el) { copyText('', btn); return; }
+        var prop = btn.getAttribute('data-copy-prop');
+        var isField = /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+        var text;
+        if (prop === 'value') text = isField ? (el.value == null ? '' : el.value) : (el.textContent || '');
+        else if (prop === 'text') text = el.textContent || '';
+        else text = isField ? (el.value == null ? '' : el.value) : (el.textContent || '');
         copyText(text, btn);
     });
 
@@ -5774,23 +5819,32 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     });
 
     // ============ 初始化 ============
-    try {
-        getById('uuidGen').click();
-        getById('pwdGen').click();
-        getById('randStrGen').click();
-        computeHash();
-        updateMarkdownPreview();
-        getById('playHtml').value = PLAY_DEFAULT.html; getById('playCss').value = PLAY_DEFAULT.css; getById('playJs').value = PLAY_DEFAULT.js; runPlayground();
-        getById('mermaidInput').value = 'flowchart TD\n A[开始] --> B[处理] --> C[结束]';
-        getById('jsonTreeInput').value = '{"name":"DevToolbox","features":["local","private"],"enabled":true}'; getById('jsonTreeRender').click();
-        try { generateQr(); } catch(qe) { setToolText('qrStatus', qe.message); }
-        updateGradient(); updateShadow();
-        try { drawChart(); } catch(ce) { setToolText('chartStatus', ce.message); }
-        try { renderBarcode(); } catch(be) { setToolText('barcodeStatus', be.message); }
-        runRmbConvert(false);
-    } catch(e) {
-        console.warn('初始化部分功能失败 (可能因浏览器限制): ' + e.message);
+    /* 逐项隔离：任何一项失败只影响自身，不会连带跳过后续工具（原实现共用一个 try，
+       首个异常就会让图表、条形码、人民币大写等全部不初始化）。 */
+    function dtpInitStep(label, fn) {
+        try { fn(); } catch (e) { console.warn('[DevToolbox] 初始化失败：' + label + ' — ' + (e && e.message ? e.message : e)); }
     }
+    dtpInitStep('UUID 生成', function () { getById('uuidGen').click(); });
+    dtpInitStep('密码生成', function () { getById('pwdGen').click(); });
+    dtpInitStep('随机字符串', function () { getById('randStrGen').click(); });
+    dtpInitStep('哈希', function () { computeHash(); });
+    dtpInitStep('Markdown 预览', function () { updateMarkdownPreview(); });
+    dtpInitStep('Playground', function () {
+        getById('playHtml').value = PLAY_DEFAULT.html;
+        getById('playCss').value = PLAY_DEFAULT.css;
+        getById('playJs').value = PLAY_DEFAULT.js;
+        runPlayground();
+    });
+    dtpInitStep('Mermaid 示例', function () { getById('mermaidInput').value = 'flowchart TD\n A[开始] --> B[处理] --> C[结束]'; });
+    dtpInitStep('JSON 树', function () {
+        getById('jsonTreeInput').value = '{"name":"DevToolbox","features":["local","private"],"enabled":true}';
+        getById('jsonTreeRender').click();
+    });
+    dtpInitStep('二维码', function () { try { generateQr(); } catch (qe) { setToolText('qrStatus', qe.message); } });
+    dtpInitStep('CSS 渐变与阴影', function () { updateGradient(); updateShadow(); });
+    dtpInitStep('图表', function () { try { drawChart(); } catch (ce) { setToolText('chartStatus', ce.message); } });
+    dtpInitStep('条形码', function () { try { renderBarcode(); } catch (be) { setToolText('barcodeStatus', be.message); } });
+    dtpInitStep('人民币大写', function () { runRmbConvert(false); });
 
     /* 主题按钮状态、当前工具草稿恢复，以及 CryptoJS 改为 defer 后的哈希补算。 */
     try {
