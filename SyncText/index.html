@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src https://api.jsonbin.io; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <title>SyncText</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M 6 2 C 5.4777778 2 4.9453899 2.1913289 4.5683594 2.5683594 C 4.1913289 2.9453899 4 3.4777778 4 4 L 4 20 C 4 20.522222 4.1913289 21.05461 4.5683594 21.431641 C 4.9453899 21.808671 5.4777778 22 6 22 L 18 22 C 18.522222 22 19.05461 21.808671 19.431641 21.431641 C 19.808671 21.05461 20 20.522222 20 20 L 20 7.9863281 L 14.013672 2 L 6 2 z M 6 4 L 13 4 L 13 9 L 18 9 L 18 20 L 6 20 L 6 4 z M 8 12 L 8 14 L 16 14 L 16 12 L 8 12 z M 8 16 L 8 18 L 16 18 L 16 16 L 8 16 z'></path></svg>">
 <script>
@@ -301,9 +304,14 @@
         backdrop-filter: blur(2px);
         opacity: 0;
         visibility: hidden;
-        transition: opacity 160ms ease, visibility 160ms ease;
+        /* 只对 opacity 做过渡：visibility 参与过渡时，
+           弹窗内的按钮会在一段时间内仍被判定为不可聚焦 */
+        transition: opacity 160ms ease;
     }
-    .overlay.open { opacity: 1; visibility: visible; }
+    .overlay.open {
+        opacity: 1;
+        visibility: visible;
+    }
 
     .modal {
         width: 100%;
@@ -350,6 +358,19 @@
         word-break: break-word;
     }
 
+    /* 弹窗内的行内错误：上传失败时保留弹窗，错误就地显示 */
+    .modal-error {
+        margin-top: 12px;
+        padding: 8px 11px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--danger);
+        background: rgba(192, 57, 43, .07);
+        border: 1px solid rgba(192, 57, 43, .28);
+        border-radius: var(--radius);
+    }
+    .modal-error[hidden] { display: none; }
+
     .modal-foot {
         margin-top: 16px;
         padding-top: 14px;
@@ -367,6 +388,9 @@
         left: 50%;
         bottom: 28px;
         z-index: 200;
+        display: flex;
+        align-items: center;
+        gap: 12px;
         padding: 9px 16px;
         font-size: 12px;
         letter-spacing: .02em;
@@ -381,6 +405,22 @@
         text-align: center;
     }
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast.has-action { pointer-events: auto; padding-right: 10px; }
+    .toast-action {
+        flex-shrink: 0;
+        padding: 2px 9px;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .04em;
+        color: inherit;
+        background: rgba(127, 127, 127, .26);
+        border: 1px solid rgba(127, 127, 127, .45);
+        border-radius: 3px;
+        cursor: pointer;
+    }
+    .toast-action[hidden] { display: none; }
+    .toast-action:hover { background: rgba(127, 127, 127, .40); }
 
     ::selection { background: var(--text); color: var(--bg); }
 
@@ -410,13 +450,29 @@
     [data-theme="dark"] .resize-handle:hover::before,
     [data-theme="dark"] .resize-handle:focus-visible::before { background: var(--text-secondary); }
     [data-theme="dark"] .overlay { background: rgba(0, 0, 0, .58); }
+    [data-theme="dark"] .modal-error {
+        background: rgba(229, 72, 77, .10);
+        border-color: rgba(229, 72, 77, .34);
+    }
+
+    /* ---------- 减少动态效果 ---------- */
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: .01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: .01ms !important;
+        }
+        .sync-state[data-state="ok"]::before,
+        .sync-state[data-state="busy"]::before { animation: none; }
+    }
 
     /* ---------- 响应式 ---------- */
     @media (max-width: 640px) {
         body { padding: 16px 10px 32px; }
         .header { gap: 8px; }
         .header-subtitle { display: none; }
-        .editor { font-size: 12.5px; padding: 12px 13px; line-height: 1.75; }
+        /* iOS 在输入框字号小于 16px 时聚焦会自动放大页面，移动端必须保持 16px */
+        .editor { font-size: 16px; padding: 12px 13px; line-height: 1.7; }
         .footer { gap: 10px; }
         .btn-sync { flex: 1 1 100%; min-width: 0; padding: 12px 20px; }
         .preview-body { max-height: 18vh; }
@@ -436,6 +492,7 @@
     </div>
 
     <textarea class="editor" id="editor" spellcheck="false" autocomplete="off"
+              autocapitalize="off" autocorrect="off"
 placeholder="在这里输入临时内容……
 
 点击「云同步」时：
@@ -475,6 +532,8 @@ placeholder="在这里输入临时内容……
             <div class="preview-body" id="localPreview"></div>
         </div>
 
+        <div class="modal-error" id="conflictError" hidden></div>
+
         <div class="modal-foot">
             <button class="btn small" id="conflictCancel" type="button">取消</button>
             <button class="btn small" id="useCloudBtn" type="button">用云端覆盖本地</button>
@@ -483,7 +542,10 @@ placeholder="在这里输入临时内容……
     </div>
 </div>
 
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="toast" id="toast" role="status" aria-live="polite">
+    <span id="toastText"></span>
+    <button class="toast-action" id="toastAction" type="button" hidden>撤销</button>
+</div>
 
 <script>
 (function () {
@@ -498,6 +560,10 @@ placeholder="在这里输入临时内容……
     const ACCESS_KEY = '$2a$10$OH.5eWnz3mflLI45mtYKouNkL9nrKIaAveu37K.KKpThlGhjaHdCG';
     const API_BASE   = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
 
+    const REQUEST_TIMEOUT = 15000;              // 单次请求超时（毫秒）
+    const READY_MAX_AGE   = 30000;              // 就绪缓存有效期（毫秒）
+    const CLOUD_LIMIT     = 100 * 1024;         // JSONBin 免费版单个 JSON 上限
+
     /* ============================================================
        DOM
        ============================================================ */
@@ -508,30 +574,61 @@ placeholder="在这里输入临时内容……
     const cloudMeta       = $('cloudMeta');
     const syncState       = $('syncState');
     const conflictOverlay = $('conflictOverlay');
+    const conflictError   = $('conflictError');
+    const appEl           = document.querySelector('.app');
 
     /* ============================================================
        会话内状态 —— 全部只存在内存，刷新即失效，不做任何数据持久化
        ============================================================ */
-    let baseline       = null;   // 最近一次与云端达成一致时的内容
-    let dirty          = false;  // 自最近一次同步后用户是否改动过
-    let busy           = false;
-    let cloudUpdatedAt = 0;      // 云端记录的最后更新时间戳
-    let pendingCloud   = null;   // 冲突待决时暂存的云端内容
-    let readyCloud     = null;   // 进入页面时后台拉取的云端内容（就绪态，尚未应用）
-    let syncSeq        = 0;      // 正式同步次数，用于丢弃过期的就绪数据
-    let readyAbort     = null;   // 就绪请求的 AbortController，正式同步时中断
-    let conflictTimer  = null;   // 冲突弹窗打开时刷新相对时间的定时器
+    let baseline        = null;   // 最近一次与云端达成一致时的内容
+    let dirty           = false;  // 自最近一次同步后用户是否改动过
+    let busy            = false;
+    let cloudUpdatedAt  = 0;      // 云端记录的最后更新时间戳
+    let cloudHasContent = null;   // 云端是否有内容（null = 尚未拉取）
+    let pendingCloud    = null;   // 冲突待决时暂存的云端内容
+    let readyCloud      = null;   // 进入页面时后台拉取的云端内容（含 fetchedAt）
+    let syncSeq         = 0;      // 正式同步次数，用于丢弃过期的就绪数据
+    let readyAbort      = null;   // 就绪请求的 AbortController，正式同步时中断
+    let conflictTimer   = null;   // 冲突弹窗打开时刷新相对时间的定时器
+    let undoSnapshot    = null;   // 覆盖本地前的内容，供 Toast 撤销
+    let lastFocused     = null;   // 弹窗打开前的焦点，关闭时归还
 
     /* ============================================================
        小工具
        ============================================================ */
     let toastTimer = null;
-    function toast(msg) {
-        const t = $('toast');
-        t.textContent = msg;
-        t.classList.add('show');
+    const toastEl       = $('toast');
+    const toastTextEl   = $('toastText');
+    const toastActionEl = $('toastAction');
+
+    function hideToast() {
+        toastEl.classList.remove('show');
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+        toastTimer = null;
+    }
+
+    /* action 可选：{ label, run }，用于「覆盖后可撤销」这类一次性操作 */
+    function toast(msg, action) {
+        toastTextEl.textContent = msg;
+
+        if (action && typeof action.run === 'function') {
+            toastActionEl.hidden = false;
+            toastActionEl.textContent = action.label || '撤销';
+            toastActionEl.onclick = function (e) {
+                e.preventDefault();
+                hideToast();
+                action.run();
+            };
+            toastEl.classList.add('has-action');
+        } else {
+            toastActionEl.hidden = true;
+            toastActionEl.onclick = null;
+            toastEl.classList.remove('has-action');
+        }
+
+        toastEl.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(hideToast, action ? 8000 : 2600);
     }
 
     function pad2(n) { return n < 10 ? '0' + n : '' + n; }
@@ -586,24 +683,53 @@ placeholder="在这里输入临时内容……
         }
     }
 
-    /* 文本大小：默认以 KB 为单位，超过 1 MB 自动切换为 MB */
+    /* 文本大小：1024 以下按字节，以上按 KB / MB，统一去尾零 */
     function formatSize(bytes) {
-        if (bytes < 1024) {
-            const kb = (bytes / 1024).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-            return kb + ' KB';
+        if (bytes < 1024) return bytes + ' B';
+        var num, unit;
+        if (bytes < 1024 * 1024) {
+            num = (bytes / 1024).toFixed(1);
+            unit = ' KB';
+        } else {
+            num = (bytes / 1048576).toFixed(2);
+            unit = ' MB';
         }
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / 1048576).toFixed(2) + ' MB';
+        return num.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1') + unit;
+    }
+
+    function countLines(text) {
+        if (!text) return 0;
+        var n = 1;
+        for (var i = 0; i < text.length; i++) {
+            if (text.charCodeAt(i) === 10) n++;
+        }
+        return n;
     }
 
     function renderMeta() {
         const v = editor.value;
-        const chars = v.length;
-        const lines = v ? v.split(/\r?\n/).length : 0;
-        metaText.textContent = chars + ' 字符 · ' + lines + ' 行 · ' + formatSize(byteLength(v));
-        cloudMeta.textContent = cloudUpdatedAt
-            ? '云端更新于 ' + fmtTime(cloudUpdatedAt)
-            : '云端尚无记录';
+        metaText.textContent = v.length + ' 字符 · ' + countLines(v) + ' 行 · ' +
+            formatSize(byteLength(v)) + ' / ' + formatSize(CLOUD_LIMIT);
+
+        if (cloudHasContent === false) {
+            cloudMeta.textContent = '云端暂无内容';
+        } else if (cloudUpdatedAt) {
+            cloudMeta.textContent = '云端更新于 ' + fmtTime(cloudUpdatedAt);
+        } else if (cloudHasContent) {
+            cloudMeta.textContent = '云端有内容 · 时间未知';
+        } else {
+            cloudMeta.textContent = '';
+        }
+    }
+
+    /* 输入期间合并统计，避免每次按键都全文 split + 编码 */
+    let metaTimer = null;
+    function scheduleMeta() {
+        if (metaTimer) clearTimeout(metaTimer);
+        metaTimer = setTimeout(function () {
+            metaTimer = null;
+            renderMeta();
+        }, 120);
     }
 
     function previewText(t) {
@@ -697,43 +823,170 @@ placeholder="在这里输入临时内容……
     });
 
     /* ============================================================
+       网络层：统一超时 + 错误归类
+       ============================================================ */
+    function timedFetch(url, options, timeoutMs, externalSignal) {
+        const ms = timeoutMs || REQUEST_TIMEOUT;
+        let timer = null;
+        let timedOut = false;
+
+        if (typeof AbortController !== 'undefined') {
+            const ctl = new AbortController();
+            timer = setTimeout(function () {
+                timedOut = true;
+                try { ctl.abort(); } catch (e) { /* 忽略 */ }
+            }, ms);
+
+            if (externalSignal) {
+                if (externalSignal.aborted) {
+                    try { ctl.abort(); } catch (e) { /* 忽略 */ }
+                } else if (typeof externalSignal.addEventListener === 'function') {
+                    externalSignal.addEventListener('abort', function () {
+                        try { ctl.abort(); } catch (e) { /* 忽略 */ }
+                    });
+                }
+            }
+            options.signal = ctl.signal;
+        }
+
+        function done() {
+            if (timer) { clearTimeout(timer); timer = null; }
+        }
+
+        return fetch(url, options).then(function (r) {
+            done();
+            return r;
+        }, function (err) {
+            done();
+            if (timedOut) {
+                const e = new Error('请求超时');
+                e.code = 'timeout';
+                throw e;
+            }
+            throw err;
+        });
+    }
+
+    function httpError(status) {
+        const e = new Error('HTTP ' + status);
+        e.status = status;
+        return e;
+    }
+
+    function describeError(err) {
+        if (!err) return '未知错误';
+
+        if (err.code === 'too_large') {
+            return '内容约 ' + formatSize(err.bytes) + '，超过云端单次上限 ' +
+                formatSize(CLOUD_LIMIT) + '，请删减后再同步';
+        }
+        if (err.code === 'timeout') {
+            return '请求超时（' + Math.round(REQUEST_TIMEOUT / 1000) + ' 秒），请检查网络后重试';
+        }
+        if (err.name === 'AbortError') return '请求已取消';
+
+        const s = err.status;
+        if (s === 401 || s === 403) return '访问密钥无效或已失效（HTTP ' + s + '）';
+        if (s === 404) return '云端记录不存在或已被删除（HTTP 404）';
+        if (s === 413) return '内容超过云端容量上限（HTTP 413）';
+        if (s === 429) return '请求过于频繁，请稍后重试（HTTP 429）';
+        if (s >= 500) return '云端服务异常（HTTP ' + s + '），请稍后重试';
+        if (s) return '同步失败（HTTP ' + s + '）';
+
+        return '网络不可用，请检查连接后重试';
+    }
+
+    /* ============================================================
        JSONBin 读写
        ============================================================ */
+    function buildRecord(text) {
+        return JSON.stringify({ text: text, updatedAt: Date.now() });
+    }
+
+    function capacityError(text) {
+        const bytes = byteLength(buildRecord(text));
+        if (bytes <= CLOUD_LIMIT) return null;
+        const e = new Error('内容过大');
+        e.code = 'too_large';
+        e.bytes = bytes;
+        return e;
+    }
+
     async function pullRemote(signal) {
-        const r = await fetch(API_BASE + '/latest', {
+        const r = await timedFetch(API_BASE + '/latest', {
             method: 'GET',
             headers: { 'X-Access-Key': ACCESS_KEY },
-            cache: 'no-store',
-            signal: signal
-        });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
+            cache: 'no-store'
+        }, REQUEST_TIMEOUT, signal);
+
+        /* 无记录时 JSONBin 返回 404，语义上等同于「云端为空」 */
+        if (r.status === 404) return null;
+        if (!r.ok) throw httpError(r.status);
+
         const j = await r.json();
         return (j && j.record) ? j.record : null;
     }
 
     async function pushRemote(text) {
-        const r = await fetch(API_BASE, {
+        const tooLarge = capacityError(text);
+        if (tooLarge) throw tooLarge;
+
+        const r = await timedFetch(API_BASE, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Access-Key': ACCESS_KEY
             },
-            body: JSON.stringify({ text: text, updatedAt: Date.now() })
-        });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
+            body: buildRecord(text)
+        }, REQUEST_TIMEOUT);
+
+        if (!r.ok) throw httpError(r.status);
         return r.json();
     }
 
+    /* 推送成功后的统一收尾 */
+    function markSynced(text) {
+        baseline = text;
+        dirty = false;
+        cloudHasContent = text.trim() !== '';
+        cloudUpdatedAt = Date.now();
+        renderMeta();
+        setState('ok', '已同步');
+    }
+
     /* ============================================================
-       应用云端内容到编辑区
+       应用云端内容到编辑区（会覆盖本地，因此保留一份可撤销副本）
        ============================================================ */
-    function applyRemote(text, ts) {
+    function applyRemote(text, ts, doneMsg) {
+        const prev = editor.value;
+
         editor.value = text;
         baseline = text;
         dirty = false;
-        cloudUpdatedAt = ts || Date.now();
+        cloudHasContent = text.trim() !== '';
+        cloudUpdatedAt = ts || 0;
         editor.scrollTop = 0;
         renderMeta();
+        setState('ok', '已同步');
+
+        if (prev && prev !== text) {
+            undoSnapshot = { text: prev };
+            toast(doneMsg || '已从云端载入内容', {
+                label: '撤销',
+                run: function () {
+                    if (!undoSnapshot) return;
+                    editor.value = undoSnapshot.text;
+                    undoSnapshot = null;
+                    dirty = true;
+                    renderMeta();
+                    setState('off', '待同步');
+                    toast('已恢复到覆盖前的内容');
+                }
+            });
+        } else {
+            undoSnapshot = null;
+            toast(doneMsg || '已从云端载入内容');
+        }
     }
 
     /* ============================================================
@@ -741,6 +994,11 @@ placeholder="在这里输入临时内容……
        ============================================================ */
     async function doSync() {
         if (busy) return;
+
+        /* 就绪缓存超龄即作废，避免用几分钟前的快照做判断 */
+        if (readyCloud !== null && (Date.now() - readyCloud.fetchedAt) >= READY_MAX_AGE) {
+            readyCloud = null;
+        }
 
         /* 快路径：就绪态缓存可用 → 先用缓存数据与文本框比对，
            省去一次网络请求；仅「云端为空且本地有内容」必须上传时，
@@ -757,6 +1015,7 @@ placeholder="在这里输入临时内容……
                 syncSeq++;
                 baseline = local;
                 dirty = false;
+                cloudHasContent = !cloudEmpty;
                 if (rc.time) cloudUpdatedAt = rc.time;
                 renderMeta();
                 setState('ok', '已同步');
@@ -779,12 +1038,17 @@ placeholder="在这里输入临时内容……
                 readyCloud = null;
                 syncSeq++;
                 applyRemote(rc.text, rc.time);
-                setState('ok', '已同步');
-                toast('已从云端载入内容');
                 return;
             }
 
-            /* 云端为空且本地有内容 —— 必须上传，落入完整逻辑 */
+            /* 云端为空且本地有内容 —— 必须上传。先做容量检查，
+               超限时不必再发一次注定失败的请求 */
+            const capErr = capacityError(local);
+            if (capErr) {
+                setState('err', '内容过大');
+                toast(describeError(capErr));
+                return;
+            }
         }
 
         /* 完整同步逻辑：中断就绪请求，丢弃可能已过期的就绪数据 */
@@ -807,12 +1071,14 @@ placeholder="在这里输入临时内容……
 
             const localEmpty = local.trim() === '';
             const cloudEmpty = cloudText.trim() === '';
+            cloudHasContent = !cloudEmpty;
 
             /* ① 两边完全一致 —— 无事可做，只刷新基线 */
             if (local === cloudText) {
                 baseline = local;
                 dirty = false;
                 if (cloudTime) cloudUpdatedAt = cloudTime;
+                else cloudUpdatedAt = 0;
                 renderMeta();
                 setState('ok', '已同步');
                 toast(cloudEmpty ? '云端与本地均无内容' : '内容已一致，无需同步');
@@ -822,16 +1088,14 @@ placeholder="在这里输入临时内容……
             /* ② 云端为空 —— 把本地内容推上去 */
             if (cloudEmpty) {
                 if (localEmpty && !dirty) {
+                    cloudUpdatedAt = 0;
+                    renderMeta();
                     setState('off', '云端为空');
                     toast('云端暂无内容');
                     return;
                 }
                 await pushRemote(local);
-                baseline = local;
-                dirty = false;
-                cloudUpdatedAt = Date.now();
-                renderMeta();
-                setState('ok', '已同步');
+                markSynced(local);
                 toast('已上传到云端');
                 return;
             }
@@ -843,19 +1107,13 @@ placeholder="在这里输入临时内容……
 
             if (localUntouched) {
                 applyRemote(cloudText, cloudTime);
-                setState('ok', '已同步');
-                toast('已从云端载入内容');
                 return;
             }
 
             /* ④ 云端自上次同步后未改动 —— 以本地为准 */
             if (baseline !== null && cloudText === baseline) {
                 await pushRemote(local);
-                baseline = local;
-                dirty = false;
-                cloudUpdatedAt = Date.now();
-                renderMeta();
-                setState('ok', '已同步');
+                markSynced(local);
                 toast('已上传到云端');
                 return;
             }
@@ -867,7 +1125,7 @@ placeholder="在这里输入临时内容……
 
         } catch (err) {
             setState('err', '同步失败');
-            toast('同步失败：' + (err && err.message ? err.message : err));
+            toast(describeError(err));
         } finally {
             busy = false;
             setBusy(false);
@@ -877,13 +1135,36 @@ placeholder="在这里输入临时内容……
     /* ============================================================
        冲突弹窗
        ============================================================ */
+    function showConflictError(msg) {
+        conflictError.textContent = msg;
+        conflictError.hidden = false;
+    }
+
+    function hideConflictError() {
+        conflictError.textContent = '';
+        conflictError.hidden = true;
+    }
+
+    function setConflictBusy(on) {
+        $('conflictCancel').disabled = on;
+        $('useCloudBtn').disabled = on;
+        $('useLocalBtn').disabled = on;
+        $('useLocalBtn').textContent = on ? '上传中…' : '用本地覆盖云端';
+    }
+
     function openConflict(cloudText, localText, ts) {
         $('cloudTime').textContent = ts
             ? '· 更新于 ' + fmtTime(ts) + '（' + fmtRelative(ts) + '）'
             : '';
         $('cloudPreview').textContent = previewText(cloudText);
         $('localPreview').textContent = previewText(localText);
+        hideConflictError();
+        setConflictBusy(false);
+
+        /* 先记录焦点再隐藏背景，关闭时归还 */
+        lastFocused = document.activeElement;
         conflictOverlay.classList.add('open');
+        if (appEl) appEl.setAttribute('aria-hidden', 'true');
 
         /* 弹窗停留期间每秒刷新相对时间，保持“多久之前”准确 */
         clearInterval(conflictTimer);
@@ -899,6 +1180,16 @@ placeholder="在这里输入临时内容……
         clearInterval(conflictTimer);
         conflictTimer = null;
         conflictOverlay.classList.remove('open');
+        if (appEl) appEl.removeAttribute('aria-hidden');
+        setConflictBusy(false);
+        hideConflictError();
+
+        const t = lastFocused;
+        lastFocused = null;
+        setTimeout(function () {
+            const target = (t && t.isConnected && t.disabled !== true) ? t : editor;
+            try { target.focus(); } catch (e) { /* 忽略 */ }
+        }, 0);
     }
 
     $('conflictCancel').addEventListener('click', function () {
@@ -912,43 +1203,71 @@ placeholder="在这里输入临时内容……
         const c = pendingCloud;
         pendingCloud = null;
         closeConflict();
-        applyRemote(c.text, c.time);
-        setState('ok', '已同步');
-        toast('已用云端内容覆盖本地');
+        applyRemote(c.text, c.time, '已用云端内容覆盖本地');
     });
 
     $('useLocalBtn').addEventListener('click', async function () {
         if (!pendingCloud) { closeConflict(); return; }
-        pendingCloud = null;
-        closeConflict();
+
+        const local = editor.value;
+        const capErr = capacityError(local);
+        if (capErr) {
+            showConflictError(describeError(capErr));
+            return;
+        }
 
         busy = true;
         setBusy(true);
+        setConflictBusy(true);
+        hideConflictError();
         setState('busy', '上传中…');
+
         try {
-            const local = editor.value;
             await pushRemote(local);
-            baseline = local;
-            dirty = false;
-            cloudUpdatedAt = Date.now();
-            renderMeta();
-            setState('ok', '已同步');
+            pendingCloud = null;
+            closeConflict();
+            markSynced(local);
             toast('已用本地内容覆盖云端');
         } catch (err) {
+            /* 失败不关闭弹窗：用户的选择还在，改完后可直接重试 */
+            showConflictError(describeError(err));
             setState('err', '同步失败');
-            toast('上传失败：' + (err && err.message ? err.message : err));
+            toast('上传失败，可在弹窗内重试');
         } finally {
             busy = false;
             setBusy(false);
+            setConflictBusy(false);
         }
     });
 
-    conflictOverlay.addEventListener('click', function (e) {
-        if (e.target === conflictOverlay) {
-            pendingCloud = null;
-            closeConflict();
-            setState('off', '未同步');
+    /* 弹窗打开时，Tab 一律落进弹窗内循环，避免焦点跑到背后的编辑区 */
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Tab') return;
+        if (!conflictOverlay.classList.contains('open')) return;
+
+        const items = conflictOverlay.querySelectorAll('.modal-foot button:not([disabled])');
+        if (!items.length) return;
+
+        const first = items[0];
+        const last = items[items.length - 1];
+        const inside = conflictOverlay.contains(document.activeElement);
+
+        if (!inside) {
+            e.preventDefault();
+            (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
         }
+    });
+
+    /* 点遮罩不再直接丢弃待决状态（避免误触后要重新走一遍判断），
+       需要取消请点「取消」或按 Esc */
+    conflictOverlay.addEventListener('click', function (e) {
+        if (e.target === conflictOverlay) e.stopPropagation();
     });
 
     /* ============================================================
@@ -956,7 +1275,12 @@ placeholder="在这里输入临时内容……
        ============================================================ */
     editor.addEventListener('input', function () {
         dirty = true;
-        renderMeta();
+        /* 继续编辑后，上一次覆盖的撤销点即失效，避免把新输入一起撤掉 */
+        if (undoSnapshot) {
+            undoSnapshot = null;
+            if (toastEl.classList.contains('has-action')) hideToast();
+        }
+        scheduleMeta();
     });
 
     syncBtn.addEventListener('click', doSync);
@@ -975,6 +1299,15 @@ placeholder="在这里输入临时内容……
             closeConflict();
             setState('off', '未同步');
         }
+    });
+
+    /* 有未同步内容时拦截刷新 / 关闭，避免误触后直接丢失 */
+    window.addEventListener('beforeunload', function (e) {
+        if (!editor.value.trim()) return;
+        if (editor.value === baseline) return;
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
     });
 
     /* ============================================================
@@ -1011,8 +1344,9 @@ placeholder="在这里输入临时内容……
                 const cloudText = (remote && typeof remote.text === 'string') ? remote.text : '';
                 const cloudTime = (remote && Number(remote.updatedAt)) || 0;
 
-                readyCloud = { text: cloudText, time: cloudTime };
+                readyCloud = { text: cloudText, time: cloudTime, fetchedAt: Date.now() };
                 readyAbort = null;
+                cloudHasContent = cloudText.trim() !== '';
                 cloudUpdatedAt = cloudTime;
                 renderMeta();
                 setState('ok', '已就绪');
