@@ -156,6 +156,23 @@
         box-shadow: 0 0 0 1px rgba(26, 26, 26, 0.08);
     }
 
+    /* 下拉选择：自绘箭头，避免不同浏览器默认样式差异 */
+    select.input {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        cursor: pointer;
+        padding-right: 30px;
+        background-image:
+            linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
+            linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+        background-position:
+            calc(100% - 15px) calc(50% - 1px),
+            calc(100% - 10px) calc(50% - 1px);
+        background-size: 5px 5px, 5px 5px;
+        background-repeat: no-repeat, no-repeat;
+    }
+
     textarea {
         min-height: 118px;
         line-height: 1.7;
@@ -280,9 +297,10 @@
     [data-theme="dark"] .btn.primary { color: #101013; }
     [data-theme="dark"] .btn.primary:hover { background: #ffffff; border-color: #ffffff; }
     [data-theme="dark"] .btn.copy-btn.copied { background: #16261a; border-color: #2f5c39; color: #7bd88f; }
+    /* 注意用 background-color，否则会把 select 的箭头背景图一起重置 */
     [data-theme="dark"] .input,
     [data-theme="dark"] textarea,
-    [data-theme="dark"] .result-box { background: #1d1d21; }
+    [data-theme="dark"] .result-box { background-color: #1d1d21; }
     [data-theme="dark"] .input:hover,
     [data-theme="dark"] textarea:hover { border-color: #45454d; }
     [data-theme="dark"] .input:focus,
@@ -305,7 +323,7 @@
     <div class="header">
         <span class="header-title">Webhook 发送器</span>
         <span class="header-dot"></span>
-        <span class="header-subtitle">企业微信 · 本地请求</span>
+        <span class="header-subtitle">多格式 · 本地请求</span>
         <button class="btn dtp-theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色模式" aria-label="切换深色或浅色模式" aria-pressed="false">深色模式</button>
     </div>
 
@@ -325,6 +343,15 @@
     </div>
 
     <p class="preview" id="preview">请求目标：—</p>
+
+    <!-- 消息类型 -->
+    <div class="section-label mt-md">消息类型</div>
+
+    <div class="field">
+        <label class="field-label" for="msgType">发送格式</label>
+        <select class="input" id="msgType"></select>
+        <p class="note mt-sm" id="typeHint"></p>
+    </div>
 
     <!-- 消息内容 -->
     <div class="section-label mt-md">消息内容</div>
@@ -356,46 +383,88 @@
 </div>
 
 <script>
-/* ============ 核心算法 ============ */
-async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
-  if (!webhookUrl) throw new Error('webhookUrl 不能为空');
-  if (typeof content !== 'string' || !content.trim()) throw new Error('content 不能为空');
-
-  const target = !proxyUrl
-    ? webhookUrl
-    : proxyUrl.includes('{url}')
-      ? proxyUrl.replace('{url}', encodeURIComponent(webhookUrl))
-      : proxyUrl + encodeURIComponent(webhookUrl);
-
-  const res = await fetch(target, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      msgtype: 'text',
-      text: { content }
-    })
-  });
-
-  const text = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text}`);
-
-  let data;
-  try { data = JSON.parse(text); }
-  catch { throw new Error('响应非 JSON: ' + text); }
-
-  if (data.errcode !== 0) throw new Error(`errcode ${data.errcode}: ${data.errmsg || ''}`);
-  return data;
-}
-
 /* ============ 页面逻辑 ============ */
 (function () {
   'use strict';
 
   const $ = (id) => document.getElementById(id);
 
+  /* ----------------------------------------------------------------
+   * 消息类型定义
+   *  - label       : 下拉选项文案
+   *  - hint        : 类型说明
+   *  - placeholder : 内容输入框占位符
+   *  - contentType : 请求头 Content-Type
+   *  - body(c)     : 把用户输入转换成请求体字符串（可抛错）
+   * ---------------------------------------------------------------- */
+  const MESSAGE_TYPES = {
+    'wecom-text': {
+      label: '企业微信 · 文本（默认）',
+      hint: '请求体：{"msgtype":"text","text":{"content":"…"}}',
+      placeholder: '要发送的文本内容…',
+      contentType: 'application/json; charset=UTF-8',
+      body: (c) => JSON.stringify({ msgtype: 'text', text: { content: c } }),
+    },
+    'wecom-markdown': {
+      label: '企业微信 · Markdown',
+      hint: '请求体：{"msgtype":"markdown","markdown":{"content":"…"}}',
+      placeholder: '支持 Markdown，例如：**加粗** <font color="info">提示</font>',
+      contentType: 'application/json; charset=UTF-8',
+      body: (c) => JSON.stringify({ msgtype: 'markdown', markdown: { content: c } }),
+    },
+    'dingtalk-text': {
+      label: '钉钉 · 文本',
+      hint: '请求体：{"msgtype":"text","text":{"content":"…"}}',
+      placeholder: '要发送的文本内容…',
+      contentType: 'application/json; charset=UTF-8',
+      body: (c) => JSON.stringify({ msgtype: 'text', text: { content: c } }),
+    },
+    'feishu-text': {
+      label: '飞书 · 文本',
+      hint: '请求体：{"msg_type":"text","content":{"text":"…"}}',
+      placeholder: '要发送的文本内容…',
+      contentType: 'application/json; charset=UTF-8',
+      body: (c) => JSON.stringify({ msg_type: 'text', content: { text: c } }),
+    },
+    'plain': {
+      label: '纯文本 (text/plain)',
+      hint: '内容将原样作为请求体发送，Content-Type: text/plain',
+      placeholder: '将原样作为请求体发送的文本…',
+      contentType: 'text/plain; charset=UTF-8',
+      body: (c) => c,
+    },
+    'raw-json': {
+      label: '原始 JSON (application/json)',
+      hint: '内容需是合法 JSON，将原样作为请求体发送',
+      placeholder: '{\n  "msgtype": "text",\n  "text": { "content": "hello" }\n}',
+      contentType: 'application/json; charset=UTF-8',
+      body: (c) => {
+        const t = c.trim();
+        try {
+          JSON.parse(t);
+        } catch (e) {
+          throw new Error('内容不是合法的 JSON：' + e.message);
+        }
+        return t;
+      },
+    },
+    'form': {
+      label: '表单 (x-www-form-urlencoded)',
+      hint: '按 key=value&key2=value2 的形式填写，将原样作为请求体发送',
+      placeholder: 'key=value&key2=value2',
+      contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+      body: (c) => c,
+    },
+  };
+
+  const DEFAULT_TYPE = 'wecom-text';
+  const LS_KEY = 'wecom-webhook-tool-v3';
+
   const els = {
     proxyUrl:   $('proxyUrl'),
     webhookUrl: $('webhookUrl'),
+    msgType:    $('msgType'),
+    typeHint:   $('typeHint'),
     content:    $('content'),
     sendBtn:    $('sendBtn'),
     clearBtn:   $('clearBtn'),
@@ -407,8 +476,6 @@ async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
     history:    $('history'),
     charCount:  $('charCount'),
   };
-
-  const LS_KEY = 'wecom-webhook-tool-v2';
 
   /* ---------- 本地记忆 ---------- */
   const storageOK = (function () {
@@ -426,6 +493,7 @@ async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
       localStorage.setItem(LS_KEY, JSON.stringify({
         proxyUrl:   els.proxyUrl.value,
         webhookUrl: els.webhookUrl.value,
+        msgType:    els.msgType.value,
       }));
     } catch (e) { /* 忽略 */ }
   }
@@ -434,14 +502,16 @@ async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
     if (!storageOK) return;
     try {
       const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-      if (saved && typeof saved === 'object') {
-        if (typeof saved.proxyUrl === 'string')   els.proxyUrl.value = saved.proxyUrl;
-        if (typeof saved.webhookUrl === 'string') els.webhookUrl.value = saved.webhookUrl;
+      if (!saved || typeof saved !== 'object') return;
+      if (typeof saved.proxyUrl === 'string')   els.proxyUrl.value = saved.proxyUrl;
+      if (typeof saved.webhookUrl === 'string') els.webhookUrl.value = saved.webhookUrl;
+      if (typeof saved.msgType === 'string' && MESSAGE_TYPES[saved.msgType]) {
+        els.msgType.value = saved.msgType;
       }
     } catch (e) { /* 忽略 */ }
   }
 
-  /* ---------- 目标地址预览 ---------- */
+  /* ---------- 目标地址 ---------- */
   function buildTarget(proxyUrl, webhookUrl) {
     if (!proxyUrl) return webhookUrl;
     if (proxyUrl.includes('{url}')) return proxyUrl.replace('{url}', encodeURIComponent(webhookUrl));
@@ -456,6 +526,29 @@ async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
 
   els.proxyUrl.addEventListener('input', () => { updatePreview(); persist(); });
   els.webhookUrl.addEventListener('input', () => { updatePreview(); persist(); });
+
+  /* ---------- 消息类型 ---------- */
+  function initTypeSelect() {
+    Object.keys(MESSAGE_TYPES).forEach((key) => {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = MESSAGE_TYPES[key].label;
+      els.msgType.appendChild(opt);
+    });
+    els.msgType.value = DEFAULT_TYPE;
+  }
+
+  function currentTypeKey() {
+    return MESSAGE_TYPES[els.msgType.value] ? els.msgType.value : DEFAULT_TYPE;
+  }
+
+  function applyType() {
+    const def = MESSAGE_TYPES[currentTypeKey()];
+    els.typeHint.textContent = def.hint;
+    els.content.placeholder = def.placeholder;
+  }
+
+  els.msgType.addEventListener('change', () => { applyType(); persist(); });
 
   /* ---------- 字符计数 ---------- */
   function updateCharCount() {
@@ -473,6 +566,38 @@ async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
   function setOutput(text, isError) {
     els.output.textContent = text;
     els.output.className = 'result' + (isError ? ' is-error' : (text === '—' ? ' is-empty' : ''));
+  }
+
+  /* ---------- 响应体美化 ---------- */
+  function prettyBody(text) {
+    const t = (text || '').trim();
+    if (!t) return '';
+    if (t[0] !== '{' && t[0] !== '[') return t;
+    try { return JSON.stringify(JSON.parse(t), null, 2); } catch (e) { return t; }
+  }
+
+  /* ---------- 业务错误识别（HTTP 200 但 errcode/code 非 0） ---------- */
+  function detectBizError(text) {
+    const t = (text || '').trim();
+    if (!t || (t[0] !== '{' && t[0] !== '[')) return null;
+
+    let data;
+    try { data = JSON.parse(t); } catch (e) { return null; }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+
+    const checks = [
+      ['errcode', data.errcode, data.errmsg],
+      ['code',    data.code,    data.msg || data.errmsg || data.message],
+      ['StatusCode', data.StatusCode, data.StatusMessage],
+    ];
+
+    for (let i = 0; i < checks.length; i++) {
+      const [key, value, msg] = checks[i];
+      if (typeof value === 'number' && value !== 0) {
+        return key + ' ' + value + (msg ? '：' + msg : '');
+      }
+    }
+    return null;
   }
 
   /* ---------- 历史记录 ---------- */
@@ -533,20 +658,38 @@ async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
 
   /* ---------- 发送 ---------- */
   async function handleSend() {
+    if (els.sendBtn.disabled) return;
+
     const proxyUrl   = els.proxyUrl.value.trim();
     const webhookUrl = els.webhookUrl.value.trim();
     const content    = els.content.value;
+    const def        = MESSAGE_TYPES[currentTypeKey()];
 
     if (!webhookUrl) {
       setStatus('err', '参数错误');
       setOutput('webhookUrl 不能为空', true);
+      els.elapsed.textContent = '';
       return;
     }
     if (!content.trim()) {
       setStatus('err', '参数错误');
       setOutput('content 不能为空', true);
+      els.elapsed.textContent = '';
       return;
     }
+
+    // 先构造请求体：JSON 类型可能在这里抛出格式错误
+    let payload;
+    try {
+      payload = def.body(content);
+    } catch (err) {
+      setStatus('err', '参数错误');
+      setOutput((err && err.message) ? err.message : String(err), true);
+      els.elapsed.textContent = '';
+      return;
+    }
+
+    const target = buildTarget(proxyUrl, webhookUrl);
 
     els.sendBtn.disabled = true;
     els.sendBtn.textContent = '发送中…';
@@ -557,16 +700,42 @@ async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
     const t0 = performance.now();
 
     try {
-      const data = await sendWecomWebhook(proxyUrl, webhookUrl, content);
+      const res = await fetch(target, {
+        method: 'POST',
+        headers: { 'Content-Type': def.contentType },
+        body: payload,
+      });
+
+      const rawBody = await res.text();
       const ms = Math.round(performance.now() - t0);
-      setStatus('ok', '发送成功');
-      setOutput(JSON.stringify(data, null, 2), false);
+
+      const head = 'HTTP ' + res.status + (res.statusText ? ' ' + res.statusText : '');
+      const body = prettyBody(rawBody) || '（响应体为空）';
+
       els.elapsed.textContent = '耗时 ' + ms + ' ms';
-      addHistory(true, '发送成功', content, ms);
+
+      if (res.ok) {
+        // HTTP 200 —— 判定为发送成功，同时完整打印响应体
+        setStatus('ok', '发送成功');
+        let out = head + '\n\n' + body;
+
+        const bizErr = detectBizError(rawBody);
+        if (bizErr) {
+          out += '\n\n⚠ 注意：HTTP 状态正常，但响应体提示业务错误 —— ' + bizErr;
+        }
+        setOutput(out, false);
+        addHistory(true, 'HTTP ' + res.status, content, ms);
+      } else {
+        setStatus('err', 'HTTP ' + res.status);
+        setOutput(head + '\n\n' + body, true);
+        addHistory(false, 'HTTP ' + res.status + (res.statusText ? ' ' + res.statusText : ''), content, ms);
+      }
     } catch (err) {
       const ms = Math.round(performance.now() - t0);
       const message = (err && err.message) ? err.message : String(err);
+
       setStatus('err', '发送失败');
+      els.elapsed.textContent = '耗时 ' + ms + ' ms';
 
       let text = message;
       if (/Failed to fetch|NetworkError|Load failed/i.test(message)) {
@@ -575,7 +744,6 @@ async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
                 '· 请确认代理已允许当前页面来源访问（Access-Control-Allow-Origin）。';
       }
       setOutput(text, true);
-      els.elapsed.textContent = '耗时 ' + ms + ' ms';
       addHistory(false, message, content, ms);
     } finally {
       els.sendBtn.disabled = false;
@@ -641,7 +809,9 @@ async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
   });
 
   /* ---------- 初始化 ---------- */
+  initTypeSelect();
   restore();
+  applyType();
   updatePreview();
   updateCharCount();
   setOutput('—', false);
