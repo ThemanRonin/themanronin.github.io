@@ -65,7 +65,10 @@
         display: flex;
         flex-direction: column;
         gap: 14px;
+        transition: padding-bottom 140ms ease;
     }
+    /* 下拉菜单展开时，给页面底部留出足够空间，避免菜单被视口截断 */
+    .app.menu-open { padding-bottom: 150px; }
 
     /* ---------- 顶部标题 ---------- */
     .header {
@@ -282,12 +285,86 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .btn-sync {
-        padding: 11px 34px;
-        min-width: 168px;
+
+    /* ---------- 同步按钮组（主按钮 + 下拉箭头） ---------- */
+    .sync-group {
+        display: inline-flex;
+        position: relative;
+        flex-shrink: 0;
+    }
+    .sync-group .btn-sync {
+        border-radius: var(--radius) 0 0 var(--radius);
+        padding: 11px 30px;
+        min-width: 148px;
         font-size: 13px;
         font-weight: 600;
         letter-spacing: .06em;
+    }
+    .btn-sync-caret {
+        padding: 11px 11px;
+        border-radius: 0 var(--radius) var(--radius) 0;
+        border-left-color: rgba(127, 127, 127, .45);
+        font-size: 13px;
+    }
+    .btn-sync-caret svg {
+        display: block;
+        transition: transform 160ms ease;
+    }
+    .btn-sync-caret[aria-expanded="true"] svg { transform: rotate(180deg); }
+    .btn-sync-caret[aria-expanded="true"] { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+    /* ---------- 下拉菜单（向下展开） ---------- */
+    .sync-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 8px);
+        min-width: 208px;
+        max-height: 50vh;
+        overflow-y: auto;
+        padding: 5px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        box-shadow: var(--shadow);
+        z-index: 60;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 140ms ease;
+    }
+    .sync-menu.open { opacity: 1; visibility: visible; }
+
+    .sync-menu-item {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1px;
+        width: 100%;
+        padding: 8px 10px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--text);
+        font-family: var(--font-sans);
+        font-size: 12.5px;
+        font-weight: 500;
+        letter-spacing: .02em;
+        line-height: 1.4;
+        text-align: left;
+        cursor: pointer;
+        transition: background var(--transition);
+    }
+    .sync-menu-item:hover:not(:disabled) { background: rgba(127, 127, 127, .13); }
+    .sync-menu-item:focus-visible {
+        outline: none;
+        background: rgba(127, 127, 127, .13);
+        box-shadow: inset 0 0 0 1px var(--text-tertiary);
+    }
+    .sync-menu-item:disabled { opacity: .42; cursor: not-allowed; }
+    .sync-menu-hint {
+        font-size: 10.5px;
+        font-weight: 400;
+        color: var(--text-tertiary);
+        letter-spacing: .02em;
     }
 
     /* ---------- 弹窗 ---------- */
@@ -315,13 +392,13 @@
 
     .modal {
         width: 100%;
-        max-width: 460px;
+        max-width: 600px;
         max-height: 88vh;
         overflow: auto;
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 6px;
-        padding: 18px;
+        padding: 20px;
         box-shadow: var(--shadow);
         transform: translateY(10px) scale(.985);
         transition: transform 180ms cubic-bezier(.2, .8, .3, 1);
@@ -454,6 +531,9 @@
         background: rgba(229, 72, 77, .10);
         border-color: rgba(229, 72, 77, .34);
     }
+    [data-theme="dark"] .btn-sync-caret { border-left-color: rgba(16, 16, 19, .30); }
+    [data-theme="dark"] .sync-menu-item:hover:not(:disabled) { background: rgba(255, 255, 255, .08); }
+    [data-theme="dark"] .sync-menu-item:focus-visible { background: rgba(255, 255, 255, .08); }
 
     /* ---------- 减少动态效果 ---------- */
     @media (prefers-reduced-motion: reduce) {
@@ -474,8 +554,19 @@
         /* iOS 在输入框字号小于 16px 时聚焦会自动放大页面，移动端必须保持 16px */
         .editor { font-size: 16px; padding: 12px 13px; line-height: 1.7; }
         .footer { gap: 10px; }
-        .btn-sync { flex: 1 1 100%; min-width: 0; padding: 12px 20px; }
+
+        .sync-group { flex: 1 1 100%; }
+        .sync-group .btn-sync {
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 12px 20px;
+        }
+        .btn-sync-caret { padding: 12px 15px; }
+        .sync-menu { min-width: 100%; }
+
         .preview-body { max-height: 18vh; }
+        .modal { padding: 16px; }
+        .app.menu-open { padding-bottom: 160px; }
     }
 </style>
 </head>
@@ -499,7 +590,11 @@ placeholder="在这里输入临时内容……
 · 云端为空 → 上传本地内容
 · 本地空白或未改动 → 拉取云端内容
 · 两边都有不同内容 → 弹窗让你选择保留哪一份
-· 两边内容相同 → 什么都不做"></textarea>
+· 两边内容相同 → 什么都不做
+
+右侧下拉箭头提供「上传 / 下载」：
+· 上传 → 先核对云端，不一致时弹窗确认再覆盖
+· 下载 → 先核对云端，不一致时弹窗确认再覆盖"></textarea>
 
     <div class="resize-handle" id="resizeHandle" role="separator" aria-orientation="horizontal"
          tabindex="0" title="拖拽调整高度，双击恢复默认" aria-label="拖拽调整文本框高度"></div>
@@ -509,7 +604,28 @@ placeholder="在这里输入临时内容……
             <span class="meta" id="metaText">0 字符 · 0 行</span>
             <span class="meta" id="cloudMeta"></span>
         </div>
-        <button class="btn primary btn-sync" id="syncBtn" type="button">云同步</button>
+
+        <div class="sync-group">
+            <button class="btn primary btn-sync" id="syncBtn" type="button">云同步</button>
+            <button class="btn primary btn-sync-caret" id="syncCaret" type="button"
+                    aria-haspopup="menu" aria-expanded="false" aria-controls="syncMenu"
+                    title="更多同步方式：上传 / 下载" aria-label="更多同步方式">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+
+            <div class="sync-menu" id="syncMenu" role="menu" aria-label="更多同步方式">
+                <button class="sync-menu-item" id="uploadBtn" type="button" role="menuitem">
+                    上传
+                    <span class="sync-menu-hint">以本地覆盖云端（先核对）</span>
+                </button>
+                <button class="sync-menu-item" id="downloadBtn" type="button" role="menuitem">
+                    下载
+                    <span class="sync-menu-hint">以云端覆盖本地（先核对）</span>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -519,7 +635,7 @@ placeholder="在这里输入临时内容……
         <div class="modal-head">
             <div>
                 <div class="modal-title" id="conflictTitle">内容不一致</div>
-                <div class="modal-sub">云端和本地都有内容，且互不相同。请选择保留哪一份，另一份会被覆盖。</div>
+                <div class="modal-sub" id="conflictSub">云端和本地都有内容，且互不相同。请选择保留哪一份，另一份会被覆盖。</div>
             </div>
         </div>
 
@@ -570,6 +686,10 @@ placeholder="在这里输入临时内容……
     const editor          = $('editor');
     const resizeHandle    = $('resizeHandle');
     const syncBtn         = $('syncBtn');
+    const syncCaret       = $('syncCaret');
+    const syncMenu        = $('syncMenu');
+    const uploadBtn       = $('uploadBtn');
+    const downloadBtn     = $('downloadBtn');
     const metaText        = $('metaText');
     const cloudMeta       = $('cloudMeta');
     const syncState       = $('syncState');
@@ -668,6 +788,8 @@ placeholder="在这里输入临时内容……
     function setBusy(on) {
         syncBtn.disabled = on;
         syncBtn.textContent = on ? '同步中…' : '云同步';
+        uploadBtn.disabled = on;
+        downloadBtn.disabled = on;
     }
 
     /* UTF-8 字节数（中文按 3 字节计） */
@@ -990,6 +1112,18 @@ placeholder="在这里输入临时内容……
     }
 
     /* ============================================================
+       中断就绪请求并作废其缓存（正式同步前调用）
+       ============================================================ */
+    function cancelReady() {
+        readyCloud = null;
+        syncSeq++;
+        if (readyAbort) {
+            try { readyAbort.abort(); } catch (e) { /* 忽略 */ }
+            readyAbort = null;
+        }
+    }
+
+    /* ============================================================
        核心：一次同步 = 自动判断该拉还是该推
        ============================================================ */
     async function doSync() {
@@ -1028,7 +1162,7 @@ placeholder="在这里输入临时内容……
                 readyCloud = null;
                 syncSeq++;
                 pendingCloud = { text: rc.text, time: rc.time };
-                openConflict(rc.text, local, rc.time);
+                openConflict(rc.text, local, rc.time, 'sync');
                 setState('off', '待选择');
                 return;
             }
@@ -1052,12 +1186,7 @@ placeholder="在这里输入临时内容……
         }
 
         /* 完整同步逻辑：中断就绪请求，丢弃可能已过期的就绪数据 */
-        readyCloud = null;
-        syncSeq++;
-        if (readyAbort) {
-            try { readyAbort.abort(); } catch (e) { /* 忽略 */ }
-            readyAbort = null;
-        }
+        cancelReady();
 
         busy = true;
         setBusy(true);
@@ -1120,7 +1249,7 @@ placeholder="在这里输入临时内容……
 
             /* ⑤ 双方都改动过 —— 无法自动判断，交给用户 */
             pendingCloud = { text: cloudText, time: cloudTime };
-            openConflict(cloudText, local, cloudTime);
+            openConflict(cloudText, local, cloudTime, 'sync');
             setState('off', '待选择');
 
         } catch (err) {
@@ -1131,6 +1260,152 @@ placeholder="在这里输入临时内容……
             setBusy(false);
         }
     }
+
+    /* ============================================================
+       手动上传 / 下载：强制先核对云端，不一致时交由用户确认
+       ============================================================ */
+    async function doTransfer(intent) {
+        if (busy) return;
+        closeMenu();
+
+        const isUpload = intent === 'upload';
+
+        cancelReady();
+
+        busy = true;
+        setBusy(true);
+        setState('busy', '核对云端…');
+
+        try {
+            const local     = editor.value;
+            const remote    = await pullRemote();
+            const cloudText = (remote && typeof remote.text === 'string') ? remote.text : '';
+            const cloudTime = (remote && Number(remote.updatedAt)) || 0;
+
+            const localEmpty = local.trim() === '';
+            const cloudEmpty = cloudText.trim() === '';
+
+            cloudHasContent = !cloudEmpty;
+            if (cloudTime) cloudUpdatedAt = cloudTime;
+            else if (cloudEmpty) cloudUpdatedAt = 0;
+            renderMeta();
+
+            /* ① 完全一致 —— 无需任何写入 */
+            if (local === cloudText) {
+                baseline = local;
+                dirty = false;
+                renderMeta();
+                setState('ok', '已同步');
+                toast(cloudEmpty
+                    ? '云端与本地均无内容'
+                    : '云端与本地内容一致，无需' + (isUpload ? '上传' : '下载'));
+                return;
+            }
+
+            /* ② 上传：云端为空，直接推送 */
+            if (isUpload && cloudEmpty) {
+                await pushRemote(local);
+                markSynced(local);
+                toast('已上传到云端');
+                return;
+            }
+
+            /* ③ 下载：云端为空，无可下载内容，不做任何改动 */
+            if (!isUpload && cloudEmpty) {
+                cloudUpdatedAt = 0;
+                renderMeta();
+                setState('ok', '云端为空');
+                toast('云端暂无内容，未做任何改动');
+                return;
+            }
+
+            /* ④ 下载且本地空白 —— 直接应用云端内容 */
+            if (!isUpload && localEmpty) {
+                applyRemote(cloudText, cloudTime, '已从云端下载内容');
+                return;
+            }
+
+            /* ⑤ 其余情况（含上传时本地为空）—— 一律弹窗确认，
+               避免意外覆盖任何一端 */
+            pendingCloud = { text: cloudText, time: cloudTime };
+            openConflict(cloudText, local, cloudTime, intent);
+            setState('off', '待选择');
+
+        } catch (err) {
+            setState('err', '同步失败');
+            toast(describeError(err));
+        } finally {
+            busy = false;
+            setBusy(false);
+        }
+    }
+
+    /* ============================================================
+       下拉菜单
+       ============================================================ */
+    function openMenu() {
+        if (syncMenu.classList.contains('open')) return;
+        syncMenu.classList.add('open');
+        syncCaret.setAttribute('aria-expanded', 'true');
+        if (appEl) appEl.classList.add('menu-open');
+        /* 打开后把焦点交给第一项，便于键盘操作 */
+        setTimeout(function () {
+            if (!syncMenu.classList.contains('open')) return;
+            const first = uploadBtn.disabled ? downloadBtn : uploadBtn;
+            try { first.focus(); } catch (e) { /* 忽略 */ }
+        }, 0);
+    }
+
+    function closeMenu() {
+        if (!syncMenu.classList.contains('open')) return;
+        syncMenu.classList.remove('open');
+        syncCaret.setAttribute('aria-expanded', 'false');
+        if (appEl) appEl.classList.remove('menu-open');
+    }
+
+    syncCaret.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (syncMenu.classList.contains('open')) closeMenu();
+        else openMenu();
+    });
+
+    syncCaret.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            openMenu();
+        }
+    });
+
+    /* 点击菜单之外的地方关闭 */
+    document.addEventListener('click', function (e) {
+        if (!syncMenu.classList.contains('open')) return;
+        if (syncMenu.contains(e.target) || syncCaret.contains(e.target)) return;
+        closeMenu();
+    });
+
+    /* 菜单内键盘导航 */
+    syncMenu.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            e.stopPropagation();
+            closeMenu();
+            try { syncCaret.focus(); } catch (err) { /* 忽略 */ }
+            return;
+        }
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+
+        const items = [uploadBtn, downloadBtn].filter(function (b) { return !b.disabled; });
+        if (!items.length) return;
+
+        e.preventDefault();
+        const i = items.indexOf(document.activeElement);
+        let next;
+        if (e.key === 'ArrowDown') next = items[(i + 1 + items.length) % items.length];
+        else next = items[(i - 1 + items.length) % items.length];
+        try { next.focus(); } catch (err) { /* 忽略 */ }
+    });
+
+    uploadBtn.addEventListener('click', function () { doTransfer('upload'); });
+    downloadBtn.addEventListener('click', function () { doTransfer('download'); });
 
     /* ============================================================
        冲突弹窗
@@ -1152,7 +1427,27 @@ placeholder="在这里输入临时内容……
         $('useLocalBtn').textContent = on ? '上传中…' : '用本地覆盖云端';
     }
 
-    function openConflict(cloudText, localText, ts) {
+    /* intent: 'sync' | 'upload' | 'download'
+       —— 只影响弹窗里的说明文字与主按钮高亮，不限制用户的最终选择 */
+    function openConflict(cloudText, localText, ts, intent) {
+        const useCloudBtn = $('useCloudBtn');
+        const useLocalBtn = $('useLocalBtn');
+        const subEl = $('conflictSub');
+
+        if (intent === 'download') {
+            subEl.textContent = '下载前核对发现云端与本地内容不同。选择「用云端覆盖本地」将按你的意图下载，另一份会被覆盖。';
+            useCloudBtn.classList.add('primary');
+            useLocalBtn.classList.remove('primary');
+        } else if (intent === 'upload') {
+            subEl.textContent = '上传前核对发现云端与本地内容不同。选择「用本地覆盖云端」将按你的意图上传，另一份会被覆盖。';
+            useLocalBtn.classList.add('primary');
+            useCloudBtn.classList.remove('primary');
+        } else {
+            subEl.textContent = '云端和本地都有内容，且互不相同。请选择保留哪一份，另一份会被覆盖。';
+            useLocalBtn.classList.add('primary');
+            useCloudBtn.classList.remove('primary');
+        }
+
         $('cloudTime').textContent = ts
             ? '· 更新于 ' + fmtTime(ts) + '（' + fmtRelative(ts) + '）'
             : '';
@@ -1294,7 +1589,16 @@ placeholder="在这里输入临时内容……
     });
 
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && conflictOverlay.classList.contains('open')) {
+        if (e.key !== 'Escape') return;
+
+        /* 菜单优先关闭 */
+        if (syncMenu.classList.contains('open')) {
+            closeMenu();
+            try { syncCaret.focus(); } catch (err) { /* 忽略 */ }
+            return;
+        }
+
+        if (conflictOverlay.classList.contains('open')) {
             pendingCloud = null;
             closeConflict();
             setState('off', '未同步');
