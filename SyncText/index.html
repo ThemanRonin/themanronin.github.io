@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SyncText</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M 6 2 C 5.4777778 2 4.9453899 2.1913289 4.5683594 2.5683594 C 4.1913289 2.9453899 4 3.4777778 4 4 L 4 20 C 4 20.522222 4.1913289 21.05461 4.5683594 21.431641 C 4.9453899 21.808671 5.4777778 22 6 22 L 18 22 C 18.522222 22 19.05461 21.808671 19.431641 21.431641 C 19.808671 21.05461 20 20.522222 20 20 L 20 7.9863281 L 14.013672 2 L 6 2 z M 6 4 L 13 4 L 13 9 L 18 9 L 18 20 L 6 20 L 6 4 z M 8 12 L 8 14 L 16 14 L 16 12 L 8 12 z M 8 16 L 8 18 L 16 18 L 16 16 L 8 16 z'></path></svg>">
 <script>
     (function () {
         try {
@@ -516,6 +517,9 @@ placeholder="在这里输入临时内容……
     let busy           = false;
     let cloudUpdatedAt = 0;      // 云端记录的最后更新时间戳
     let pendingCloud   = null;   // 冲突待决时暂存的云端内容
+    let readyCloud     = null;   // 进入页面时后台拉取的云端内容（就绪态，尚未应用）
+    let syncSeq        = 0;      // 正式同步次数，用于丢弃过期的就绪数据
+    let conflictTimer  = null;   // 冲突弹窗打开时刷新相对时间的定时器
 
     /* ============================================================
        小工具
@@ -540,6 +544,24 @@ placeholder="在这里输入临时内容……
                ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
     }
 
+    /* 相对时间：根据 elapsed 自动选择 秒 / 分 / 时 / 天 / 月 / 年 */
+    function fmtRelative(ts) {
+        if (!ts) return '';
+        const diff = Date.now() - ts;
+        if (diff < 10000) return '刚刚';
+        const sec = Math.floor(diff / 1000);
+        if (sec < 60) return sec + ' 秒前';
+        const min = Math.floor(sec / 60);
+        if (min < 60) return min + ' 分钟前';
+        const hour = Math.floor(min / 60);
+        if (hour < 24) return hour + ' 小时前';
+        const day = Math.floor(hour / 24);
+        if (day < 30) return day + ' 天前';
+        const month = Math.floor(day / 30);
+        if (month < 12) return month + ' 个月前';
+        return Math.floor(month / 12) + ' 年前';
+    }
+
     function setState(kind, text) {
         syncState.dataset.state = kind;
         syncState.textContent = text;
@@ -550,11 +572,34 @@ placeholder="在这里输入临时内容……
         syncBtn.textContent = on ? '同步中…' : '云同步';
     }
 
+    /* UTF-8 字节数（中文按 3 字节计） */
+    function byteLength(text) {
+        try {
+            return new TextEncoder().encode(text).length;
+        } catch (e) {
+            try {
+                return new Blob([text]).size;
+            } catch (e2) {
+                return text.length;
+            }
+        }
+    }
+
+    /* 文本大小：默认以 KB 为单位，超过 1 MB 自动切换为 MB */
+    function formatSize(bytes) {
+        if (bytes < 1024) {
+            const kb = (bytes / 1024).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+            return kb + ' KB';
+        }
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(2) + ' MB';
+    }
+
     function renderMeta() {
         const v = editor.value;
         const chars = v.length;
         const lines = v ? v.split(/\r?\n/).length : 0;
-        metaText.textContent = chars + ' 字符 · ' + lines + ' 行';
+        metaText.textContent = chars + ' 字符 · ' + lines + ' 行 · ' + formatSize(byteLength(v));
         cloudMeta.textContent = cloudUpdatedAt
             ? '云端更新于 ' + fmtTime(cloudUpdatedAt)
             : '云端尚无记录';
@@ -694,6 +739,34 @@ placeholder="在这里输入临时内容……
        ============================================================ */
     async function doSync() {
         if (busy) return;
+
+        /* 快路径：进入页面时已完成云端就绪，且用户未改动文本
+           → 直接应用就绪的云端内容，省去一次网络请求 */
+        if (readyCloud !== null && !dirty) {
+            const rc = readyCloud;
+            readyCloud = null;
+            syncSeq++;
+
+            if (editor.value === rc.text) {
+                baseline = editor.value;
+                dirty = false;
+                if (rc.time) cloudUpdatedAt = rc.time;
+                renderMeta();
+                setState('ok', '已同步');
+                toast(rc.text.trim() === '' ? '云端与本地均无内容' : '内容已一致，无需同步');
+                return;
+            }
+
+            applyRemote(rc.text, rc.time);
+            setState('ok', '已同步');
+            toast(rc.text.trim() === '' ? '云端暂无内容' : '已从云端载入内容');
+            return;
+        }
+
+        /* 完整同步逻辑：就绪数据可能已过期，丢弃后按既有规则处理 */
+        readyCloud = null;
+        syncSeq++;
+
         busy = true;
         setBusy(true);
         setState('busy', '同步中…');
@@ -777,13 +850,26 @@ placeholder="在这里输入临时内容……
        冲突弹窗
        ============================================================ */
     function openConflict(cloudText, localText, ts) {
-        $('cloudTime').textContent = ts ? '· 更新于 ' + fmtTime(ts) : '';
+        $('cloudTime').textContent = ts
+            ? '· 更新于 ' + fmtTime(ts) + '（' + fmtRelative(ts) + '）'
+            : '';
         $('cloudPreview').textContent = previewText(cloudText);
         $('localPreview').textContent = previewText(localText);
         conflictOverlay.classList.add('open');
+
+        /* 弹窗停留期间每秒刷新相对时间，保持“多久之前”准确 */
+        clearInterval(conflictTimer);
+        if (ts) {
+            conflictTimer = setInterval(function () {
+                $('cloudTime').textContent =
+                    '· 更新于 ' + fmtTime(ts) + '（' + fmtRelative(ts) + '）';
+            }, 1000);
+        }
     }
 
     function closeConflict() {
+        clearInterval(conflictTimer);
+        conflictTimer = null;
         conflictOverlay.classList.remove('open');
     }
 
@@ -871,6 +957,40 @@ placeholder="在这里输入临时内容……
     try {
         if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) editor.focus();
     } catch (e) { /* 忽略 */ }
+
+    /* ============================================================
+       进入页面即后台就绪：立即拉取一次云端内容，仅缓存、不覆盖
+       文本框，状态置为「已就绪」。用户此时点击云同步可直接应用
+       缓存内容，无需再次请求；若用户已改动文本，或期间发生过
+       正式同步（如 Ctrl+Enter），则丢弃本次结果，点击时按既有
+       完整逻辑处理。
+       ============================================================ */
+    (function initReady() {
+        syncBtn.disabled = true;
+        setState('busy', '就绪中…');
+
+        pullRemote()
+            .then(function (remote) {
+                /* 期间用户已触发过正式同步 → 本次结果已过期 */
+                if (syncSeq !== 0) return;
+
+                const cloudText = (remote && typeof remote.text === 'string') ? remote.text : '';
+                const cloudTime = (remote && Number(remote.updatedAt)) || 0;
+
+                readyCloud = { text: cloudText, time: cloudTime };
+                cloudUpdatedAt = cloudTime;
+                renderMeta();
+                setState('ok', '已就绪');
+            })
+            .catch(function () {
+                /* 就绪失败不打扰用户，保持未同步，点击时走完整逻辑 */
+                if (syncSeq !== 0) return;
+                setState('off', '未同步');
+            })
+            .then(function () {
+                if (!busy) syncBtn.disabled = false;
+            });
+    })();
 })();
 
 /* ============ 主题切换：与站内其他页面共用 cipher_theme_v2 ============ */
