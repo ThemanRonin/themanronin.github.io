@@ -590,7 +590,7 @@
     .sync-compare-row {
         display: flex;
         align-items: baseline;
-        justify-content: space-between;
+        justify-content: flex-start;
         gap: 10px;
         padding: 4px 0;
     }
@@ -602,6 +602,7 @@
         color: var(--text-tertiary);
         text-transform: uppercase;
         flex-shrink: 0;
+        width: 46px;
         font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
     .sync-compare-value {
@@ -610,9 +611,23 @@
         font-weight: 700;
         letter-spacing: 0;
         color: var(--text);
-        text-align: right;
+        text-align: left;
+        flex-shrink: 0;
     }
     .sync-compare-value.is-pending { color: var(--text-tertiary); font-weight: 500; }
+    .sync-compare-time {
+        margin-left: auto;
+        min-width: 0;
+        font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 11px;
+        letter-spacing: .02em;
+        color: var(--text-tertiary);
+        text-align: right;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .sync-compare-time.is-error { color: var(--danger); }
 
     /* ---------- 导出 / 备份 ---------- */
     .export-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
@@ -762,6 +777,8 @@
         .today-daynum { font-size: 38px; }
         .today-hero { gap: 12px; }
         .upcoming-row { grid-template-columns: 52px 34px minmax(0, 1fr); }
+
+        .sync-compare-time { font-size: 10px; }
     }
 
     @media (max-width: 380px) {
@@ -911,15 +928,16 @@
             <div class="sync-compare-row">
                 <span class="sync-compare-label">云端</span>
                 <span class="sync-compare-value is-pending" id="syncCloudCount">查询中…</span>
+                <span class="sync-compare-time" id="syncCloudTime"></span>
             </div>
             <div class="sync-compare-row">
                 <span class="sync-compare-label">本地</span>
                 <span class="sync-compare-value" id="syncLocalCount">—</span>
+                <span class="sync-compare-time" id="syncLocalTime"></span>
             </div>
         </div>
 
-        <div class="import-hint" id="syncCloudMeta">正在查询云端数据…</div>
-        <div class="import-hint" id="syncMetaHint" style="margin-top:6px">尚未同步</div>
+        <div class="import-hint" id="syncMetaHint">尚未同步</div>
 
         <div class="import-hint" style="margin-top:8px">上传会用本机数据整体替换云端；下载会用云端数据整体覆盖本机。上传 / 下载直接使用本次查询到的云端数据，不会重复读取；如需获取最新云端数据，请点「刷新」。</div>
 
@@ -1041,6 +1059,7 @@
     const DEFAULT_KEY = 'shift_calendar_default_v1';
     const INVERT_KEY = 'shift_calendar_invert_v1';
     const BACKUP_KEY = 'shift_calendar_backup_v1';
+    const LOCAL_META_KEY = 'shift_calendar_local_meta_v1';
     const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
     /* 统计周期：上月 26 号 ~ 本月 25 号（含首尾，覆盖本月 1 号所在周期） */
@@ -1297,6 +1316,18 @@
         return out;
     }
 
+    /* 两个排班表是否完全一致（键集合与班次值都相同） */
+    function storeEqual(a, b) {
+        const ka = Object.keys(a);
+        const kb = Object.keys(b);
+        if (ka.length !== kb.length) return false;
+        for (let i = 0; i < ka.length; i++) {
+            const k = ka[i];
+            if (!Object.prototype.hasOwnProperty.call(b, k) || a[k] !== b[k]) return false;
+        }
+        return true;
+    }
+
     function loadStore() {
         try {
             const raw = localStorage.getItem(STORE_KEY);
@@ -1307,11 +1338,36 @@
         }
     }
 
-    function saveStore() {
+    /* 本地数据最后修改时间（用于判断本地是否被修改 / 覆盖） */
+    function loadLocalMeta() {
         try {
-            localStorage.setItem(STORE_KEY, JSON.stringify(store));
+            const raw = localStorage.getItem(LOCAL_META_KEY);
+            if (!raw) return { modifiedAt: 0 };
+            const m = JSON.parse(raw);
+            return { modifiedAt: Number(m && m.modifiedAt) || 0 };
+        } catch (e) {
+            return { modifiedAt: 0 };
+        }
+    }
+
+    function saveLocalMeta() {
+        try { localStorage.setItem(LOCAL_META_KEY, JSON.stringify(localMeta)); } catch (e) { /* 忽略 */ }
+    }
+
+    function saveStore() {
+        const json = JSON.stringify(store);
+        try {
+            localStorage.setItem(STORE_KEY, json);
         } catch (e) {
             showToast('本地保存失败，请尽快导出备份');
+            return;
+        }
+        /* 只有内容真的发生变化时才更新本地修改时间 */
+        if (json !== lastSavedStoreJson) {
+            lastSavedStoreJson = json;
+            localMeta.modifiedAt = Date.now();
+            saveLocalMeta();
+            renderLocalTime();
         }
     }
 
@@ -1423,20 +1479,53 @@
             : '尚未同步';
     }
 
-    /* 云端 meta 显示状态，供定时刷新时间差使用 */
-    let syncCloudMetaState = { type: 'idle', ts: 0, text: '' };
+    /* 云端行状态：type = 'idle' | 'time' | 'text' */
+    let syncCloudState = { type: 'idle', ts: 0, text: '', isError: false, title: '' };
 
-    function setCloudMetaText(text) {
-        syncCloudMetaState = { type: 'text', ts: 0, text: text };
-        $('syncCloudMeta').textContent = text;
+    function renderCloudTime() {
+        const el = $('syncCloudTime');
+        if (!el) return;
+        if (syncCloudState.type === 'time' && syncCloudState.ts) {
+            el.textContent = formatTsWithAgo(syncCloudState.ts);
+            el.title = '云端最后更新：' + formatTs(syncCloudState.ts);
+            el.classList.remove('is-error');
+        } else if (syncCloudState.type === 'text') {
+            el.textContent = syncCloudState.text || '';
+            el.classList.toggle('is-error', !!syncCloudState.isError);
+            el.title = syncCloudState.title || '';
+        } else {
+            el.textContent = '';
+            el.classList.remove('is-error');
+            el.title = '';
+        }
     }
+
+    function setCloudMetaText(text, isError, title) {
+        syncCloudState = { type: 'text', ts: 0, text: text || '', isError: !!isError, title: title || '' };
+        renderCloudTime();
+    }
+
     function setCloudMetaTime(ts) {
-        syncCloudMetaState = { type: 'time', ts: ts, text: '' };
-        $('syncCloudMeta').textContent = '云端最后更新：' + formatTsWithAgo(ts);
+        syncCloudState = { type: 'time', ts: ts, text: '', isError: false, title: '' };
+        renderCloudTime();
     }
+
     function refreshCloudMeta() {
-        if (syncCloudMetaState.type === 'time' && syncCloudMetaState.ts) {
-            $('syncCloudMeta').textContent = '云端最后更新：' + formatTsWithAgo(syncCloudMetaState.ts);
+        if (syncCloudState.type === 'time' && syncCloudState.ts) {
+            renderCloudTime();
+        }
+    }
+
+    /* 本地行时间显示 */
+    function renderLocalTime() {
+        const el = $('syncLocalTime');
+        if (!el) return;
+        if (localMeta.modifiedAt) {
+            el.textContent = formatTsWithAgo(localMeta.modifiedAt);
+            el.title = '本地数据最后修改：' + formatTs(localMeta.modifiedAt);
+        } else {
+            el.textContent = '尚无修改';
+            el.title = '';
         }
     }
 
@@ -1448,6 +1537,7 @@
             if (!syncOverlay.classList.contains('open')) return;
             renderSyncMeta();
             refreshCloudMeta();
+            renderLocalTime();
         }, 1000);
     }
     function stopSyncMetaTimer() {
@@ -1552,6 +1642,7 @@
 
     function renderLocalCount() {
         setCompareValue($('syncLocalCount'), Object.keys(store).length + ' 条', false);
+        renderLocalTime();
     }
 
     /* 打开弹窗时（或点「刷新」时）查询云端，并把结果缓存起来 */
@@ -1561,14 +1652,14 @@
         if (!syncConfigured()) {
             syncCache = null;
             setCompareValue($('syncCloudCount'), '—', true);
-            setCloudMetaText('源码中没有可用的云端配置，无法连接。');
+            setCloudMetaText('未配置', true);
             setSyncButtonsDisabled(true);
             return;
         }
 
         syncCache = null;
         setCompareValue($('syncCloudCount'), '查询中…', true);
-        setCloudMetaText('正在查询云端数据…');
+        setCloudMetaText('');
         setSyncButtonsDisabled(true);
 
         const t = requestSignal();
@@ -1587,17 +1678,18 @@
 
             setCompareValue($('syncCloudCount'), count + ' 条', false);
             if (!count) {
-                setCloudMetaText('云端暂时没有排班数据，上传后即可在其他设备下载。');
+                setCloudMetaText('暂无数据');
             } else if (ts) {
                 setCloudMetaTime(ts);
             } else {
-                setCloudMetaText('云端已有排班数据。');
+                setCloudMetaText('—');
             }
             setSyncButtonsDisabled(false);
         } catch (e) {
             syncCache = null;
-            setCompareValue($('syncCloudCount'), '查询失败', true);
-            setCloudMetaText('云端查询失败：' + netErrorText(e));
+            setCompareValue($('syncCloudCount'), '—', true);
+            setCloudMetaText('查询失败', true, '云端查询失败：' + netErrorText(e));
+            setSyncStatus('云端查询失败：' + netErrorText(e), true);
             setSyncButtonsDisabled(false);
         } finally {
             t.done();
@@ -1693,6 +1785,13 @@
             return;
         }
 
+        /* 内容完全一致时不再走覆盖流程，直接提示无需下载 */
+        if (storeEqual(store, syncCache.remoteStore)) {
+            setSyncStatus('云端与本机数据一致，无需下载', false);
+            showToast('数据一致，无需下载');
+            return;
+        }
+
         const remoteTs = syncCache.remoteTs;
         const localCount = Object.keys(store).length;
 
@@ -1722,6 +1821,7 @@
         syncOverlay.classList.add('open');
         syncBodyLock();
         renderSyncMeta();
+        renderLocalTime();
         setSyncStatus('');
         $('syncClose').focus();
         startSyncMetaTimer();
@@ -1766,6 +1866,8 @@
        状态
        ============================================================ */
     let store = loadStore();
+    let localMeta = loadLocalMeta();
+    let lastSavedStoreJson = JSON.stringify(store);
     let defaultEnabled = loadDefaultEnabled();
     let inverted = loadInverted();
     const _now = new Date();
@@ -2765,6 +2867,7 @@
        ============================================================ */
     updateSyncBadge();
     renderSyncMeta();
+    renderLocalTime();
     render();
 
     /* 页面常开跨天时刷新「今日」面板、今日高亮与未来 7 天 */
