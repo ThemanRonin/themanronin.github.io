@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webhook 发送器</title>
+<script>
+    /* 在样式生效前确定主题，避免深色模式下的白屏闪烁；存储键与站内其他页面保持一致。 */
+    (function () {
+        try {
+            var t = localStorage.getItem('cipher_theme_v2');
+            if (t === 'dark' || t === 'light') { document.documentElement.setAttribute('data-theme', t); return; }
+        } catch (e) { /* localStorage 不可用时忽略 */ }
+        try {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        } catch (e) { /* 忽略 */ }
+    })();
+</script>
+<style>
+    :root {
+        --bg: #fafafa;
+        --surface: #fff;
+        --text: #1a1a1a;
+        --text-secondary: #6e6e6e;
+        --text-tertiary: #999;
+        --border: #e0e0e0;
+        --border-light: #eee;
+        --accent: #1a1a1a;
+        --accent-hover: #3a3a3a;
+        --danger: #c0392b;
+        --ok: #237a38;
+        --radius: 4px;
+        --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', 'Menlo', monospace;
+        --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        --transition: 120ms ease;
+        color-scheme: light;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: var(--font-sans);
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 40px 16px 60px;
+    }
+
+    .container { width: 100%; max-width: 820px; min-width: 0; }
+
+    /* ---------- 顶部标题 ---------- */
+    .header { margin-bottom: 36px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .header-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+    .header-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text); flex-shrink: 0; }
+    .header-subtitle { font-size: 12px; color: var(--text-tertiary); }
+    .dtp-theme-toggle { align-self: center; margin-left: auto; padding: 6px 12px; font-size: 11px; }
+
+    /* ---------- 分区标签 ---------- */
+    .section-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-tertiary);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
+
+    /* ---------- 按钮 ---------- */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 16px;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        transition: all var(--transition);
+        font-family: var(--font-sans);
+        white-space: nowrap;
+        outline: none;
+        user-select: none;
+    }
+    .btn:hover { background: #f4f4f4; border-color: #c0c0c0; }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn.small { padding: 5px 10px; font-size: 11px; }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn.copy-btn.copied { background: #f0faf0; border-color: #b7d9b7; color: #2d6a2d; pointer-events: none; }
+
+    /* ---------- 布局工具类 ---------- */
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .row-between { justify-content: space-between; }
+    .gap-sm { gap: 8px; }
+    .mt-sm { margin-top: 10px; }
+    .mt-md { margin-top: 22px; }
+    .mb-sm { margin-bottom: 8px; }
+    .note { font-size: 11px; color: var(--text-tertiary); letter-spacing: 0.02em; }
+    .note b { font-family: var(--font-mono); font-weight: 700; color: var(--text); }
+
+    kbd {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        padding: 1px 4px;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        background: var(--surface);
+        color: var(--text-secondary);
+    }
+
+    /* ---------- 表单 ---------- */
+    .field { margin-bottom: 14px; }
+    .field:last-child { margin-bottom: 0; }
+
+    .field-label {
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+    }
+    .field-hint { font-weight: 400; color: var(--text-tertiary); font-size: 11px; }
+
+    .input, textarea {
+        width: 100%;
+        padding: 9px 12px;
+        font-size: 13px;
+        font-family: var(--font-mono);
+        color: var(--text);
+        background: #f9f9f9;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        outline: none;
+        transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
+    .input:hover, textarea:hover { border-color: #c0c0c0; }
+    .input:focus, textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px rgba(26, 26, 26, 0.08);
+    }
+
+    textarea {
+        min-height: 118px;
+        line-height: 1.7;
+        resize: vertical;
+        font-family: var(--font-sans);
+    }
+
+    .preview {
+        margin-top: 12px;
+        padding: 8px 10px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        line-height: 1.6;
+        color: var(--text-tertiary);
+        background: var(--surface);
+        border: 1px dashed var(--border);
+        border-radius: var(--radius);
+        word-break: break-all;
+    }
+
+    /* ---------- 状态徽章 ---------- */
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--text-tertiary);
+        transition: color var(--transition), border-color var(--transition);
+        white-space: nowrap;
+    }
+    .badge::before {
+        content: '';
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+        flex-shrink: 0;
+    }
+    .badge.pending { color: var(--text-tertiary); }
+    .badge.ok { color: var(--ok); border-color: #bfe0c4; }
+    .badge.err { color: var(--danger); border-color: #e8c2be; }
+
+    /* ---------- 响应结果框 ---------- */
+    .result-box {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        min-height: 96px;
+        padding: 14px;
+        background: #f9f9f9;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+    }
+
+    .result {
+        flex: 1;
+        min-width: 0;
+        margin: 0;
+        max-height: 320px;
+        overflow: auto;
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: var(--text);
+        scrollbar-width: thin;
+    }
+
+    .result.is-error { color: var(--danger); }
+    .result.is-empty { color: var(--text-tertiary); }
+
+    /* ---------- 发送记录 ---------- */
+    .hist-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 9px 0;
+        font-size: 12px;
+        border-bottom: 1px solid var(--border-light);
+    }
+    .hist-row:last-child { border-bottom: none; }
+    .hist-time { flex: none; color: var(--text-tertiary); font-family: var(--font-mono); padding-top: 1px; }
+    .hist-dot { flex: none; width: 5px; height: 5px; border-radius: 50%; margin-top: 7px; }
+    .hist-dot.ok { background: var(--ok); }
+    .hist-dot.err { background: var(--danger); }
+    .hist-msg { flex: 1; min-width: 0; color: var(--text-secondary); word-break: break-word; line-height: 1.5; }
+    .hist-ms { flex: none; color: var(--text-tertiary); font-family: var(--font-mono); padding-top: 1px; }
+
+    /* ---------- 主按钮 ---------- */
+    .btn-generate {
+        width: 100%;
+        margin-top: 24px;
+        padding: 12px 20px;
+        font-size: 13px;
+    }
+
+    ::selection { background: var(--text); color: var(--bg); }
+
+    /* ---------- 深色模式 ---------- */
+    [data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0d0d0f;
+        --surface: #17171a;
+        --text: #e9e9ec;
+        --text-secondary: #a1a1a8;
+        --text-tertiary: #71717a;
+        --border: #2c2c31;
+        --border-light: #222227;
+        --accent: #e9e9ec;
+        --accent-hover: #ffffff;
+        --danger: #e5484d;
+        --ok: #7bd88f;
+    }
+    [data-theme="dark"] .btn:hover { background: #232328; border-color: #45454d; }
+    [data-theme="dark"] .btn.primary { color: #101013; }
+    [data-theme="dark"] .btn.primary:hover { background: #ffffff; border-color: #ffffff; }
+    [data-theme="dark"] .btn.copy-btn.copied { background: #16261a; border-color: #2f5c39; color: #7bd88f; }
+    [data-theme="dark"] .input,
+    [data-theme="dark"] textarea,
+    [data-theme="dark"] .result-box { background: #1d1d21; }
+    [data-theme="dark"] .input:hover,
+    [data-theme="dark"] textarea:hover { border-color: #45454d; }
+    [data-theme="dark"] .input:focus,
+    [data-theme="dark"] textarea:focus { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14); }
+    [data-theme="dark"] .badge.ok { border-color: #2f5c39; }
+    [data-theme="dark"] .badge.err { border-color: #5c2f2f; }
+
+    @media (max-width: 600px) {
+        body { padding: 20px 10px 40px; }
+        .header { margin-bottom: 24px; }
+        .result-box { min-height: 84px; padding: 12px; }
+        .result { font-size: 12px; }
+        .btn-generate { margin-top: 18px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <span class="header-title">Webhook 发送器</span>
+        <span class="header-dot"></span>
+        <span class="header-subtitle">企业微信 · 本地请求</span>
+        <button class="btn dtp-theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色模式" aria-label="切换深色或浅色模式" aria-pressed="false">深色模式</button>
+    </div>
+
+    <!-- 请求地址 -->
+    <div class="section-label">请求地址</div>
+
+    <div class="field">
+        <label class="field-label" for="proxyUrl">代理地址 <span class="field-hint">可选，支持 {url} 占位符；留空则直连 webhook</span></label>
+        <input class="input" id="proxyUrl" type="text" spellcheck="false"
+               placeholder="https://your-proxy.example.com/api/wecom?url={url}">
+    </div>
+
+    <div class="field">
+        <label class="field-label" for="webhookUrl">Webhook 地址</label>
+        <input class="input" id="webhookUrl" type="text" spellcheck="false"
+               placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxxxx">
+    </div>
+
+    <p class="preview" id="preview">请求目标：—</p>
+
+    <!-- 消息内容 -->
+    <div class="section-label mt-md">消息内容</div>
+    <textarea id="content" placeholder="要发送的文本内容…"></textarea>
+    <p class="note mt-sm"><b id="charCount">0</b> 个字符 · <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd> 快速发送</p>
+
+    <!-- 发送按钮 -->
+    <button class="btn primary btn-generate" id="sendBtn" type="button">发送消息</button>
+
+    <!-- 响应结果 -->
+    <div class="section-label mt-md">响应结果</div>
+
+    <div class="row row-between mb-sm">
+        <div class="row gap-sm">
+            <span class="badge pending" id="status">未发送</span>
+            <span class="note" id="elapsed"></span>
+        </div>
+        <button class="btn small" id="clearBtn" type="button">清空</button>
+    </div>
+
+    <div class="result-box">
+        <pre class="result is-empty" id="output">—</pre>
+        <button class="btn small copy-btn" id="copyBtn" type="button">复制</button>
+    </div>
+
+    <!-- 发送记录 -->
+    <div class="section-label mt-md">发送记录</div>
+    <div id="history"><p class="note">暂无记录</p></div>
+</div>
+
+<script>
+/* ============ 核心算法 ============ */
+async function sendWecomWebhook(proxyUrl, webhookUrl, content) {
+  if (!webhookUrl) throw new Error('webhookUrl 不能为空');
+  if (typeof content !== 'string' || !content.trim()) throw new Error('content 不能为空');
+
+  const target = !proxyUrl
+    ? webhookUrl
+    : proxyUrl.includes('{url}')
+      ? proxyUrl.replace('{url}', encodeURIComponent(webhookUrl))
+      : proxyUrl + encodeURIComponent(webhookUrl);
+
+  const res = await fetch(target, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      msgtype: 'text',
+      text: { content }
+    })
+  });
+
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text}`);
+
+  let data;
+  try { data = JSON.parse(text); }
+  catch { throw new Error('响应非 JSON: ' + text); }
+
+  if (data.errcode !== 0) throw new Error(`errcode ${data.errcode}: ${data.errmsg || ''}`);
+  return data;
+}
+
+/* ============ 页面逻辑 ============ */
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+
+  const els = {
+    proxyUrl:   $('proxyUrl'),
+    webhookUrl: $('webhookUrl'),
+    content:    $('content'),
+    sendBtn:    $('sendBtn'),
+    clearBtn:   $('clearBtn'),
+    copyBtn:    $('copyBtn'),
+    status:     $('status'),
+    output:     $('output'),
+    preview:    $('preview'),
+    elapsed:    $('elapsed'),
+    history:    $('history'),
+    charCount:  $('charCount'),
+  };
+
+  const LS_KEY = 'wecom-webhook-tool-v2';
+
+  /* ---------- 本地记忆 ---------- */
+  const storageOK = (function () {
+    try {
+      const k = '__wh_test__';
+      localStorage.setItem(k, '1');
+      localStorage.removeItem(k);
+      return true;
+    } catch (e) { return false; }
+  })();
+
+  function persist() {
+    if (!storageOK) return;
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        proxyUrl:   els.proxyUrl.value,
+        webhookUrl: els.webhookUrl.value,
+      }));
+    } catch (e) { /* 忽略 */ }
+  }
+
+  function restore() {
+    if (!storageOK) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+      if (saved && typeof saved === 'object') {
+        if (typeof saved.proxyUrl === 'string')   els.proxyUrl.value = saved.proxyUrl;
+        if (typeof saved.webhookUrl === 'string') els.webhookUrl.value = saved.webhookUrl;
+      }
+    } catch (e) { /* 忽略 */ }
+  }
+
+  /* ---------- 目标地址预览 ---------- */
+  function buildTarget(proxyUrl, webhookUrl) {
+    if (!proxyUrl) return webhookUrl;
+    if (proxyUrl.includes('{url}')) return proxyUrl.replace('{url}', encodeURIComponent(webhookUrl));
+    return proxyUrl + encodeURIComponent(webhookUrl);
+  }
+
+  function updatePreview() {
+    const p = els.proxyUrl.value.trim();
+    const w = els.webhookUrl.value.trim();
+    els.preview.textContent = w ? '请求目标：' + buildTarget(p, w) : '请求目标：—';
+  }
+
+  els.proxyUrl.addEventListener('input', () => { updatePreview(); persist(); });
+  els.webhookUrl.addEventListener('input', () => { updatePreview(); persist(); });
+
+  /* ---------- 字符计数 ---------- */
+  function updateCharCount() {
+    els.charCount.textContent = els.content.value.length;
+  }
+  els.content.addEventListener('input', updateCharCount);
+
+  /* ---------- 状态 ---------- */
+  function setStatus(kind, text) {
+    els.status.className = 'badge ' + kind;
+    els.status.textContent = text;
+  }
+
+  /* ---------- 输出 ---------- */
+  function setOutput(text, isError) {
+    els.output.textContent = text;
+    els.output.className = 'result' + (isError ? ' is-error' : (text === '—' ? ' is-empty' : ''));
+  }
+
+  /* ---------- 历史记录 ---------- */
+  const historyItems = [];
+  const MAX_HISTORY = 20;
+
+  function truncate(str, n) {
+    const s = String(str || '').replace(/\s+/g, ' ').trim();
+    return s.length > n ? s.slice(0, n) + '…' : (s || '（空）');
+  }
+
+  function addHistory(ok, detail, content, ms) {
+    historyItems.unshift({
+      ok,
+      detail,
+      content,
+      ms,
+      time: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+    });
+    if (historyItems.length > MAX_HISTORY) historyItems.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    els.history.innerHTML = '';
+
+    if (!historyItems.length) {
+      const p = document.createElement('p');
+      p.className = 'note';
+      p.textContent = '暂无记录';
+      els.history.appendChild(p);
+      return;
+    }
+
+    historyItems.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'hist-row';
+
+      const time = document.createElement('span');
+      time.className = 'hist-time';
+      time.textContent = item.time;
+
+      const dot = document.createElement('span');
+      dot.className = 'hist-dot ' + (item.ok ? 'ok' : 'err');
+
+      const msg = document.createElement('span');
+      msg.className = 'hist-msg';
+      msg.textContent = item.ok ? truncate(item.content, 60) : item.detail;
+
+      const msEl = document.createElement('span');
+      msEl.className = 'hist-ms';
+      msEl.textContent = item.ms + ' ms';
+
+      row.append(time, dot, msg, msEl);
+      els.history.appendChild(row);
+    });
+  }
+
+  /* ---------- 发送 ---------- */
+  async function handleSend() {
+    const proxyUrl   = els.proxyUrl.value.trim();
+    const webhookUrl = els.webhookUrl.value.trim();
+    const content    = els.content.value;
+
+    if (!webhookUrl) {
+      setStatus('err', '参数错误');
+      setOutput('webhookUrl 不能为空', true);
+      return;
+    }
+    if (!content.trim()) {
+      setStatus('err', '参数错误');
+      setOutput('content 不能为空', true);
+      return;
+    }
+
+    els.sendBtn.disabled = true;
+    els.sendBtn.textContent = '发送中…';
+    els.elapsed.textContent = '';
+    setStatus('pending', '请求中…');
+    setOutput('请求中…', false);
+
+    const t0 = performance.now();
+
+    try {
+      const data = await sendWecomWebhook(proxyUrl, webhookUrl, content);
+      const ms = Math.round(performance.now() - t0);
+      setStatus('ok', '发送成功');
+      setOutput(JSON.stringify(data, null, 2), false);
+      els.elapsed.textContent = '耗时 ' + ms + ' ms';
+      addHistory(true, '发送成功', content, ms);
+    } catch (err) {
+      const ms = Math.round(performance.now() - t0);
+      const message = (err && err.message) ? err.message : String(err);
+      setStatus('err', '发送失败');
+
+      let text = message;
+      if (/Failed to fetch|NetworkError|Load failed/i.test(message)) {
+        text += '\n\n提示：这通常是跨域（CORS）或网络问题。\n' +
+                '· 浏览器直接请求 qyapi.weixin.qq.com 一般会被 CORS 拦截，需要配置代理地址；\n' +
+                '· 请确认代理已允许当前页面来源访问（Access-Control-Allow-Origin）。';
+      }
+      setOutput(text, true);
+      els.elapsed.textContent = '耗时 ' + ms + ' ms';
+      addHistory(false, message, content, ms);
+    } finally {
+      els.sendBtn.disabled = false;
+      els.sendBtn.textContent = '发送消息';
+    }
+  }
+
+  els.sendBtn.addEventListener('click', handleSend);
+
+  els.content.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (!els.sendBtn.disabled) handleSend();
+    }
+  });
+
+  /* ---------- 清空结果 ---------- */
+  els.clearBtn.addEventListener('click', () => {
+    setStatus('pending', '未发送');
+    setOutput('—', false);
+    els.elapsed.textContent = '';
+  });
+
+  /* ---------- 复制结果 ---------- */
+  let copyTimer = null;
+
+  function flashCopied() {
+    els.copyBtn.textContent = '已复制';
+    els.copyBtn.classList.add('copied');
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      els.copyBtn.textContent = '复制';
+      els.copyBtn.classList.remove('copied');
+    }, 1600);
+  }
+
+  function legacyCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* 忽略 */ }
+    document.body.removeChild(ta);
+  }
+
+  els.copyBtn.addEventListener('click', () => {
+    const text = els.output.textContent || '';
+    if (!text || text === '—') return;
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(flashCopied, () => {
+        legacyCopy(text);
+        flashCopied();
+      });
+    } else {
+      legacyCopy(text);
+      flashCopied();
+    }
+  });
+
+  /* ---------- 初始化 ---------- */
+  restore();
+  updatePreview();
+  updateCharCount();
+  setOutput('—', false);
+})();
+
+/* ============ 主题切换 ============ */
+var THEME_KEY = 'cipher_theme_v2';
+function applyTheme(theme, persist) {
+    var normalized = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', normalized);
+    var isDark = normalized === 'dark';
+    var btn = document.getElementById('themeToggle');
+    if (btn) {
+        btn.textContent = isDark ? '☀ 浅色模式' : '🌙 深色模式';
+        btn.setAttribute('aria-pressed', String(isDark));
+        btn.setAttribute('aria-label', isDark ? '切换到浅色模式' : '切换到深色模式');
+    }
+    if (persist !== false) {
+        try { localStorage.setItem(THEME_KEY, normalized); } catch (e) { /* 忽略 */ }
+    }
+}
+applyTheme(document.documentElement.getAttribute('data-theme') || 'light', false);
+document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
+</script>
+
+</body>
+</html>
