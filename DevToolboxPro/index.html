@@ -541,9 +541,11 @@
                 <button class="btn primary" id="b64Enc">编码</button>
                 <button class="btn" id="b64Dec">解码</button>
                 <button class="btn small copy-btn" data-target="b64Output">复制</button>
+                <span class="note" id="b64Status"></span>
             </div>
             <div class="section-label mt-md mb-sm">输出</div>
             <textarea id="b64Output" class="output-area" readonly placeholder="结果..."></textarea>
+            <p class="note mt-sm">解码按 UTF-8 严格校验：字节不是合法 UTF-8 时不会显示为乱码，而是提示二进制内容并给出十六进制预览。需要还原图片、压缩包等二进制文件请使用「文件 ⇋ Base64」。</p>
         </div>
         <div class="panel" id="sub-encode-base64url">
             <div class="section-label mb-sm">输入</div>
@@ -1152,7 +1154,7 @@ Bob,25"></textarea></div><div class="tool-field"><label for="csvJsonOutput">转�
         <div id="smartResults" style="margin-top:8px;">
             <div class="result-mono empty">点击“智能解码”开始分析</div>
         </div>
-        <p class="note mt-sm">自动尝试 Base64 / Base64URL、URL、HTML 实体、Unicode 与 \xNN 转义、Hex、JSON 字符串、JWT 片段及 Latin1→UTF-8 修复；可递归处理多层编码。结果仅为启发式判断，请自行核验。</p>
+        <p class="note mt-sm">自动尝试 Base64 / Base64URL、Base32、Base58、Base85、URL、HTML 实体、Unicode 与 \xNN 转义、Hex、JSON 字符串、JWT 片段及 Latin1→UTF-8 修复；全部方法均无结果时再补充 ROT13 / ROT47（标为低置信度）。纯十六进制输入会额外提示可能对应的摘要算法。可递归处理多层编码，结果仅为启发式判断，请自行核验。</p>
     </div>
 
     <!-- ==================== 实用工具 ==================== -->
@@ -2866,15 +2868,51 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     });
 
     // ============ 编解码功能 ============
+    /* 严格按 UTF-8 解码：fatal:true 让非法字节抛错，交由调用方判断是二进制还是文本。
+       宽松的 safeAtob 仍保留给智能解码等容忍乱码的场景。 */
+    function base64ToTextStrict(b64) {
+        var bytes = base64ToBytes(b64);
+        return { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes), bytes: bytes };
+    }
+    function formatBytePreview(bytes, limit) {
+        var n = Math.min(bytes.length, limit || 32), parts = [];
+        for (var i = 0; i < n; i++) parts.push(bytes[i].toString(16).padStart(2, '0'));
+        return parts.join(' ') + (bytes.length > n ? ' …' : '');
+    }
     getById('b64Enc').onclick = function() {
         var v = getById('b64Input').value;
         getById('b64Output').value = v ? safeBtoa(v) : '';
+        getById('b64Status').textContent = v ? '✓ 已按 UTF-8 编码为 ' + getById('b64Output').value.length + ' 个字符' : '';
     };
     getById('b64Dec').onclick = function() {
-        var v = getById('b64Input').value.trim();
-        var decoded = safeAtob(v);
-        if (decoded) getById('b64Output').value = decoded;
-        else { getById('b64Output').value = ''; alert('无效的Base64字符串'); }
+        var raw = getById('b64Input').value.trim();
+        var out = getById('b64Output'), status = getById('b64Status');
+        out.value = ''; status.textContent = '';
+        if (!raw) return;
+        /* 顺手兼容粘贴进来的 Base64URL（含 - 和 _），省去先切换工具的步骤。 */
+        var normalized = raw.replace(/\s+/g, '');
+        var wasUrlSafe = /[-_]/.test(normalized);
+        if (wasUrlSafe) normalized = normalized.replace(/-/g, '+').replace(/_/g, '/');
+        normalized = normalized.replace(/=+$/g, '');
+        if (!/^[A-Za-z0-9+/]+$/.test(normalized)) {
+            status.textContent = '✗ 含非 Base64 字符，无法解码';
+            return;
+        }
+        if (normalized.length % 4 === 1) {
+            status.textContent = '✗ 长度不合法（Base64 去掉填充后长度模 4 不能为 1）';
+            return;
+        }
+        normalized += '='.repeat((4 - normalized.length % 4) % 4);
+        try {
+            var result = base64ToTextStrict(normalized);
+            out.value = result.text;
+            status.textContent = '✓ 已解码为 ' + result.bytes.length + ' 字节的 UTF-8 文本' + (wasUrlSafe ? '（已按 Base64URL 兼容处理）' : '');
+        } catch (e) {
+            var raw2 = base64ToBytes(normalized);
+            status.textContent = '✗ 解码得到 ' + raw2.length + ' 字节的二进制数据，不是合法 UTF-8 文本。'
+                + '十六进制预览：' + formatBytePreview(raw2, 24)
+                + '。如需还原文件请改用「文件 ⇋ Base64」，需要十六进制表示请用「Hex文本」。';
+        }
     };
     getById('b64urlEnc').onclick = function() {
         var value = getById('b64urlInput').value;
@@ -3896,33 +3934,53 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         if(/^(base64|url|hex)/i.test(method)||method.indexOf('URL')>=0||method.indexOf('Hex')>=0)score+=1;
         return {score:score,level:score>=4?'high':score>=2?'medium':'low'};
     }
-    function decodeCandidates(value) {
+    function decodeCandidates(value, allowRot) {
         var out=[], seen=new Set([value]);
-        function add(method,content){if(typeof content==='string'&&content!==value&&!seen.has(content)){seen.add(content);out.push({method:method,content:content,conf:calculateConfidence(content,method)});}}
+        /* level 可选：用于强制压低启发式候选——ROT13 的输出永远是可打印字符，
+           若交给 calculateConfidence 会被误判为高置信度并挤掉真正的解码结果。 */
+        function add(method,content,level,terminal){if(typeof content!=='string'||content===value||seen.has(content))return;seen.add(content);var conf=calculateConfidence(content,method);if(level){conf={score:level==='high'?4:level==='medium'?2:0,level:level};}out.push({method:method,content:content,conf:conf,terminal:!!terminal});}
+        /* 二进制类解码的统一入口：只有能按 UTF-8 还原且内容可读时才作为候选，避免乱码刷屏。 */
+        function addText(method,text,level){if(typeof text==='string'&&text&&isPrintable(text))add(method,text,level);}
+        function addBytes(method,bytes,level){if(!bytes||!bytes.length)return;try{addText(method,bytesUtf8(bytes),level);}catch(e){}}
         // Base64 / Base64URL: accept only alphabet-shaped inputs; reject ambiguous single characters.
-        if(value.length>=4&&/^[A-Za-z0-9+/]+={0,2}$/.test(value)&&value.length%4!==1){try{var b=value.replace(/=+$/,'');b+='='.repeat((4-b.length%4)%4);var d=safeAtob(b);if(d&&d!==value)add('Base64',d);}catch(e){}}
-        if(value.length>=4&&/^[A-Za-z0-9_-]+={0,2}$/.test(value)&&value.length%4!==1){try{var u=value.replace(/-/g,'+').replace(/_/g,'/').replace(/=+$/,'');u+='='.repeat((4-u.length%4)%4);var du=safeAtob(u);if(du&&du!==value)add('Base64URL',du);}catch(e){}}
+        if(value.length>=4&&/^[A-Za-z0-9+/]+={0,2}$/.test(value)&&value.length%4!==1){try{var b=value.replace(/=+$/,'');b+='='.repeat((4-b.length%4)%4);var d=safeAtob(b);if(d&&d!==value)addText('Base64',d);}catch(e){}}
+        if(value.length>=4&&/^[A-Za-z0-9_-]+={0,2}$/.test(value)&&value.length%4!==1){try{var u=value.replace(/-/g,'+').replace(/_/g,'/').replace(/=+$/,'');u+='='.repeat((4-u.length%4)%4);var du=safeAtob(u);if(du&&du!==value)addText('Base64URL',du);}catch(e){}}
         try{var url=decodeURIComponent(value);add('URL 解码',url);}catch(e){}
         try{var html=decodeHtmlEntities(value);add('HTML 实体',html);}catch(e){}
         try{var uni=value.replace(/\\u\{([0-9a-fA-F]{1,6})\}/g,function(_,h){var cp=parseInt(h,16);if(cp>0x10ffff||(cp>=0xd800&&cp<=0xdfff))throw new Error('Code point invalid');return String.fromCodePoint(cp);}).replace(/\\u([0-9a-fA-F]{4})/g,function(_,h){return String.fromCharCode(parseInt(h,16));}).replace(/\\x([0-9a-fA-F]{2})/g,function(_,h){return String.fromCharCode(parseInt(h,16));});add('Unicode / \\x 转义',uni);}catch(e){}
-        try{var hex=value.replace(/\s+/g,'');if(hex.length>=2&&hex.length%2===0&&/^[0-9a-fA-F]+$/.test(hex))add('Hex 解码',hexDecode(hex));}catch(e){}
+        try{var hex=value.replace(/\s+/g,'');if(hex.length>=2&&hex.length%2===0&&/^[0-9a-fA-F]+$/.test(hex))addText('Hex 解码',hexDecode(hex));}catch(e){}
+        /* Base32 / Base58 / Base85：编解码分类已提供这些工具，识别器同步覆盖，
+           否则用户会误以为智能解码不支持。三个实现都可能抛错，统一 try 包裹。 */
+        try{var b32=value.replace(/\s+/g,'');if(b32.length>=8&&/^[A-Za-z2-7]+=*$/.test(b32))addText('Base32',base32DecodeText(b32));}catch(e){}
+        try{var b58=value.trim();if(b58.length>=8&&/^[1-9A-HJ-NP-Za-km-z]+$/.test(b58))addText('Base58',base58DecodeText(b58));}catch(e){}
+        try{var b85=value.trim();if(b85.length>=8&&/^[!-u\s<~>]+$/.test(b85))addBytes('Base85（Ascii85）',ascii85Decode(b85));}catch(e){}
         // JSON quoted string escapes or pretty-print JSON objects/arrays.
         try{var parsed=JSON.parse(value);if(typeof parsed==='string')add('JSON 字符串转义',parsed);else if(parsed&&typeof parsed==='object')add('JSON 格式化',JSON.stringify(parsed,null,2));}catch(e){}
         // JWT: only decode the visible header/payload; this is not signature verification.
         var parts=value.split('.');if(parts.length===3){try{var hjson=safeAtob(parts[0].replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-parts[0].length%4)%4));var pobj=safeAtob(parts[1].replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-parts[1].length%4)%4));var hj=JSON.parse(hjson),pj=JSON.parse(pobj);add('JWT Header（未验签）',JSON.stringify(hj,null,2));add('JWT Payload（未验签）',JSON.stringify(pj,null,2));}catch(e){}}
         // Try Latin1 bytes interpreted as UTF-8, only for byte-valued code units.
         try{if(Array.from(value).every(function(c){return c.charCodeAt(0)<=255;})){var bytes=new Uint8Array(value.length);for(var i=0;i<value.length;i++)bytes[i]=value.charCodeAt(i);var fixed=new TextDecoder('utf-8',{fatal:true}).decode(bytes);if(fixed!==value&&isPrintable(fixed))add('Latin1 → UTF-8 修复',fixed);}}catch(e){}
+        /* ROT13 / ROT47 对任何可打印文本都能“解出”结果，放在最后且仅当其余方法全部无结果时尝试，
+           并强制标为低置信度，避免淹没真正的解码结果。 */
+        var hexLike=/^[0-9a-fA-F\s]+$/.test(value)&&value.replace(/\s+/g,'').length>=32;
+        if(allowRot !== false && !out.length && !hexLike){
+            try{if(/[A-Za-z]/.test(value))add('ROT13',rot13(value),'low',true);}catch(e){}
+            try{if(/[!-~]/.test(value))add('ROT47',rot47(value),'low',true);}catch(e){}
+        }
         return out;
     }
     getById('smartDecode').onclick=function(){
         var input=getById('smartInput').value.trim(),container=getById('smartResults'),feedback=getById('smartFeedback');container.textContent='';feedback.textContent='';
         if(!input){var empty=document.createElement('div');empty.className='result-mono empty';empty.textContent='请输入内容';container.appendChild(empty);return;}
         if(input.length>100000){var tooLarge=document.createElement('div');tooLarge.className='result-mono empty';tooLarge.textContent='输入过长（最多 100,000 字符），请先缩小数据范围。';container.appendChild(tooLarge);return;}
+        /* 摘要指纹：纯十六进制且长度命中常见摘要时给出提示，只是格式匹配，不代表校验通过。 */
+        var hashHint='', hashText=input.replace(/\s+/g,''), hashMap={32:'MD5 / NTLM',40:'SHA-1',56:'SHA-224 / SHA3-224',64:'SHA-256 / BLAKE2s / SM3',96:'SHA-384 / SHA3-384',128:'SHA-512 / SHA3-512 / BLAKE2b-512'};
+        if(/^[0-9a-fA-F]+$/.test(hashText)&&hashMap[hashText.length])hashHint=' · 疑似 '+hashMap[hashText.length]+' 摘要（仅格式匹配，未做校验）';
         var recursive=getById('smartRecursive').checked,maxDepth=recursive?parseInt(getById('smartDepth').value,10):1,queue=[{content:input,depth:0,chain:[]}],seen=new Set([input]),results=[],maxResults=40;
-        while(queue.length&&results.length<maxResults){var node=queue.shift();if(node.depth>=maxDepth)continue;var candidates=decodeCandidates(node.content);for(var i=0;i<candidates.length&&results.length<maxResults;i++){var c=candidates[i];if(seen.has(c.content))continue;seen.add(c.content);var chain=node.chain.concat(c.method);var item={method:(node.depth?'第'+(node.depth+1)+'层 · ':'')+chain.join(' → '),content:c.content,conf:calculateConfidence(c.content,c.method),depth:node.depth+1};results.push(item);queue.push({content:c.content,depth:node.depth+1,chain:chain});}}
+        while(queue.length&&results.length<maxResults){var node=queue.shift();if(node.depth>=maxDepth)continue;var candidates=decodeCandidates(node.content,node.depth===0);for(var i=0;i<candidates.length&&results.length<maxResults;i++){var c=candidates[i];if(seen.has(c.content))continue;seen.add(c.content);var chain=node.chain.concat(c.method);var item={method:(node.depth?'第'+(node.depth+1)+'层 · ':'')+chain.join(' → '),content:c.content,conf:c.conf||calculateConfidence(c.content,c.method),depth:node.depth+1};results.push(item);/* 终态候选（如 ROT13）不再继续递归，否则会互相套娃刷出大量无意义结果。 */if(!c.terminal)queue.push({content:c.content,depth:node.depth+1,chain:chain});}}
         results.sort(function(a,b){return b.conf.score-a.conf.score||a.depth-b.depth;});
-        if(!results.length){var none=document.createElement('div');none.className='result-mono empty';none.textContent='未找到可用的解码结果';container.appendChild(none);return;}
-        feedback.textContent='找到 '+results.length+' 个候选结果'+(results.length>=maxResults?'（已达到显示上限）':'')+'；置信度仅供参考。';
+        if(!results.length){var none=document.createElement('div');none.className='result-mono empty';none.textContent='未找到可用的解码结果'+hashHint;container.appendChild(none);return;}
+        feedback.textContent='找到 '+results.length+' 个候选结果'+(results.length>=maxResults?'（已达到显示上限）':'')+'；置信度仅供参考'+hashHint+'';
         for(var j=0;j<results.length;j++){var r=results[j],itemEl=document.createElement('div');itemEl.className='smart-result-item';var methodEl=document.createElement('span');methodEl.className='method';methodEl.textContent=r.method;var contentEl=document.createElement('span');contentEl.className='content';contentEl.textContent=r.content.length>20000?r.content.slice(0,20000)+'…（结果过长，已截断显示）':r.content;var conf=document.createElement('span');conf.className='confidence '+r.conf.level;conf.textContent=r.conf.level==='high'?'高':r.conf.level==='medium'?'中':'低';itemEl.appendChild(methodEl);itemEl.appendChild(contentEl);itemEl.appendChild(conf);var cp=document.createElement('button');cp.type='button';cp.className='btn small';cp.textContent='复制';cp.addEventListener('click',(function(text){return function(){copyText(text,this);};})(r.content));itemEl.appendChild(cp);container.appendChild(itemEl);}
     };
     getById('smartClear').onclick=function(){getById('smartInput').value='';getById('smartResults').textContent='';getById('smartFeedback').textContent='';var d=document.createElement('div');d.className='result-mono empty';d.textContent='点击“智能解码”开始分析';getById('smartResults').appendChild(d);};
