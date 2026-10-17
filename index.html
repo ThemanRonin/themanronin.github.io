@@ -14,7 +14,7 @@
 
     <meta
         name="description"
-        content="ThemanRonin 个人项目导航，收录 CIPHER 加密工具、DevToolbox Pro 开发者工具箱、LiquidGlass 玻璃效果模拟器、密码生成器和字数统计工具。"
+        content="ThemanRonin 个人项目导航，收录 CIPHER 加密工具、DevToolbox Pro 开发者工具箱、LiquidGlass 玻璃效果模拟器、密码生成器、字数统计工具、排班日历和 Webhook 发送器。"
     >
 
     <link
@@ -454,7 +454,7 @@
                 <h1>索引</h1>
 
                 <div class="subtitle">
-                    站内页面目录 · 5 PROJECTS
+                    站内页面目录 · 7 PROJECTS
                 </div>
             </div>
 
@@ -473,7 +473,7 @@
         <!-- =====================================================
              项目目录
 
-             当前仓库中的五个网页项目。
+             当前仓库中的七个网页项目。
 
              所有项目链接均使用：
              target="_blank"
@@ -655,6 +655,75 @@
 
                 <div class="card-path">
                     /wordcount
+                </div>
+            </a>
+
+            <!-- =================================================
+                 Calendar：排班日历
+                 ================================================= -->
+
+            <a
+                class="card"
+                href="./Calendar/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="在新标签页打开 Calendar 排班日历"
+            >
+                <div class="card-top">
+                    <span class="card-name">Calendar</span>
+
+                    <span class="card-arrow" aria-hidden="true">↗</span>
+                </div>
+
+                <div class="card-title">
+                    排班日历
+                </div>
+
+                <div class="card-desc">
+                    月视图排班工具，点击日期即可设置白班、夜班、
+                    休班、请假与加班。内置默认班次规则：
+                    工作 2 天休息 2 天，白 / 夜班按班次周期
+                    （每月 26 号至次月 25 号）自动切换，
+                    支持文本批量导入、倒转互换与周期统计。
+                    数据仅保存在本地浏览器，不会上传。
+                </div>
+
+                <div class="card-path">
+                    /Calendar
+                </div>
+            </a>
+
+            <!-- =================================================
+                 Webhook Forwarder：Webhook 发送器
+                 ================================================= -->
+
+            <a
+                class="card"
+                href="./WebhookForwarder/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="在新标签页打开 Webhook Forwarder 发送器"
+            >
+                <div class="card-top">
+                    <span class="card-name">Webhook Forwarder</span>
+
+                    <span class="card-arrow" aria-hidden="true">↗</span>
+                </div>
+
+                <div class="card-title">
+                    Webhook 发送器
+                </div>
+
+                <div class="card-desc">
+                    企业微信群机器人 Webhook 文本消息发送工具。
+                    填写 Webhook 地址与内容即可一键 POST 发送，
+                    支持代理转发（{url} 占位符）、请求目标预览、
+                    响应与耗时查看、字符统计以及最近 20 条
+                    发送记录。配置保存在本地浏览器。
+                </div>
+
+                <div class="card-path">
+                    /WebhookForwarder
                 </div>
             </a>
 
