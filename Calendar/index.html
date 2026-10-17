@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>排班日历</title>
+<script>
+    /* 在样式生效前确定主题，避免深色模式下的白屏闪烁；存储键与站内其他页面保持一致。 */
+    (function () {
+        try {
+            var t = localStorage.getItem('cipher_theme_v2');
+            if (t === 'dark' || t === 'light') { document.documentElement.setAttribute('data-theme', t); return; }
+        } catch (e) { /* localStorage 不可用时忽略 */ }
+        try {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        } catch (e) { /* 忽略 */ }
+    })();
+</script>
+<style>
+    :root {
+        --bg: #fafafa;
+        --surface: #fff;
+        --text: #1a1a1a;
+        --text-secondary: #6e6e6e;
+        --text-tertiary: #999;
+        --border: #e0e0e0;
+        --border-light: #eee;
+        --accent: #1a1a1a;
+        --accent-hover: #3a3a3a;
+        --danger: #c0392b;
+        --ok: #237a38;
+        --radius: 4px;
+        --shadow: 0 14px 44px rgba(0, 0, 0, .16);
+        --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', 'Menlo', monospace;
+        --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        --transition: 120ms ease;
+        color-scheme: light;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: var(--font-sans);
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 40px 16px 60px;
+    }
+
+    .container { width: 100%; max-width: 880px; min-width: 0; }
+
+    /* ---------- 顶部标题 ---------- */
+    .header { margin-bottom: 30px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .header-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+    .header-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text); flex-shrink: 0; align-self: center; }
+    .header-subtitle { font-size: 12px; color: var(--text-tertiary); }
+    .dtp-theme-toggle { align-self: center; margin-left: auto; padding: 6px 12px; font-size: 11px; }
+
+    /* ---------- 分区标签 ---------- */
+    .section-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-tertiary);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
+
+    /* ---------- 按钮 ---------- */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 16px;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        transition: all var(--transition);
+        font-family: var(--font-sans);
+        white-space: nowrap;
+        outline: none;
+        user-select: none;
+    }
+    .btn:hover { background: #f4f4f4; border-color: #c0c0c0; }
+    .btn:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(26,26,26,.12); }
+    .btn.small { padding: 5px 10px; font-size: 11px; }
+    .btn.icon-btn { width: 34px; height: 34px; padding: 0; font-size: 16px; line-height: 1; }
+    .btn.danger:hover { color: var(--danger); border-color: #e6b4af; background: #fdf3f2; }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn:disabled { opacity: .38; cursor: not-allowed; }
+    .btn:disabled:hover { background: var(--surface); border-color: var(--border); color: var(--text); }
+
+    /* ---------- 工具栏 ---------- */
+    .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+    }
+    .toolbar-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+    input[type="month"] {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: .02em;
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        cursor: pointer;
+        outline: none;
+        transition: border-color var(--transition);
+        min-width: 148px;
+    }
+    input[type="month"]:hover { border-color: #c0c0c0; }
+    input[type="month"]:focus-visible { border-color: var(--accent); }
+
+    /* ---------- 星期头 ---------- */
+    .weekdays {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 1px;
+        margin-bottom: 6px;
+    }
+    .weekdays span {
+        text-align: center;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .06em;
+        color: var(--text-tertiary);
+        padding: 2px 0;
+    }
+    .weekdays span:nth-child(6),
+    .weekdays span:nth-child(7) { color: #b35b00; }
+
+    /* ---------- 日历网格 ---------- */
+    .calendar {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 1px;
+        background: var(--border-light);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    .day {
+        background: var(--surface);
+        min-height: 108px;
+        padding: 10px 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 7px;
+        cursor: pointer;
+        position: relative;
+        outline: none;
+        user-select: none;
+        transition: background var(--transition);
+    }
+    .day:hover { background: #f4f4f5; }
+    .day:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); z-index: 1; }
+    .day.blank { background: var(--bg); cursor: default; }
+    .day.blank:hover { background: var(--bg); }
+
+    .day-num {
+        font-family: var(--font-mono);
+        font-size: 25px;
+        line-height: 1;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: var(--text-secondary);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 40px;
+        height: 40px;
+        padding: 0 4px;
+        border-radius: 50%;
+        transition: background var(--transition), color var(--transition);
+    }
+    .day.today .day-num { background: var(--text); color: var(--surface); }
+    .day.weekend .day-num { color: #b35b00; }
+    .day.today.weekend .day-num { color: var(--surface); }
+
+    .shift-badge {
+        max-width: 100%;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: .01em;
+        line-height: 1.45;
+        padding: 3px 9px;
+        border-radius: 3px;
+        color: var(--sc);
+        background: var(--sb);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border: 1px solid transparent;
+    }
+    /* 默认班次：虚线描边 + 透明底，与手动设置区分 */
+    .shift-badge.is-default {
+        background: transparent;
+        border-color: var(--sc);
+        border-style: dashed;
+        opacity: .82;
+    }
+
+    /* ---------- 班次配色 ---------- */
+    .c-day     { --sc: #175ca8; --sb: rgba(23, 92, 168, .10); }
+    .c-night   { --sc: #7a3e9d; --sb: rgba(122, 62, 157, .10); }
+    .c-rest    { --sc: #237a38; --sb: rgba(35, 122, 56, .10); }
+    .c-leave   { --sc: #b35b00; --sb: rgba(179, 91, 0, .11); }
+    .c-dayOT   { --sc: #0b7285; --sb: rgba(11, 114, 133, .11); }
+    .c-nightOT { --sc: #c2255c; --sb: rgba(194, 37, 92, .10); }
+
+    /* ---------- 统计 ---------- */
+    .stats { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+    .stat-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 4px 9px;
+        border-radius: 3px;
+        color: var(--sc);
+        background: var(--sb);
+        white-space: nowrap;
+    }
+    .stat-chip.is-zero { opacity: .38; }
+    .stat-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sc); flex-shrink: 0; }
+    .stat-num { font-family: var(--font-mono); font-weight: 700; }
+    .stat-total { font-size: 11px; color: var(--text-tertiary); margin-left: auto; letter-spacing: .02em; }
+
+    .note { font-size: 11px; color: var(--text-tertiary); letter-spacing: 0.02em; }
+    .mt-md { margin-top: 20px; }
+    .mt-sm { margin-top: 10px; }
+
+    /* ---------- 弹窗 ---------- */
+    .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(0, 0, 0, .34);
+        -webkit-backdrop-filter: blur(2px);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 160ms ease, visibility 160ms ease;
+    }
+    .overlay.open { opacity: 1; visibility: visible; }
+
+    .modal {
+        width: 100%;
+        max-width: 400px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 18px;
+        box-shadow: var(--shadow);
+        transform: translateY(10px) scale(.985);
+        transition: transform 180ms cubic-bezier(.2, .8, .3, 1);
+    }
+    .modal.modal-wide { max-width: 460px; }
+    .overlay.open .modal { transform: none; }
+
+    .modal-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .modal-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+    .modal-sub { font-size: 11px; color: var(--text-tertiary); letter-spacing: .04em; margin-top: 2px; }
+
+    .shift-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 16px;
+    }
+    .shift-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 12px;
+        font-size: 12px;
+        font-weight: 500;
+        font-family: var(--font-sans);
+        text-align: left;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        cursor: pointer;
+        outline: none;
+        transition: all var(--transition);
+    }
+    .shift-option:not(.selected):hover { background: #f5f5f6; border-color: #c0c0c0; }
+    .shift-option:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(26,26,26,.12); }
+    .shift-option.selected {
+        color: var(--sc);
+        background: var(--sb);
+        border-color: var(--sc);
+        font-weight: 600;
+    }
+    .shift-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sc); flex-shrink: 0; }
+
+    .modal-foot {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    /* ---------- 导入 ---------- */
+    .import-textarea {
+        width: 100%;
+        min-height: 178px;
+        max-height: 42vh;
+        margin-top: 14px;
+        padding: 10px 12px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        resize: vertical;
+        outline: none;
+        transition: border-color var(--transition);
+    }
+    .import-textarea:focus { border-color: var(--accent); }
+    .import-textarea::placeholder { color: var(--text-tertiary); }
+    .import-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 8px; letter-spacing: .02em; }
+    .import-status { margin-right: auto; font-size: 11px; color: var(--text-tertiary); letter-spacing: .02em; }
+    .import-status.error { color: var(--danger); }
+
+    /* ---------- Toast ---------- */
+    .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 28px;
+        z-index: 200;
+        padding: 9px 16px;
+        font-size: 12px;
+        letter-spacing: .02em;
+        color: var(--surface);
+        background: var(--text);
+        border-radius: var(--radius);
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, 12px);
+        transition: opacity 180ms ease, transform 180ms ease;
+        max-width: calc(100vw - 32px);
+        text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    ::selection { background: var(--text); color: var(--bg); }
+
+    /* ---------- 深色模式 ---------- */
+    [data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0d0d0f;
+        --surface: #17171a;
+        --text: #e9e9ec;
+        --text-secondary: #a1a1a8;
+        --text-tertiary: #71717a;
+        --border: #2c2c31;
+        --border-light: #222227;
+        --accent: #e9e9ec;
+        --accent-hover: #ffffff;
+        --danger: #e5484d;
+        --ok: #7bd88f;
+        --shadow: 0 14px 44px rgba(0, 0, 0, .62);
+    }
+    [data-theme="dark"] .btn:hover { background: #232328; border-color: #45454d; }
+    [data-theme="dark"] .btn.danger:hover { background: #2a1416; border-color: #6b2c30; color: #e5484d; }
+    [data-theme="dark"] .btn:focus-visible { box-shadow: 0 0 0 1px rgba(255,255,255,.16); }
+    [data-theme="dark"] .btn.primary { color: #101013; }
+    [data-theme="dark"] .btn.primary:hover { background: #ffffff; border-color: #ffffff; }
+    [data-theme="dark"] .btn:disabled:hover { background: var(--surface); border-color: var(--border); color: var(--text); }
+    [data-theme="dark"] .day:hover { background: #202025; }
+    [data-theme="dark"] .day.blank,
+    [data-theme="dark"] .day.blank:hover { background: var(--bg); }
+    [data-theme="dark"] input[type="month"]:hover { border-color: #45454d; }
+    [data-theme="dark"] .shift-option:not(.selected):hover { background: #232328; border-color: #45454d; }
+    [data-theme="dark"] .overlay { background: rgba(0, 0, 0, .58); }
+    [data-theme="dark"] .weekdays span:nth-child(6),
+    [data-theme="dark"] .weekdays span:nth-child(7) { color: #ffab70; }
+    [data-theme="dark"] .day.weekend .day-num { color: #ffab70; }
+    [data-theme="dark"] .day.today.weekend .day-num { color: var(--surface); }
+
+    [data-theme="dark"] .c-day     { --sc: #79b8ff; --sb: rgba(121, 184, 255, .14); }
+    [data-theme="dark"] .c-night   { --sc: #c792ea; --sb: rgba(199, 146, 234, .14); }
+    [data-theme="dark"] .c-rest    { --sc: #7bd88f; --sb: rgba(123, 216, 143, .14); }
+    [data-theme="dark"] .c-leave   { --sc: #ffab70; --sb: rgba(255, 171, 112, .14); }
+    [data-theme="dark"] .c-dayOT   { --sc: #66d9e8; --sb: rgba(102, 217, 232, .14); }
+    [data-theme="dark"] .c-nightOT { --sc: #f783ac; --sb: rgba(247, 131, 172, .14); }
+
+    /* ---------- 移动端 ---------- */
+    @media (max-width: 640px) {
+        body { padding: 20px 10px 40px; }
+        .header { margin-bottom: 20px; }
+        .toolbar { gap: 8px; }
+        .toolbar-group { flex: 1 1 auto; }
+        input[type="month"] { min-width: 0; flex: 1; font-size: 12px; }
+        .btn.icon-btn { width: 30px; height: 30px; }
+        .day { min-height: 82px; padding: 7px 3px; gap: 5px; }
+        .day-num { font-size: 19px; min-width: 30px; height: 30px; }
+        .shift-badge { font-size: 10px; padding: 2px 5px; border-radius: 2px; }
+        .shift-grid { grid-template-columns: 1fr 1fr; gap: 7px; }
+        .shift-option { padding: 10px 9px; font-size: 11px; }
+        .stat-total { margin-left: 0; width: 100%; }
+        .import-textarea { min-height: 140px; font-size: 11px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <span class="header-title">排班日历</span>
+        <span class="header-dot"></span>
+        <span class="header-subtitle">本地记录 · 数据不上传</span>
+        <button class="btn dtp-theme-toggle" id="themeToggle" type="button" title="切换深色 / 浅色模式" aria-label="切换深色或浅色模式" aria-pressed="false">深色模式</button>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <button class="btn icon-btn" id="prevMonthBtn" type="button" title="上一月" aria-label="上一月">‹</button>
+            <input type="month" id="monthPicker" aria-label="选择年月">
+            <button class="btn icon-btn" id="nextMonthBtn" type="button" title="下一月" aria-label="下一月">›</button>
+        </div>
+        <div class="toolbar-group">
+            <button class="btn small" id="todayBtn" type="button">回到今天</button>
+            <button class="btn small" id="defaultBtn" type="button" aria-pressed="false" title="工作2天休息2天，白/夜班每2个班次周期切换">默认班次</button>
+            <button class="btn small" id="invertBtn" type="button" aria-pressed="false" disabled title="临时互换默认的白班与夜班">倒转</button>
+            <button class="btn small" id="importBtn" type="button">导入</button>
+        </div>
+    </div>
+
+    <!-- 星期 -->
+    <div class="weekdays">
+        <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+    </div>
+
+    <!-- 日历 -->
+    <div class="calendar" id="calendar" role="grid" aria-label="排班日历"></div>
+
+    <!-- 统计 -->
+    <div class="section-label mt-md"><span id="periodLabel">本月统计</span></div>
+    <div class="stats" id="stats"></div>
+
+    <p class="note mt-sm">点击任意日期即可设置班次；数据保存在当前浏览器中，不会上传。统计周期为每月 26 号至次月 25 号。「默认班次」按工作 2 天、休息 2 天循环，工作日每 2 个班次周期在夜班 / 白班之间切换：10 月、11 月班次（9/26 - 11/25）为夜班，12 月、1 月班次（11/26 - 1/25）为白班。开启「倒转」可临时互换默认的白班 / 夜班，不影响手动设置。</p>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="overlay" id="overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title" id="modalTitle">—</div>
+                <div class="modal-sub" id="modalSub">—</div>
+            </div>
+            <button class="btn small" id="modalClose" type="button">关闭</button>
+        </div>
+        <div class="shift-grid" id="shiftGrid"></div>
+        <div class="modal-foot">
+            <button class="btn small danger" id="clearDayBtn" type="button">清除手动班次</button>
+        </div>
+    </div>
+</div>
+
+<!-- 导入弹窗 -->
+<div class="overlay" id="importOverlay">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title" id="importTitle">导入排班数据</div>
+                <div class="modal-sub">每行一条，日期与班次用冒号分隔</div>
+            </div>
+            <button class="btn small" id="importClose" type="button">关闭</button>
+        </div>
+        <textarea class="import-textarea" id="importText" spellcheck="false"
+            placeholder="2026/06/26 (周五): 休息&#10;2026/06/27 (周六): 休息&#10;2026/06/28 (周日): 请假&#10;2026/07/02 (周四): 夜班&#10;2026/07/04 (周六): 夜班加班"></textarea>
+        <div class="import-hint">支持 白班 / 夜班 / 休班（休息）/ 请假 / 白班加班 / 夜班加班；日期支持 2026/06/26、2026-6-26、2026年6月26日 等写法，星期与括号内容会自动忽略。导入的班次优先于默认班次。</div>
+        <div class="modal-foot">
+            <span class="import-status" id="importStatus"></span>
+            <button class="btn small" id="importCancel" type="button">取消</button>
+            <button class="btn small primary" id="importConfirm" type="button">导入</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+    'use strict';
+
+    const $ = function (id) { return document.getElementById(id); };
+
+    /* ============================================================
+       班次定义
+       ============================================================ */
+    const SHIFT_DEFS = [
+        { id: 'day',     name: '白班'     },
+        { id: 'night',   name: '夜班'     },
+        { id: 'rest',    name: '休班'     },
+        { id: 'leave',   name: '请假'     },
+        { id: 'dayOT',   name: '白班加班' },
+        { id: 'nightOT', name: '夜班加班' }
+    ];
+    const SHIFT_MAP = {};
+    SHIFT_DEFS.forEach(function (s) { SHIFT_MAP[s.id] = s; });
+
+    /* 导入时识别班次名称（键统一小写） */
+    const SHIFT_ALIASES = {
+        '白班': 'day', '白': 'day', '日班': 'day', '早班': 'day', 'day': 'day',
+        '夜班': 'night', '夜': 'night', '晚班': 'night', 'night': 'night',
+        '休班': 'rest', '休息': 'rest', '休': 'rest', '休假': 'rest', '轮休': 'rest',
+        'rest': 'rest', 'off': 'rest', '休息日': 'rest',
+        '请假': 'leave', '假': 'leave', '事假': 'leave', '病假': 'leave', 'leave': 'leave',
+        '白班加班': 'dayOT', '白加班': 'dayOT', '白班加': 'dayOT', 'dayot': 'dayOT',
+        '夜班加班': 'nightOT', '夜加班': 'nightOT', '夜班加': 'nightOT', 'nightot': 'nightOT'
+    };
+    const ALIAS_KEYS = Object.keys(SHIFT_ALIASES).sort(function (a, b) { return b.length - a.length; });
+
+    const WEEK_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+    const STORE_KEY = 'shift_calendar_v1';
+    const DEFAULT_KEY = 'shift_calendar_default_v1';
+    const INVERT_KEY = 'shift_calendar_invert_v1';
+
+    /* 统计周期：视图月 26 号 ~ 次月 25 号（含首尾） */
+    const PERIOD_START_DAY = 26;
+    const PERIOD_END_DAY = 25;
+
+    /* 默认班次规则 */
+    const DEFAULT_RULE = {
+        // 休 / 工循环：基准日 2026-10-12、2026-10-13 为休班；周期 4 天，前 2 天休
+        baseDate: { y: 2026, m: 9, d: 12 },
+        cycle: 4,
+        restCount: 2,
+        // 白 / 夜班切换：班次周期按“结束月份”命名，例如 10 月班次 = 9/26 - 10/25
+        // 基准：10 月班次为夜班；每 2 个班次周期切换一次
+        shiftBaseYear: 2026,
+        shiftBaseMonth: 9,   // 0-based，即 10 月班次
+        groupSize: 2
+    };
+
+    /* ============================================================
+       DOM
+       ============================================================ */
+    const calendarEl   = $('calendar');
+    const statsEl      = $('stats');
+    const periodLabel  = $('periodLabel');
+    const monthPicker  = $('monthPicker');
+    const overlay      = $('overlay');
+    const modalTitle   = $('modalTitle');
+    const modalSub     = $('modalSub');
+    const shiftGrid    = $('shiftGrid');
+    const clearDayBtn  = $('clearDayBtn');
+    const defaultBtn   = $('defaultBtn');
+    const invertBtn    = $('invertBtn');
+
+    const importOverlay = $('importOverlay');
+    const importText    = $('importText');
+    const importStatus  = $('importStatus');
+
+    /* ============================================================
+       工具函数
+       ============================================================ */
+    function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+    function keyOf(y, m, d) { return y + '-' + pad2(m + 1) + '-' + pad2(d); }
+    function parseKey(k) {
+        const p = k.split('-');
+        return { y: Number(p[0]), m: Number(p[1]) - 1, d: Number(p[2]) };
+    }
+    function dayIndex(y, m, d) {
+        return Math.round(Date.UTC(y, m, d) / 86400000);
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+        const t = $('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+    }
+
+    /* ============================================================
+       持久化
+       ============================================================ */
+    function loadStore() {
+        try {
+            const raw = localStorage.getItem(STORE_KEY);
+            if (!raw) return {};
+            const data = JSON.parse(raw);
+            if (!data || typeof data !== 'object') return {};
+            const out = {};
+            Object.keys(data).forEach(function (k) {
+                if (/^\d{4}-\d{2}-\d{2}$/.test(k) && SHIFT_MAP[data[k]]) {
+                    out[k] = data[k];
+                }
+            });
+            return out;
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function saveStore() {
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); }
+        catch (e) { /* 存储不可用时静默失败 */ }
+    }
+
+    function loadDefaultEnabled() {
+        try { return localStorage.getItem(DEFAULT_KEY) === '1'; }
+        catch (e) { return false; }
+    }
+    function saveDefaultEnabled() {
+        try { localStorage.setItem(DEFAULT_KEY, defaultEnabled ? '1' : '0'); }
+        catch (e) { /* 忽略 */ }
+    }
+
+    function loadInverted() {
+        try { return localStorage.getItem(INVERT_KEY) === '1'; }
+        catch (e) { return false; }
+    }
+    function saveInverted() {
+        try { localStorage.setItem(INVERT_KEY, inverted ? '1' : '0'); }
+        catch (e) { /* 忽略 */ }
+    }
+
+    /* ============================================================
+       状态
+       ============================================================ */
+    let store = loadStore();
+    let defaultEnabled = loadDefaultEnabled();
+    let inverted = loadInverted();
+    const _now = new Date();
+    let viewYear = _now.getFullYear();
+    let viewMonth = _now.getMonth();
+    let editingDate = null;
+
+    /* ============================================================
+       默认班次计算
+       ============================================================ */
+    function getDefaultShift(y, m, d) {
+        if (!defaultEnabled) return null;
+
+        // 1. 判断休班 / 上班：4 天循环，基准日 2026-10-12、10-13 为休班
+        const base = DEFAULT_RULE.baseDate;
+        const diff = dayIndex(y, m, d) - dayIndex(base.y, base.m, base.d);
+        const mod = ((diff % DEFAULT_RULE.cycle) + DEFAULT_RULE.cycle) % DEFAULT_RULE.cycle;
+        if (mod < DEFAULT_RULE.restCount) return 'rest';
+
+        // 2. 判断白班 / 夜班
+        //    班次周期按“结束月份”命名：X 月班次 = (X-1) 月 26 日 ~ X 月 25 日
+        //    所以：d >= 26 时，属于下个月的班次周期；d <= 25 时，属于本月的班次周期
+        let pYear = y;
+        let pMonth = m;
+        if (d >= PERIOD_START_DAY) {
+            pMonth++;
+            if (pMonth > 11) { pMonth = 0; pYear++; }
+        }
+        const periodIdx = pYear * 12 + pMonth;
+        const baseIdx = DEFAULT_RULE.shiftBaseYear * 12 + DEFAULT_RULE.shiftBaseMonth;
+        const groupIdx = Math.floor((periodIdx - baseIdx) / DEFAULT_RULE.groupSize);
+        const normalized = ((groupIdx % 2) + 2) % 2;
+
+        // 基准组（group 0，即 10 月、11 月班次）为夜班，下一组（12 月、1 月班次）为白班
+        let shiftType = normalized === 0 ? 'night' : 'day';
+
+        // 3. 倒转：白班 <-> 夜班
+        if (inverted) {
+            shiftType = shiftType === 'night' ? 'day' : 'night';
+        }
+
+        return shiftType;
+    }
+
+    /* 某天最终生效的班次 + 是否为默认 */
+    function resolveDay(y, m, d) {
+        const k = keyOf(y, m, d);
+        if (store[k]) return { shift: store[k], isDefault: false };
+        const def = getDefaultShift(y, m, d);
+        if (def) return { shift: def, isDefault: true };
+        return { shift: null, isDefault: false };
+    }
+
+    /* ============================================================
+       日历渲染
+       ============================================================ */
+    function renderCalendar() {
+        monthPicker.value = viewYear + '-' + pad2(viewMonth + 1);
+
+        const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+        const offset = (firstDow + 6) % 7;
+        const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+        const totalCells = Math.ceil((offset + daysInMonth) / 7) * 7;
+
+        const today = new Date();
+        const todayKey = keyOf(today.getFullYear(), today.getMonth(), today.getDate());
+
+        const frag = document.createDocumentFragment();
+
+        for (let i = 0; i < totalCells; i++) {
+            const dayNum = i - offset + 1;
+            const cell = document.createElement('div');
+
+            if (dayNum < 1 || dayNum > daysInMonth) {
+                cell.className = 'day blank';
+                frag.appendChild(cell);
+                continue;
+            }
+
+            const key = keyOf(viewYear, viewMonth, dayNum);
+            const info = resolveDay(viewYear, viewMonth, dayNum);
+            const dow = new Date(viewYear, viewMonth, dayNum).getDay();
+
+            cell.className = 'day';
+            if (key === todayKey) cell.classList.add('today');
+            if (dow === 0 || dow === 6) cell.classList.add('weekend');
+            cell.dataset.date = key;
+            cell.tabIndex = 0;
+            cell.setAttribute('role', 'gridcell');
+            cell.setAttribute(
+                'aria-label',
+                viewYear + '年' + (viewMonth + 1) + '月' + dayNum + '日，' +
+                (info.shift ? SHIFT_MAP[info.shift].name + (info.isDefault ? '（默认）' : '') : '未排班')
+            );
+
+            const num = document.createElement('span');
+            num.className = 'day-num';
+            num.textContent = dayNum;
+            cell.appendChild(num);
+
+            if (info.shift) {
+                const badge = document.createElement('span');
+                badge.className = 'shift-badge c-' + info.shift + (info.isDefault ? ' is-default' : '');
+                badge.textContent = SHIFT_MAP[info.shift].name;
+                badge.title = SHIFT_MAP[info.shift].name + (info.isDefault ? '（默认班次）' : '（手动设置）');
+                cell.appendChild(badge);
+            }
+
+            frag.appendChild(cell);
+        }
+
+        calendarEl.innerHTML = '';
+        calendarEl.appendChild(frag);
+    }
+
+    /* ============================================================
+       统计周期：视图月 26 号 ~ 次月 25 号（含首尾）
+       ============================================================ */
+    function getPeriodRange() {
+        const start = new Date(viewYear, viewMonth, PERIOD_START_DAY);
+        const end = new Date(viewYear, viewMonth + 1, PERIOD_END_DAY);
+        return { start: start, end: end };
+    }
+
+    function renderStats() {
+        const counts = {};
+        SHIFT_DEFS.forEach(function (s) { counts[s.id] = 0; });
+
+        const range = getPeriodRange();
+        let total = 0;
+        let totalDays = 0;
+
+        const cursor = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate());
+        const last = range.end;
+        while (cursor <= last) {
+            totalDays++;
+            const info = resolveDay(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+            if (info.shift && counts[info.shift] !== undefined) {
+                counts[info.shift]++;
+                total++;
+            }
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        const sy = range.start.getFullYear();
+        const sm = range.start.getMonth() + 1;
+        const sd = range.start.getDate();
+        const ey = range.end.getFullYear();
+        const em = range.end.getMonth() + 1;
+        const ed = range.end.getDate();
+
+        let rangeText;
+        if (sy !== ey) {
+            rangeText = sy + '年' + sm + '月' + sd + '日 - ' + ey + '年' + em + '月' + ed + '日';
+        } else if (sm !== em) {
+            rangeText = sm + '月' + sd + '日 - ' + em + '月' + ed + '日';
+        } else {
+            rangeText = sm + '月' + sd + '日 - ' + ed + '日';
+        }
+        periodLabel.textContent = '班次统计 · ' + rangeText;
+
+        statsEl.innerHTML = '';
+
+        SHIFT_DEFS.forEach(function (s) {
+            const chip = document.createElement('span');
+            chip.className = 'stat-chip c-' + s.id + (counts[s.id] === 0 ? ' is-zero' : '');
+
+            const dot = document.createElement('span');
+            dot.className = 'stat-dot';
+
+            const label = document.createElement('span');
+            label.textContent = s.name;
+
+            const num = document.createElement('span');
+            num.className = 'stat-num';
+            num.textContent = counts[s.id];
+
+            chip.appendChild(dot);
+            chip.appendChild(label);
+            chip.appendChild(num);
+            statsEl.appendChild(chip);
+        });
+
+        const totalChip = document.createElement('span');
+        totalChip.className = 'stat-total';
+        totalChip.textContent = '已排 ' + total + ' 天 · 未排 ' + (totalDays - total) + ' 天 · 周期共 ' + totalDays + ' 天';
+        statsEl.appendChild(totalChip);
+    }
+
+    function render() {
+        renderCalendar();
+        renderStats();
+        updateToggleButtons();
+    }
+
+    function updateToggleButtons() {
+        if (defaultEnabled) {
+            defaultBtn.classList.add('primary');
+            defaultBtn.textContent = '默认班次 · 开';
+            defaultBtn.setAttribute('aria-pressed', 'true');
+        } else {
+            defaultBtn.classList.remove('primary');
+            defaultBtn.textContent = '默认班次';
+            defaultBtn.setAttribute('aria-pressed', 'false');
+        }
+
+        if (!defaultEnabled) {
+            invertBtn.disabled = true;
+            invertBtn.classList.remove('primary');
+            invertBtn.textContent = '倒转';
+            invertBtn.setAttribute('aria-pressed', 'false');
+        } else if (inverted) {
+            invertBtn.disabled = false;
+            invertBtn.classList.add('primary');
+            invertBtn.textContent = '倒转 · 开';
+            invertBtn.setAttribute('aria-pressed', 'true');
+        } else {
+            invertBtn.disabled = false;
+            invertBtn.classList.remove('primary');
+            invertBtn.textContent = '倒转';
+            invertBtn.setAttribute('aria-pressed', 'false');
+        }
+    }
+
+    /* ============================================================
+       编辑弹窗
+       ============================================================ */
+    function renderShiftOptions() {
+        shiftGrid.innerHTML = '';
+        if (!editingDate) return;
+
+        const p = parseKey(editingDate);
+        const manual = store[editingDate] || null;
+        const def = getDefaultShift(p.y, p.m, p.d);
+        const current = manual || def;
+
+        SHIFT_DEFS.forEach(function (s) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'shift-option c-' + s.id + (current === s.id ? ' selected' : '');
+            btn.setAttribute('aria-pressed', current === s.id ? 'true' : 'false');
+
+            const dot = document.createElement('span');
+            dot.className = 'shift-dot';
+
+            const label = document.createElement('span');
+            label.textContent = s.name;
+            if (def === s.id && !manual) {
+                label.textContent += '（默认）';
+            }
+
+            btn.appendChild(dot);
+            btn.appendChild(label);
+
+            btn.addEventListener('click', function () {
+                if (!editingDate) return;
+                if (def === s.id) {
+                    delete store[editingDate];
+                } else {
+                    store[editingDate] = s.id;
+                }
+                saveStore();
+                render();
+                closeEditor();
+            });
+
+            shiftGrid.appendChild(btn);
+        });
+    }
+
+    function openEditor(key) {
+        editingDate = key;
+        const p = parseKey(key);
+        const dt = new Date(p.y, p.m, p.d);
+
+        const manual = store[key] || null;
+        const def = getDefaultShift(p.y, p.m, p.d);
+        const current = manual || def;
+
+        modalTitle.textContent = p.y + '年' + (p.m + 1) + '月' + p.d + '日';
+
+        let sub = WEEK_NAMES[dt.getDay()];
+        if (manual) {
+            sub += ' · 当前：' + SHIFT_MAP[manual].name + '（手动）';
+        } else if (def) {
+            sub += ' · 当前：' + SHIFT_MAP[def].name + '（默认）';
+        } else {
+            sub += ' · 尚未排班';
+        }
+        modalSub.textContent = sub;
+
+        clearDayBtn.disabled = !manual;
+
+        renderShiftOptions();
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        $('modalClose').focus();
+    }
+
+    function closeEditor() {
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+        editingDate = null;
+    }
+
+    /* ============================================================
+       导入：解析
+       ============================================================ */
+    function normalizeShiftName(raw) {
+        if (!raw) return null;
+
+        let s = String(raw)
+            .replace(/[（(][^）)]*[）)]/g, '')
+            .replace(/[\s\u3000]+/g, '')
+            .replace(/^[·•\-–—:：,，、]+/, '')
+            .replace(/[:：,，、.。;；·•\-–—]+$/, '');
+
+        if (!s) return null;
+
+        const lower = s.toLowerCase();
+        if (SHIFT_ALIASES[lower]) return SHIFT_ALIASES[lower];
+
+        for (let i = 0; i < ALIAS_KEYS.length; i++) {
+            const k = ALIAS_KEYS[i];
+            if (lower.indexOf(k) !== -1) return SHIFT_ALIASES[k];
+        }
+        return null;
+    }
+
+    function parseImport(text) {
+        const lines = String(text).split(/\r?\n/);
+        const entries = [];
+        const failed = [];
+
+        lines.forEach(function (rawLine) {
+            let line = rawLine.trim();
+            if (!line) return;
+            if (line.charAt(0) === '#' || line.slice(0, 2) === '//') return;
+
+            line = line.replace(/[年月]/g, '/').replace(/[日号]/g, ' ');
+
+            const m = line.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+            if (!m) { failed.push(rawLine.trim()); return; }
+
+            const y = Number(m[1]);
+            const mo = Number(m[2]);
+            const d = Number(m[3]);
+            const dt = new Date(y, mo - 1, d);
+            if (y < 1900 || y > 2200 || dt.getFullYear() !== y ||
+                dt.getMonth() !== mo - 1 || dt.getDate() !== d) {
+                failed.push(rawLine.trim());
+                return;
+            }
+
+            let rest = line.slice(m.index + m[0].length);
+            rest = rest.replace(/^[\s:：,，\-–—|/]+/, '');
+
+            const parts = rest.split(/[:：]/);
+            const namePart = parts.length > 1 ? parts[parts.length - 1] : rest;
+
+            const shiftId = normalizeShiftName(namePart);
+            if (!shiftId) { failed.push(rawLine.trim()); return; }
+
+            entries.push({ key: keyOf(y, mo - 1, d), shift: shiftId });
+        });
+
+        return { entries: entries, failed: failed };
+    }
+
+    function applyImport(entries) {
+        const map = {};
+        entries.forEach(function (e) { map[e.key] = e.shift; });
+        Object.keys(map).forEach(function (k) { store[k] = map[k]; });
+        saveStore();
+
+        const firstKey = entries[0].key;
+        const fp = parseKey(firstKey);
+        viewYear = fp.y;
+        viewMonth = fp.m;
+
+        render();
+    }
+
+    function openImport() {
+        importText.value = '';
+        importStatus.textContent = '';
+        importStatus.className = 'import-status';
+        importOverlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        setTimeout(function () { importText.focus(); }, 60);
+    }
+
+    function closeImport() {
+        importOverlay.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    function doImport() {
+        const text = importText.value;
+        if (!text.trim()) {
+            importStatus.textContent = '请输入要导入的内容';
+            importStatus.className = 'import-status error';
+            return;
+        }
+
+        const result = parseImport(text);
+
+        if (!result.entries.length) {
+            importStatus.textContent = '未识别到有效数据，请检查格式';
+            importStatus.className = 'import-status error';
+            return;
+        }
+
+        applyImport(result.entries);
+
+        if (result.failed.length) {
+            showToast('已导入 ' + result.entries.length + ' 条，' + result.failed.length + ' 行无法识别');
+        } else {
+            showToast('已成功导入 ' + result.entries.length + ' 条排班');
+        }
+
+        closeImport();
+    }
+
+    /* ============================================================
+       事件绑定
+       ============================================================ */
+    calendarEl.addEventListener('click', function (e) {
+        const cell = e.target.closest('.day');
+        if (!cell || !cell.dataset.date) return;
+        openEditor(cell.dataset.date);
+    });
+
+    calendarEl.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const cell = e.target.closest('.day');
+        if (!cell || !cell.dataset.date) return;
+        e.preventDefault();
+        openEditor(cell.dataset.date);
+    });
+
+    $('prevMonthBtn').addEventListener('click', function () {
+        const d = new Date(viewYear, viewMonth - 1, 1);
+        viewYear = d.getFullYear();
+        viewMonth = d.getMonth();
+        render();
+    });
+
+    $('nextMonthBtn').addEventListener('click', function () {
+        const d = new Date(viewYear, viewMonth + 1, 1);
+        viewYear = d.getFullYear();
+        viewMonth = d.getMonth();
+        render();
+    });
+
+    $('todayBtn').addEventListener('click', function () {
+        const d = new Date();
+        viewYear = d.getFullYear();
+        viewMonth = d.getMonth();
+        render();
+    });
+
+    monthPicker.addEventListener('change', function () {
+        const v = monthPicker.value;
+        if (!/^\d{4}-\d{2}$/.test(v)) { render(); return; }
+        const parts = v.split('-');
+        const y = Number(parts[0]);
+        const m = Number(parts[1]) - 1;
+        if (m < 0 || m > 11 || y < 1900 || y > 2200) { render(); return; }
+        viewYear = y;
+        viewMonth = m;
+        render();
+    });
+
+    defaultBtn.addEventListener('click', function () {
+        defaultEnabled = !defaultEnabled;
+        saveDefaultEnabled();
+        render();
+        showToast(defaultEnabled
+            ? '默认班次已开启：工作 2 天、休息 2 天，白/夜班每 2 个周期切换'
+            : '默认班次已关闭');
+    });
+
+    invertBtn.addEventListener('click', function () {
+        if (!defaultEnabled) return;
+        inverted = !inverted;
+        saveInverted();
+        render();
+        showToast(inverted
+            ? '默认班次已倒转：白班 ↔ 夜班'
+            : '默认班次已恢复正常（未倒转）');
+    });
+
+    clearDayBtn.addEventListener('click', function () {
+        if (!editingDate) return;
+        if (!store[editingDate]) return;
+        delete store[editingDate];
+        saveStore();
+        render();
+        closeEditor();
+    });
+
+    $('modalClose').addEventListener('click', closeEditor);
+
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeEditor();
+    });
+
+    $('importBtn').addEventListener('click', openImport);
+    $('importClose').addEventListener('click', closeImport);
+    $('importCancel').addEventListener('click', closeImport);
+    $('importConfirm').addEventListener('click', doImport);
+    importOverlay.addEventListener('click', function (e) {
+        if (e.target === importOverlay) closeImport();
+    });
+    importText.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            doImport();
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (overlay.classList.contains('open')) closeEditor();
+        else if (importOverlay.classList.contains('open')) closeImport();
+    });
+
+    /* ============================================================
+       初始化
+       ============================================================ */
+    render();
+})();
+
+/* ============ 主题切换：与站内其他页面共用 cipher_theme_v2 ============ */
+var THEME_KEY = 'cipher_theme_v2';
+function applyTheme(theme, persist) {
+    var normalized = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', normalized);
+    var isDark = normalized === 'dark';
+    var btn = document.getElementById('themeToggle');
+    if (btn) {
+        btn.textContent = isDark ? '☀ 浅色模式' : '🌙 深色模式';
+        btn.setAttribute('aria-pressed', String(isDark));
+        btn.setAttribute('aria-label', isDark ? '切换到浅色模式' : '切换到深色模式');
+    }
+    if (persist !== false) {
+        try { localStorage.setItem(THEME_KEY, normalized); } catch (e) { /* 存储不可用时仅本次生效 */ }
+    }
+}
+applyTheme(document.documentElement.getAttribute('data-theme') || 'light', false);
+document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
+</script>
+
+</body>
+</html>
