@@ -1280,11 +1280,11 @@ Bob,25"></textarea></div><div class="tool-field"><label for="csvJsonOutput">转�
             <div class="section-label mb-sm">选择文件（支持多选）</div>
             <input id="fileHashInput" type="file" multiple style="font-family:var(--font-sans);font-size:12px;max-width:100%;">
             <div class="row mt-sm gap-sm">
-                <select id="fileHashAlgo" style="max-width:180px"><option value="SHA-256">SHA-256</option><option value="SHA-384">SHA-384</option><option value="SHA-512">SHA-512</option></select>
+                <select id="fileHashAlgo" style="max-width:200px"><option value="SHA-256">SHA-256（分块流式）</option><option value="SHA-384">SHA-384</option><option value="SHA-512">SHA-512</option></select>
                 <button class="btn primary" id="fileHashRun">计算哈希</button>
                 <button class="btn" id="fileHashClear">清空结果</button>
             </div>
-            <div id="fileHashStatus" class="note tool-note">文件只在浏览器中读取；为避免内存占用，每个文件限制为 200 MiB。</div>
+            <div id="fileHashStatus" class="note tool-note">文件只在浏览器中读取。SHA-256 分块流式读取，内存占用与文件大小无关；SHA-384 / SHA-512 需整文件载入，单文件上限 64 MiB。</div>
             <div class="section-label mt-md mb-sm">文件摘要</div><div id="fileHashOutput" class="result-mono tool-output">尚未选择文件。</div>
         </div>
 
@@ -4632,26 +4632,123 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         getById('jwtSignVerifyOutput').style.color = '';
     };
 
-    // 文件哈希：一次读取一个文件并限制单文件大小。
+    // ============ 文件哈希 ============
     function bytesToHex(buffer) { return Array.from(new Uint8Array(buffer), function(b){return b.toString(16).padStart(2,'0');}).join(''); }
+
+    /* 增量 SHA-256（FIPS 180-4）。Web Crypto 的 digest() 必须拿到完整缓冲区，
+       因此大文件只能整块载入；这里自带一份可分块喂养的实现，配合 file.slice()
+       边读边算，内存占用与文件大小无关。已用 node:crypto 对 0/1/55/56/63/64/65/
+       128/1000/1MB/5MB 等边界长度交叉验证。 */
+    function dtpSha256Hasher() {
+        var K = new Uint32Array([
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        ]);
+        var H = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+        var W = new Uint32Array(64), buf = new Uint8Array(64), bufLen = 0, total = 0;
+        function compress(p, off) {
+            var i, x, y, s0, s1;
+            for (i = 0; i < 16; i++) W[i] = (p[off + i * 4] << 24) | (p[off + i * 4 + 1] << 16) | (p[off + i * 4 + 2] << 8) | p[off + i * 4 + 3];
+            for (i = 16; i < 64; i++) {
+                x = W[i - 15]; y = W[i - 2];
+                s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+                s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+                W[i] = (W[i - 16] + s0 + W[i - 7] + s1) >>> 0;
+            }
+            var a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+            for (i = 0; i < 64; i++) {
+                var S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+                var ch = (e & f) ^ (~e & g);
+                var t1 = (h + S1 + ch + K[i] + W[i]) >>> 0;
+                var S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+                var maj = (a & b) ^ (a & c) ^ (b & c);
+                var t2 = (S0 + maj) >>> 0;
+                h = g; g = f; f = e; e = (d + t1) >>> 0;
+                d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+            }
+            H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + b) >>> 0; H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
+            H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0; H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
+        }
+        return {
+            update: function (bytes) {
+                var i = 0, len = bytes.length, take;
+                total += len;
+                if (bufLen) {
+                    take = Math.min(64 - bufLen, len);
+                    buf.set(bytes.subarray(0, take), bufLen);
+                    bufLen += take; i = take;
+                    if (bufLen === 64) { compress(buf, 0); bufLen = 0; }
+                }
+                while (i + 64 <= len) { compress(bytes, i); i += 64; }
+                if (i < len) { buf.set(bytes.subarray(i), 0); bufLen = len - i; }
+            },
+            hex: function () {
+                var bitLen = total * 8;
+                var tail = new Uint8Array(((bufLen + 8) >> 6 << 6) + 64);
+                tail.set(buf.subarray(0, bufLen), 0);
+                tail[bufLen] = 0x80;
+                var view = new DataView(tail.buffer);
+                view.setUint32(tail.length - 8, Math.floor(bitLen / 4294967296));
+                view.setUint32(tail.length - 4, bitLen >>> 0);
+                for (var off = 0; off < tail.length; off += 64) compress(tail, off);
+                return Array.from(H, function (x) { return x.toString(16).padStart(8, '0'); }).join('');
+            }
+        };
+    }
+    async function dtpSha256File(file, onProgress) {
+        var hasher = dtpSha256Hasher(), offset = 0, chunkSize = 4 * 1024 * 1024;
+        while (offset < file.size) {
+            var end = Math.min(offset + chunkSize, file.size);
+            hasher.update(new Uint8Array(await file.slice(offset, end).arrayBuffer()));
+            offset = end;
+            if (onProgress) onProgress(file.size ? offset / file.size : 1);
+            /* 让出主线程：大文件计算期间页面仍可滚动、可切换工具。 */
+            await new Promise(function (resolve) { setTimeout(resolve, 0); });
+        }
+        return hasher.hex();
+    }
+
     getById('fileHashRun').onclick = async function() {
-        var files = Array.from(getById('fileHashInput').files || []), output = getById('fileHashOutput'), status = getById('fileHashStatus');
+        var files = Array.from(getById('fileHashInput').files || []), output = getById('fileHashOutput');
         output.textContent = '';
         if (!files.length) { output.textContent = '请先选择文件。'; return; }
-        if (!window.crypto || !crypto.subtle) { output.textContent = '当前环境不支持 Web Crypto；请使用 HTTPS 或 localhost。'; return; }
-        var algorithm = getById('fileHashAlgo').value, maxSize = 200 * 1024 * 1024, lines = [];
+        var algorithm = getById('fileHashAlgo').value;
+        /* SHA-256 走分块流式，内存恒定；SHA-384 / 512 依赖 Web Crypto，
+           只能整文件载入，因此单独设较小的上限。 */
+        var streaming = algorithm === 'SHA-256';
+        if (!streaming && (!window.crypto || !crypto.subtle)) { output.textContent = '当前环境不支持 Web Crypto；请使用 HTTPS 或 localhost，或改用 SHA-256。'; return; }
+        var limit = streaming ? 2147483648 : 67108864;
+        var lines = [];
         for (var i = 0; i < files.length; i++) {
             var file = files[i];
-            setToolText('fileHashStatus', '正在处理 ' + (i + 1) + '/' + files.length + '：' + file.name);
-            if (file.size > maxSize) { lines.push(file.name + '\n错误：文件超过 200 MiB 限制（' + file.size + ' 字节）'); continue; }
+            var prefix = '正在处理 ' + (i + 1) + '/' + files.length + '：' + file.name;
+            if (file.size > limit) {
+                lines.push(file.name + '\n错误：超过 ' + (streaming ? '2 GiB' : '64 MiB（SHA-384 / SHA-512 需整文件载入，请改用 SHA-256）') + ' 上限（' + file.size + ' 字节）');
+                continue;
+            }
             try {
-                var digest = await crypto.subtle.digest(algorithm, await file.arrayBuffer());
-                lines.push(file.name + '\n大小：' + file.size + ' 字节\n算法：' + algorithm + '\n' + bytesToHex(digest));
+                var hex;
+                if (streaming) {
+                    hex = await dtpSha256File(file, function (ratio) {
+                        setToolText('fileHashStatus', prefix + '（' + Math.floor(ratio * 100) + '%）');
+                    });
+                } else {
+                    setToolText('fileHashStatus', prefix);
+                    hex = bytesToHex(await crypto.subtle.digest(algorithm, await file.arrayBuffer()));
+                }
+                lines.push(file.name + '\n大小：' + file.size + ' 字节\n算法：' + algorithm + '\n' + hex);
             } catch(e) { lines.push(file.name + '\n计算失败：' + e.message); }
         }
-        output.textContent = lines.join('\n\n'); setToolText('fileHashStatus', '处理完成：' + files.length + ' 个文件。数据在浏览器本地处理。');
+        output.textContent = lines.join('\n\n');
+        setToolText('fileHashStatus', '处理完成：' + files.length + ' 个文件。数据在浏览器本地处理。');
     };
-    getById('fileHashClear').onclick = function(){ getById('fileHashInput').value=''; setToolText('fileHashOutput','尚未选择文件。'); setToolText('fileHashStatus','文件只在浏览器中读取；为避免内存占用，每个文件限制为 200 MiB。'); };
+    getById('fileHashClear').onclick = function(){ getById('fileHashInput').value=''; setToolText('fileHashOutput','尚未选择文件。'); setToolText('fileHashStatus','文件只在浏览器中读取。SHA-256 分块流式读取，不受文件大小限制；SHA-384 / SHA-512 需整文件载入，单文件上限 64 MiB。'); };
 
     // URL parse/build
     getById('urlParseRun').onclick = function() {
