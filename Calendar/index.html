@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>排班日历</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAWElEQVR4nO2TQQrAIAwE5//PMpTSV633ipUQFakO5JQlAwmBv/MAd6BfcAEKln0J1KmqvAMGpHq86LsFXtYRaPQNNOvIXo6gyRE02UigUZ9sHYanwAbYkAwS6qCgYmFKfAAAAABJRU5ErkJggg==">
 <script>
     (function () {
         try {
@@ -59,6 +60,15 @@
 
     /* ---------- 顶部标题 ---------- */
     .header { margin-bottom: 30px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .header-icon {
+        width: 18px;
+        height: 18px;
+        align-self: center;
+        flex-shrink: 0;
+        opacity: .82;
+        border-radius: 3px;
+    }
+    [data-theme="dark"] .header-icon { filter: invert(1) brightness(1.3); }
     .header-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
     .header-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text); flex-shrink: 0; align-self: center; }
     .header-subtitle { font-size: 12px; color: var(--text-tertiary); }
@@ -151,6 +161,8 @@
         margin-bottom: 18px;
     }
     .toolbar-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    /* 云同步与常规功能之间的间隔 */
+    .toolbar-gap { width: 14px; flex-shrink: 0; }
 
     input[type="month"] {
         font-family: var(--font-mono);
@@ -251,19 +263,20 @@
     .day.weekend .day-num { color: #b35b00; }
     .day.today.weekend .day-num { color: var(--today-ring); }
 
+    /* 班次徽标：允许换行，窄屏下「白班加班」自动折成两行 */
     .shift-badge {
         max-width: 100%;
         font-size: 13px;
         font-weight: 600;
         letter-spacing: .01em;
-        line-height: 1.45;
+        line-height: 1.4;
         padding: 3px 9px;
         border-radius: 3px;
         color: var(--sc);
         background: var(--sb);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        text-align: center;
+        white-space: normal;
+        text-wrap: balance;
         border: 1px solid transparent;
     }
     /* 默认班次：虚线描边 + 透明底，与手动设置区分 */
@@ -398,9 +411,7 @@
         background: var(--sb);
         border: 1px solid transparent;
         max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        text-align: left;
     }
     .today-shift-badge.is-default { background: transparent; border: 1px dashed var(--sc); }
     .today-shift-badge.is-empty {
@@ -565,6 +576,44 @@
     .sync-row select:focus { border-color: var(--accent); }
     .sync-actions { display: flex; gap: 8px; margin-left: auto; }
 
+    /* 云端 / 本地数据对比（使用微软雅黑，不用等宽字体） */
+    .sync-compare {
+        display: flex;
+        flex-direction: column;
+        margin-top: 14px;
+        padding: 10px 14px;
+        background: var(--bg);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius);
+        font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .sync-compare-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 4px 0;
+    }
+    .sync-compare-row + .sync-compare-row { border-top: 1px dashed var(--border-light); }
+    .sync-compare-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .08em;
+        color: var(--text-tertiary);
+        text-transform: uppercase;
+        flex-shrink: 0;
+        font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .sync-compare-value {
+        font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0;
+        color: var(--text);
+        text-align: right;
+    }
+    .sync-compare-value.is-pending { color: var(--text-tertiary); font-weight: 500; }
+
     /* ---------- 导出 / 备份 ---------- */
     .export-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
     .export-actions .btn { flex: 1 1 120px; }
@@ -694,13 +743,16 @@
     @media (max-width: 640px) {
         body { padding: 20px 10px 40px; }
         .header { margin-bottom: 20px; }
+        .header-icon { width: 16px; height: 16px; }
         .toolbar { gap: 8px; }
         .toolbar-group { flex: 1 1 auto; }
+        .toolbar-gap { width: 10px; }
         input[type="month"] { min-width: 0; flex: 1; font-size: 12px; }
         .btn.icon-btn { width: 30px; height: 30px; }
         .day { min-height: 82px; padding: 7px 3px; gap: 5px; }
         .day-num { font-size: 19px; min-width: 30px; height: 30px; }
-        .shift-badge { font-size: 10px; padding: 2px 5px; border-radius: 2px; }
+        /* 窄屏徽标收窄内边距，四字班次自动折成两行（白班 / 加班） */
+        .shift-badge { font-size: 10px; padding: 2px 4px; border-radius: 2px; line-height: 1.35; }
         .shift-grid { grid-template-columns: 1fr 1fr; gap: 7px; }
         .shift-option { padding: 10px 9px; font-size: 11px; }
         .stat-total { margin-left: 0; width: 100%; }
@@ -722,6 +774,7 @@
 
 <div class="container">
     <div class="header">
+        <img class="header-icon" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAWElEQVR4nO2TQQrAIAwE5//PMpTSV633ipUQFakO5JQlAwmBv/MAd6BfcAEKln0J1KmqvAMGpHq86LsFXtYRaPQNNOvIXo6gyRE02UigUZ9sHYanwAbYkAwS6qCgYmFKfAAAAABJRU5ErkJggg==" alt="" aria-hidden="true">
         <span class="header-title">排班日历</span>
         <span class="header-dot"></span>
         <span class="header-subtitle">本地存储 · 可选云同步</span>
@@ -745,6 +798,7 @@
                     <button class="btn small" id="invertBtn" type="button" aria-pressed="false" disabled title="临时互换默认的白班与夜班">倒转</button>
                     <button class="btn small" id="importBtn" type="button">导入</button>
                     <button class="btn small" id="exportBtn" type="button">导出</button>
+                    <span class="toolbar-gap" aria-hidden="true"></span>
                     <button class="btn small" id="syncBtn" type="button">云同步</button>
                 </div>
             </div>
@@ -848,36 +902,31 @@
         <div class="modal-head">
             <div>
                 <div class="modal-title" id="syncTitle">云同步</div>
-                <div class="modal-sub">JSONBin · 数据只保存在你自己的账号里</div>
+                <div class="modal-sub">打开时自动查询云端，由你决定上传或下载</div>
             </div>
             <button class="btn small" id="syncClose" type="button">关闭</button>
         </div>
 
-        <div class="sync-form">
-            <label class="sync-row">
-                <span>Bin ID</span>
-                <input id="syncBinId" type="text" autocomplete="off" spellcheck="false"
-                       placeholder="例如 65f1a2b3c4d5e6f7a8b9c0d1">
-            </label>
-            <label class="sync-row">
-                <span>Access Key</span>
-                <input id="syncKey" type="password" autocomplete="off" spellcheck="false"
-                       placeholder="$2b$10$...">
-            </label>
+        <div class="sync-compare">
+            <div class="sync-compare-row">
+                <span class="sync-compare-label">云端</span>
+                <span class="sync-compare-value is-pending" id="syncCloudCount">查询中…</span>
+            </div>
+            <div class="sync-compare-row">
+                <span class="sync-compare-label">本地</span>
+                <span class="sync-compare-value" id="syncLocalCount">—</span>
+            </div>
         </div>
 
-        <div class="sync-reset-row">
-            <span class="import-hint" id="syncBuiltinHint">已内置默认配置，一般无需修改。</span>
-            <button class="btn small" id="syncResetBuiltin" type="button">重置为内置配置</button>
-        </div>
+        <div class="import-hint" id="syncCloudMeta">正在查询云端数据…</div>
+        <div class="import-hint" id="syncMetaHint" style="margin-top:6px">尚未同步</div>
 
-        <div class="import-hint" id="syncMetaHint" style="margin-top:8px">尚未同步</div>
-
-        <div class="import-hint" style="margin-top:8px">上传前会先读取云端并确认覆盖，云端在其它设备上更新过时会额外提示；下载会用云端数据覆盖本机，下载前会再次确认。</div>
+        <div class="import-hint" style="margin-top:8px">上传会用本机数据整体替换云端；下载会用云端数据整体覆盖本机。上传 / 下载直接使用本次查询到的云端数据，不会重复读取；如需获取最新云端数据，请点「刷新」。</div>
 
         <div class="modal-foot">
             <span class="import-status" id="syncStatus"></span>
             <div class="sync-actions">
+                <button class="btn small" id="syncRefresh" type="button">刷新</button>
                 <button class="btn small" id="syncDownload" type="button">下载</button>
                 <button class="btn small primary" id="syncUpload" type="button">上传</button>
             </div>
@@ -948,10 +997,6 @@
 
     /* ============================================================
             这里保存的只是个人排班数据
-            非敏感内容，公开到仓库并无大碍
-            非敏感内容，公开到仓库并无大碍
-            非敏感内容，公开到仓库并无大碍
-            非敏感内容，公开到仓库并无大碍
             非敏感内容，公开到仓库并无大碍
             因此直接将配置写入源码，省去在每台设备上重复填写的麻烦。
             如果哪天觉得不妥，只需在 JSONBin 后台重建 Access Key 并更新
@@ -1065,11 +1110,36 @@
         toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
     }
 
+    /* 统一时间格式：yyyy-MM-dd HH:mm:ss */
     function formatTs(ts) {
         if (!ts) return '—';
         const d = new Date(ts);
-        return d.getFullYear() + '/' + pad2(d.getMonth() + 1) + '/' + pad2(d.getDate()) +
-            ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+            ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+    }
+
+    /* 相对时间差：刚刚 / x秒前 / x分y秒前 / x小时y分前 / x天y小时前 */
+    function formatAgo(ts) {
+        if (!ts) return '';
+        const diff = Date.now() - ts;
+        /* 未来时间（跨设备时钟偏差）不显示负数 */
+        if (diff < 0) return '刚刚';
+        const sec = Math.floor(diff / 1000);
+        if (sec < 1) return '刚刚';
+        if (sec < 60) return sec + '秒前';
+        const min = Math.floor(sec / 60);
+        if (min < 60) return min + '分' + (sec % 60) + '秒前';
+        const hour = Math.floor(min / 60);
+        if (hour < 24) return hour + '小时' + (min % 60) + '分前';
+        const day = Math.floor(hour / 24);
+        if (day < 30) return day + '天' + (hour % 24) + '小时前';
+        return day + '天前';
+    }
+
+    /* 时间 + 时间差：2026-10-17 19:48:29 (3分45秒前) */
+    function formatTsWithAgo(ts) {
+        if (!ts) return '—';
+        return formatTs(ts) + ' (' + formatAgo(ts) + ')';
     }
 
     function formatRangeText(range) {
@@ -1299,9 +1369,11 @@
     }
 
     /* ============================================================
-       云同步（手动上传 / 下载，配置优先读取硬编码默认值）
+       云同步
+       配置直接读源码内置值；打开弹窗时查询一次云端并缓存，
+       上传 / 下载直接使用缓存，只有点「刷新」才重新读取。
+       时间显示附带相对时间差，弹窗打开期间每秒刷新。
        ============================================================ */
-    const SYNC_CFG_KEY = 'shift_calendar_sync_v1';
     const SYNC_META_KEY = 'shift_calendar_sync_meta_v1';
     const SYNC_TIMEOUT_MS = 12000;
 
@@ -1311,31 +1383,12 @@
             && !!SYNC_DEFAULT.binId && !!SYNC_DEFAULT.key;
     }
 
-    function loadSyncCfg() {
-        // 1. 优先本地保存的覆盖值（用户手动改过）
-        try {
-            const raw = localStorage.getItem(SYNC_CFG_KEY);
-            if (raw) {
-                const c = JSON.parse(raw);
-                if (c && typeof c === 'object' && c.binId && c.key) {
-                    return { binId: String(c.binId), key: String(c.key) };
-                }
-            }
-        } catch (e) { /* 忽略 */ }
-        // 2. 回退到硬编码默认值
-        if (hasBuiltinCfg()) {
-            return { binId: SYNC_DEFAULT.binId, key: SYNC_DEFAULT.key };
-        }
-        return { binId: '', key: '' };
-    }
-    function persistSyncCfg() {
-        try { localStorage.setItem(SYNC_CFG_KEY, JSON.stringify(syncCfg)); } catch (e) {}
-    }
-    function clearPersistedSyncCfg() {
-        try { localStorage.removeItem(SYNC_CFG_KEY); } catch (e) {}
-    }
+    const syncCfg = hasBuiltinCfg()
+        ? { binId: SYNC_DEFAULT.binId, key: SYNC_DEFAULT.key }
+        : { binId: '', key: '' };
 
-    let syncCfg = loadSyncCfg();
+    /* 本次查询到的云端数据快照：{ remoteStore, remoteTs, count, fetchedAt } */
+    let syncCache = null;
 
     /* 上次成功同步的时间，用于判断云端是否在其它设备上被更新过。
        JSONBin 不提供服务器端更新时间，这里用写入端自带的 updatedAt，
@@ -1366,8 +1419,42 @@
         const el = $('syncMetaHint');
         if (!el) return;
         el.textContent = syncMeta.lastSyncAt
-            ? '上次同步：' + formatTs(syncMeta.lastSyncAt) + (syncMeta.lastAction ? ' · ' + syncMeta.lastAction : '')
+            ? '上次同步：' + formatTsWithAgo(syncMeta.lastSyncAt) + (syncMeta.lastAction ? ' · ' + syncMeta.lastAction : '')
             : '尚未同步';
+    }
+
+    /* 云端 meta 显示状态，供定时刷新时间差使用 */
+    let syncCloudMetaState = { type: 'idle', ts: 0, text: '' };
+
+    function setCloudMetaText(text) {
+        syncCloudMetaState = { type: 'text', ts: 0, text: text };
+        $('syncCloudMeta').textContent = text;
+    }
+    function setCloudMetaTime(ts) {
+        syncCloudMetaState = { type: 'time', ts: ts, text: '' };
+        $('syncCloudMeta').textContent = '云端最后更新：' + formatTsWithAgo(ts);
+    }
+    function refreshCloudMeta() {
+        if (syncCloudMetaState.type === 'time' && syncCloudMetaState.ts) {
+            $('syncCloudMeta').textContent = '云端最后更新：' + formatTsWithAgo(syncCloudMetaState.ts);
+        }
+    }
+
+    /* 云同步弹窗打开期间，每秒刷新一次相对时间差 */
+    let syncMetaTimer = null;
+    function startSyncMetaTimer() {
+        stopSyncMetaTimer();
+        syncMetaTimer = setInterval(function () {
+            if (!syncOverlay.classList.contains('open')) return;
+            renderSyncMeta();
+            refreshCloudMeta();
+        }, 1000);
+    }
+    function stopSyncMetaTimer() {
+        if (syncMetaTimer) {
+            clearInterval(syncMetaTimer);
+            syncMetaTimer = null;
+        }
     }
 
     function syncConfigured() {
@@ -1393,21 +1480,10 @@
         el.className = 'import-status' + (isError ? ' error' : '');
     }
 
-    function collectSyncCfgFromForm() {
-        return {
-            binId: $('syncBinId').value.trim(),
-            key: $('syncKey').value.trim()
-        };
-    }
-
-    function fillSyncForm() {
-        $('syncBinId').value = syncCfg.binId || '';
-        $('syncKey').value = syncCfg.key || '';
-    }
-
     function setSyncButtonsDisabled(disabled) {
         $('syncUpload').disabled = disabled;
         $('syncDownload').disabled = disabled;
+        $('syncRefresh').disabled = disabled;
     }
 
     function httpErrorText(status) {
@@ -1435,14 +1511,14 @@
         return (e && e.message) ? e.message : '网络错误';
     }
 
-    async function pushJsonbin(cfg, payload, signal) {
+    async function pushJsonbin(payload, signal) {
         const r = await fetch(
-            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(cfg.binId),
+            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(syncCfg.binId),
             {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Access-Key': cfg.key
+                    'X-Access-Key': syncCfg.key
                 },
                 body: JSON.stringify(payload),
                 signal: signal,
@@ -1453,11 +1529,11 @@
         return r.json();
     }
 
-    async function pullJsonbin(cfg, signal) {
+    async function pullJsonbin(signal) {
         const r = await fetch(
-            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(cfg.binId) + '/latest',
+            'https://api.jsonbin.io/v3/b/' + encodeURIComponent(syncCfg.binId) + '/latest',
             {
-                headers: { 'X-Access-Key': cfg.key },
+                headers: { 'X-Access-Key': syncCfg.key },
                 signal: signal,
                 cache: 'no-store'
             }
@@ -1467,39 +1543,87 @@
         return j.record || null;
     }
 
-    /* 上传前先读云端，确认覆盖并提示跨设备冲突 */
-    async function doUpload() {
-        const cfg = collectSyncCfgFromForm();
-        if (!cfg.binId || !cfg.key) {
-            setSyncStatus('请先填写 Bin ID 和 Access Key', true);
+    function setCompareValue(el, text, pending) {
+        if (!el) return;
+        el.textContent = text;
+        if (pending) el.classList.add('is-pending');
+        else el.classList.remove('is-pending');
+    }
+
+    function renderLocalCount() {
+        setCompareValue($('syncLocalCount'), Object.keys(store).length + ' 条', false);
+    }
+
+    /* 打开弹窗时（或点「刷新」时）查询云端，并把结果缓存起来 */
+    async function refreshCloudInfo() {
+        renderLocalCount();
+
+        if (!syncConfigured()) {
+            syncCache = null;
+            setCompareValue($('syncCloudCount'), '—', true);
+            setCloudMetaText('源码中没有可用的云端配置，无法连接。');
+            setSyncButtonsDisabled(true);
             return;
         }
 
-        setSyncStatus('正在检查云端…', false);
+        syncCache = null;
+        setCompareValue($('syncCloudCount'), '查询中…', true);
+        setCloudMetaText('正在查询云端数据…');
         setSyncButtonsDisabled(true);
+
         const t = requestSignal();
-        let remote;
         try {
-            remote = await pullJsonbin(cfg, t.signal);
+            const remote = await pullJsonbin(t.signal);
+            const remoteStore = sanitizeStore(remote && remote.store);
+            const count = Object.keys(remoteStore).length;
+            const ts = Number(remote && remote.updatedAt) || 0;
+
+            syncCache = {
+                remoteStore: remoteStore,
+                remoteTs: ts,
+                count: count,
+                fetchedAt: Date.now()
+            };
+
+            setCompareValue($('syncCloudCount'), count + ' 条', false);
+            if (!count) {
+                setCloudMetaText('云端暂时没有排班数据，上传后即可在其他设备下载。');
+            } else if (ts) {
+                setCloudMetaTime(ts);
+            } else {
+                setCloudMetaText('云端已有排班数据。');
+            }
+            setSyncButtonsDisabled(false);
         } catch (e) {
-            setSyncStatus('无法读取云端：' + netErrorText(e), true);
-            showToast('无法读取云端，已取消上传');
-            return;
+            syncCache = null;
+            setCompareValue($('syncCloudCount'), '查询失败', true);
+            setCloudMetaText('云端查询失败：' + netErrorText(e));
+            setSyncButtonsDisabled(false);
         } finally {
             t.done();
-            setSyncButtonsDisabled(false);
+        }
+    }
+
+    /* 上传：直接基于打开时（或刷新时）缓存的数据做判断，不再请求云端 */
+    function doUpload() {
+        if (!syncConfigured()) {
+            setSyncStatus('没有可用的云端配置，无法上传', true);
+            return;
+        }
+        if (!syncCache) {
+            setSyncStatus('尚未获取云端数据，请先点「刷新」', true);
+            return;
         }
 
-        const remoteStore = sanitizeStore(remote && remote.store);
-        const remoteCount = Object.keys(remoteStore).length;
-        const remoteTs = Number(remote && remote.updatedAt) || 0;
+        const remoteCount = syncCache.count;
+        const remoteTs = syncCache.remoteTs;
         const localCount = Object.keys(store).length;
         const remoteNewer = remoteCount > 0 && remoteTs > (syncMeta.lastSyncAt || 0);
         const localEmpty = localCount === 0 && remoteCount > 0;
 
         const lines = [];
         lines.push('本机 ' + localCount + ' 条排班；云端 ' + remoteCount + ' 条' +
-            (remoteTs ? '（更新于 ' + formatTs(remoteTs) + '）' : '') + '。');
+            (remoteTs ? '（更新于 ' + formatTsWithAgo(remoteTs) + '）' : '') + '。');
         lines.push('上传会用本机数据整体替换云端。');
         if (localEmpty) {
             lines.push('注意：本机没有任何排班，上传会清空云端数据。');
@@ -1514,22 +1638,33 @@
                 : (remoteNewer ? '云端数据更新，仍要覆盖？' : '覆盖云端数据？'),
             sub: lines.join(' '),
             okText: '确认上传',
-            onOk: function () { performUpload(cfg); }
+            onOk: performUpload
         });
     }
 
-    async function performUpload(cfg) {
+    async function performUpload() {
         setSyncStatus('上传中…', false);
         setSyncButtonsDisabled(true);
         const t = requestSignal();
         try {
             const payload = { store: store, updatedAt: Date.now() };
-            await pushJsonbin(cfg, payload, t.signal);
-            syncCfg = cfg;
-            persistSyncCfg();
+            await pushJsonbin(payload, t.signal);
+
+            /* 上传成功后，云端内容即本机内容，直接更新缓存，不再重复拉取 */
+            const count = Object.keys(store).length;
+            syncCache = {
+                remoteStore: JSON.parse(JSON.stringify(store)),
+                remoteTs: payload.updatedAt,
+                count: count,
+                fetchedAt: Date.now()
+            };
+            setCompareValue($('syncCloudCount'), count + ' 条', false);
+            renderLocalCount();
+            setCloudMetaTime(payload.updatedAt);
+
             updateSyncBadge();
             saveSyncMeta(payload.updatedAt, '上传');
-            setSyncStatus('上传成功 · ' + formatTs(payload.updatedAt), false);
+            setSyncStatus('上传成功 · ' + formatTsWithAgo(payload.updatedAt), false);
             showToast('已上传到云端');
         } catch (e) {
             setSyncStatus('上传失败：' + netErrorText(e), true);
@@ -1540,78 +1675,63 @@
         }
     }
 
-    /* 下载前先读云端，空数据直接取消，非空才弹出覆盖确认 */
-    async function doDownload() {
-        const cfg = collectSyncCfgFromForm();
-        if (!cfg.binId || !cfg.key) {
-            setSyncStatus('请先填写 Bin ID 和 Access Key', true);
+    /* 下载：直接使用缓存中的云端数据，不再请求云端 */
+    function doDownload() {
+        if (!syncConfigured()) {
+            setSyncStatus('没有可用的云端配置，无法下载', true);
+            return;
+        }
+        if (!syncCache) {
+            setSyncStatus('尚未获取云端数据，请先点「刷新」', true);
             return;
         }
 
-        setSyncStatus('正在读取云端…', false);
-        setSyncButtonsDisabled(true);
-        const t = requestSignal();
-        let remote;
-        try {
-            remote = await pullJsonbin(cfg, t.signal);
-        } catch (e) {
-            setSyncStatus('读取失败：' + netErrorText(e), true);
-            showToast('读取失败');
-            return;
-        } finally {
-            t.done();
-            setSyncButtonsDisabled(false);
-        }
-
-        const remoteStore = sanitizeStore(remote && remote.store);
-        const count = Object.keys(remoteStore).length;
+        const count = syncCache.count;
         if (!count) {
             setSyncStatus('云端暂无排班数据，已取消下载', true);
             showToast('云端暂无数据');
             return;
         }
 
-        const remoteTs = Number(remote && remote.updatedAt) || 0;
+        const remoteTs = syncCache.remoteTs;
         const localCount = Object.keys(store).length;
 
         openConfirm({
             title: '覆盖本地数据？',
-            sub: '云端 ' + count + ' 条排班' + (remoteTs ? '（更新于 ' + formatTs(remoteTs) + '）' : '') +
+            sub: '云端 ' + count + ' 条排班' + (remoteTs ? '（更新于 ' + formatTsWithAgo(remoteTs) + '）' : '') +
                  '将覆盖本机 ' + localCount + ' 条排班，此操作无法撤销。',
             okText: '确认覆盖',
-            onOk: function () { applyDownload(cfg, remoteStore, remoteTs); }
+            onOk: function () { applyDownload(syncCache.remoteStore, remoteTs); }
         });
     }
 
-    function applyDownload(cfg, remoteStore, remoteTs) {
+    function applyDownload(remoteStore, remoteTs) {
         backupStore('下载覆盖前');
         store = remoteStore;
         saveStore();
         render();
-        syncCfg = cfg;
-        persistSyncCfg();
         updateSyncBadge();
+        renderLocalCount();
         const ts = remoteTs || Date.now();
         saveSyncMeta(ts, '下载');
-        setSyncStatus('下载成功 · ' + formatTs(ts), false);
+        setSyncStatus('下载成功 · ' + formatTsWithAgo(ts), false);
         showToast('已从云端下载并覆盖本地数据');
     }
 
     function openSyncSettings() {
-        fillSyncForm();
-        if (hasBuiltinCfg()) {
-            $('syncBuiltinHint').textContent = '已内置默认配置，一般无需修改。';
-        } else {
-            $('syncBuiltinHint').textContent = '未内置配置，请手动填写。';
-        }
-        renderSyncMeta();
-        setSyncStatus(syncConfigured() ? '已配置，可直接上传或下载' : '');
         syncOverlay.classList.add('open');
         syncBodyLock();
+        renderSyncMeta();
+        setSyncStatus('');
+        $('syncClose').focus();
+        startSyncMetaTimer();
+        refreshCloudInfo();
     }
+
     function closeSyncSettings() {
         syncOverlay.classList.remove('open');
         syncBodyLock();
+        stopSyncMetaTimer();
     }
 
     let confirmAction = null;
@@ -2379,7 +2499,7 @@
             btn.disabled = true;
             return;
         }
-        hint.textContent = '自动备份：' + formatTs(b.savedAt) + ' · ' +
+        hint.textContent = '自动备份：' + formatTsWithAgo(b.savedAt) + ' · ' +
             Object.keys(b.store).length + ' 条' + (b.reason ? ' · ' + b.reason : '');
         btn.disabled = false;
     }
@@ -2444,7 +2564,7 @@
         }
         openConfirm({
             title: '恢复自动备份？',
-            sub: '备份时间 ' + formatTs(b.savedAt) + '，共 ' + Object.keys(b.store).length +
+            sub: '备份时间 ' + formatTsWithAgo(b.savedAt) + '，共 ' + Object.keys(b.store).length +
                  ' 条。恢复后将替换当前 ' + Object.keys(store).length + ' 条排班。',
             okText: '确认恢复',
             onOk: function () {
@@ -2615,18 +2735,9 @@
 
     $('syncUpload').addEventListener('click', doUpload);
     $('syncDownload').addEventListener('click', doDownload);
-
-    /* 重置为内置配置 */
-    $('syncResetBuiltin').addEventListener('click', function () {
-        if (!hasBuiltinCfg()) {
-            setSyncStatus('代码中未内置配置，请手动填写', true);
-            return;
-        }
-        clearPersistedSyncCfg();
-        syncCfg = { binId: SYNC_DEFAULT.binId, key: SYNC_DEFAULT.key };
-        fillSyncForm();
-        updateSyncBadge();
-        setSyncStatus('已填入内置配置，点上传或下载生效');
+    $('syncRefresh').addEventListener('click', function () {
+        setSyncStatus('');
+        refreshCloudInfo();
     });
 
     $('confirmCancel').addEventListener('click', closeConfirm);
