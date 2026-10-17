@@ -349,6 +349,57 @@
         .header { flex-wrap: wrap; }
         .dtp-theme-toggle { align-self: center; margin-left: auto; padding: 6px 12px; font-size: 11px; }
 
+        /* ============ 轻提示（toast）：替代 alert，不阻塞交互 ============ */
+        .dtp-toast-host {
+            position: fixed;
+            left: 50%;
+            bottom: 24px;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: max-content;
+            max-width: min(92vw, 560px);
+            pointer-events: none;
+        }
+        .dtp-toast {
+            pointer-events: auto;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px 10px 14px;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-left-width: 3px;
+            border-radius: var(--radius);
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.14);
+            font-size: 12.5px;
+            line-height: 1.55;
+            max-width: 100%;
+            animation: dtpToastIn 160ms ease;
+        }
+        .dtp-toast.error { border-left-color: var(--danger); }
+        .dtp-toast.success { border-left-color: var(--ok); }
+        .dtp-toast.info { border-left-color: var(--text-tertiary); }
+        .dtp-toast-text { white-space: pre-line; overflow-wrap: anywhere; }
+        .dtp-toast-close {
+            flex: 0 0 auto;
+            border: 0;
+            background: none;
+            color: var(--text-tertiary);
+            font-size: 15px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 2px;
+            font-family: var(--font-sans);
+        }
+        .dtp-toast-close:hover { color: var(--text); }
+        @keyframes dtpToastIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { .dtp-toast { animation: none; } }
+
         /* ============ 移动端导航（小屏用下拉选择替代横向滚动标签条） ============ */
         .dtp-nav-select { display: block; width: 100%; max-width: 100%; min-width: 0; font-family: var(--font-sans); font-size: 13px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); margin-bottom: 12px; }
         .dtp-nav-select-wrap { display: none; min-width: 0; }
@@ -1686,6 +1737,7 @@ timeout"></textarea></div>
         <span class="dtp-dep-detail" id="depDetail" hidden></span>
     </p>
 </div>
+<div id="dtpToastHost" class="dtp-toast-host" aria-live="polite" aria-atomic="false"></div>
 
 <script>
 // >>>DTP-PURE-BEGIN
@@ -2776,6 +2828,35 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         } else fallbackCopy();
     }
 
+    /* 轻提示：替代 alert。alert 会阻塞主线程、打断输入焦点，且样式不可控。
+       错误停留 6 秒，其余 3.2 秒；最多同时保留 3 条，超出时挤掉最早的一条。 */
+    function dtpToast(message, type, timeout) {
+        var host = getById('dtpToastHost');
+        if (!host) return null;
+        var el = document.createElement('div');
+        el.className = 'dtp-toast ' + (type || 'info');
+        el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        var text = document.createElement('span');
+        text.className = 'dtp-toast-text';
+        text.textContent = String(message);
+        el.appendChild(text);
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'dtp-toast-close';
+        close.setAttribute('aria-label', '关闭提示');
+        close.textContent = '×';
+        el.appendChild(close);
+        host.appendChild(el);
+        while (host.children.length > 3) host.removeChild(host.firstElementChild);
+        var timer = setTimeout(dismiss, timeout || (type === 'error' ? 6000 : 3200));
+        function dismiss() {
+            clearTimeout(timer);
+            if (el.parentNode) el.parentNode.removeChild(el);
+        }
+        close.addEventListener('click', dismiss);
+        return dismiss;
+    }
+
     // ============ Tab系统：点击 / 方向键切换，同时维护 tablist · tab · tabpanel 语义 ============
     function dtpTabList(container, attr) {
         return Array.prototype.slice.call(container.querySelectorAll('[' + attr + ']'));
@@ -2933,7 +3014,7 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     getById('b64urlEnc').onclick = function() {
         var value = getById('b64urlInput').value;
         try { getById('b64urlOutput').value = value ? safeBtoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '') : ''; }
-        catch(e) { getById('b64urlOutput').value = ''; alert('Base64URL 编码失败：' + e.message); }
+        catch(e) { getById('b64urlOutput').value = ''; dtpToast('Base64URL 编码失败：' + e.message, 'error'); }
     };
     getById('b64urlDec').onclick = function() {
         var raw = getById('b64urlInput').value.trim();
@@ -2945,7 +3026,7 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
             var decoded = safeAtob(normalized);
             if (decoded === '' && normalized !== '') throw new Error('无法解码');
             getById('b64urlOutput').value = decoded;
-        } catch(e) { getById('b64urlOutput').value = ''; alert('Base64URL 解码失败：' + e.message); }
+        } catch(e) { getById('b64urlOutput').value = ''; dtpToast('Base64URL 解码失败：' + e.message, 'error'); }
     };
 
     getById('urlEnc').onclick = function() {
@@ -2954,7 +3035,7 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     getById('urlDec').onclick = function() {
         try {
             getById('urlOutput').value = decodeURIComponent(getById('urlInput').value.trim());
-        } catch(e) { getById('urlOutput').value = ''; alert('无效的URL编码'); }
+        } catch(e) { getById('urlOutput').value = ''; dtpToast('无效的 URL 编码：请检查 % 转义是否完整', 'error'); }
     };
     getById('htmlEntityEnc').onclick = function() {
         var v = getById('htmlEntityInput').value;
@@ -3005,10 +3086,10 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     };
     getById('hexDec').onclick = function() {
         var h = getById('hexInput').value.replace(/\s+/g, '');
-        if (!/^[0-9a-fA-F]+$/.test(h) || h.length % 2 !== 0) { getById('hexOutput').value = ''; alert('无效的十六进制字符串'); return; }
+        if (!/^[0-9a-fA-F]+$/.test(h) || h.length % 2 !== 0) { getById('hexOutput').value = ''; dtpToast('无效的十六进制字符串：只能包含 0-9 / a-f，且长度必须为偶数', 'error'); return; }
         var decoded = hexDecode(h);
         if (decoded) getById('hexOutput').value = decoded;
-        else alert('Hex解码失败');
+        else dtpToast('Hex 解码失败：字节序列不是合法文本', 'error');
     };
 
     // ============ 哈希功能 ============
@@ -3240,7 +3321,7 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
         return '-----BEGIN ' + type + '-----\n' + lines + '\n-----END ' + type + '-----';
     }
     getById('rsaGenKey').onclick = async function() {
-        if (!window.crypto || !window.crypto.subtle) { alert('当前环境不支持Web Crypto API'); return; }
+        if (!window.crypto || !window.crypto.subtle) { dtpToast('当前环境不支持 Web Crypto，请通过 HTTPS 或 localhost 打开', 'error'); return; }
         try {
             var keyPair = await crypto.subtle.generateKey(
                 { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([0x01,0x00,0x01]), hash: 'SHA-256' },
@@ -3250,10 +3331,10 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
             var privBuffer = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
             getById('rsaPublicKey').value = await arrayBufferToPem(pubBuffer, 'PUBLIC KEY');
             getById('rsaPrivateKey').value = await arrayBufferToPem(privBuffer, 'PRIVATE KEY');
-        } catch(e) { alert('生成密钥失败: ' + e.message); }
+        } catch(e) { dtpToast('生成密钥失败：' + e.message, 'error'); }
     };
     getById('rsaEnc').onclick = async function() {
-        if (!window.crypto || !window.crypto.subtle) { alert('当前环境不支持Web Crypto API'); return; }
+        if (!window.crypto || !window.crypto.subtle) { dtpToast('当前环境不支持 Web Crypto，请通过 HTTPS 或 localhost 打开', 'error'); return; }
         var pem = getById('rsaPublicKey').value.trim();
         var plain = getById('rsaInput').value;
         if (!pem) { getById('rsaOutput').value = ''; getById('rsaOutput').placeholder = '请填写 RSA 公钥'; return; }
@@ -3261,10 +3342,10 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
             var key = await crypto.subtle.importKey('spki', await pemToArrayBuffer(pem), {name:'RSA-OAEP', hash:'SHA-256'}, false, ['encrypt']);
             var enc = await crypto.subtle.encrypt({name:'RSA-OAEP'}, key, new TextEncoder().encode(plain));
             getById('rsaOutput').value = btoa(String.fromCharCode.apply(null, new Uint8Array(enc)));
-        } catch(e) { getById('rsaOutput').value = ''; alert('加密失败: ' + e.message); }
+        } catch(e) { getById('rsaOutput').value = ''; dtpToast('加密失败：' + e.message, 'error'); }
     };
     getById('rsaDec').onclick = async function() {
-        if (!window.crypto || !window.crypto.subtle) { alert('当前环境不支持Web Crypto API'); return; }
+        if (!window.crypto || !window.crypto.subtle) { dtpToast('当前环境不支持 Web Crypto，请通过 HTTPS 或 localhost 打开', 'error'); return; }
         var pem = getById('rsaPrivateKey').value.trim();
         var cipherB64 = getById('rsaInput').value.trim();
         if (!pem || !cipherB64) { getById('rsaOutput').value = ''; getById('rsaOutput').placeholder = '请填写 RSA 私钥和 Base64 密文'; return; }
@@ -3273,7 +3354,7 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
             var data = new Uint8Array(atob(cipherB64).split('').map(function(c){return c.charCodeAt(0);}));
             var dec = await crypto.subtle.decrypt({name:'RSA-OAEP'}, key, data);
             getById('rsaOutput').value = new TextDecoder().decode(dec);
-        } catch(e) { getById('rsaOutput').value = ''; alert('解密失败: ' + e.message); }
+        } catch(e) { getById('rsaOutput').value = ''; dtpToast('解密失败：' + e.message, 'error'); }
     };
 
     // ============ RSA 混合加密：RSA-OAEP 包装 AES-256 密钥，正文使用 AES-GCM ============
@@ -3291,7 +3372,7 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
             var plaintext=new TextEncoder().encode(getById('hybridInput').value);
             var ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv,additionalData:HYBRID_AAD,tagLength:128},aesKey,plaintext);
             out.value=JSON.stringify({format:HYBRID_FORMAT,wrappedKey:bytesToBase64(new Uint8Array(wrapped)),iv:bytesToBase64(iv),ciphertext:bytesToBase64(new Uint8Array(ciphertext))},null,2);
-        }catch(e){out.value='';alert('混合加密失败：'+e.message);}
+        }catch(e){out.value='';dtpToast('混合加密失败：' + e.message, 'error');}
     };
     getById('hybridDecrypt').onclick = async function() {
         var out=getById('hybridOutput'); out.value='';
@@ -3306,7 +3387,7 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
             var aesKey=await crypto.subtle.importKey('raw',rawKey,{name:'AES-GCM'},false,['decrypt']);
             var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:base64ToBytes(obj.iv),additionalData:HYBRID_AAD,tagLength:128},aesKey,base64ToBytes(obj.ciphertext));
             out.value=new TextDecoder('utf-8',{fatal:true}).decode(plain);
-        }catch(e){out.value='';alert('混合解密失败：密码学认证、密钥或密文格式检查未通过。'+(e.message?'\n'+e.message:''));}
+        }catch(e){out.value='';dtpToast('混合解密失败：密码学认证、密钥或密文格式检查未通过。'+(e.message?'\n'+e.message:''), 'error');}
     };
 
     // ============ 文件 AES-GCM：单文件加密，带格式头和认证数据 ============
@@ -3983,8 +4064,8 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     getById('csvToJson').onclick=function(){var out=getById('csvJsonOutput');try{var input=getById('csvJsonInput').value;if(!input.trim())throw new Error('请输入 CSV');var rows=parseCsv(input,getById('csvDelimiter').value);if(!rows.length)throw new Error('没有可转换的数据');var withHeader=getById('csvHasHeader').value==='yes';var headers,body;
         if(withHeader){headers=rows.shift().map(function(h){return h.trim();});if(new Set(headers).size!==headers.length)throw new Error('CSV 字段名重复，请先处理重复列名');body=rows.map(function(r){var obj={};headers.forEach(function(h,i){obj[h]=r[i]===undefined?'':r[i];});if(r.length>headers.length)obj._extra=r.slice(headers.length);return obj;});}
         else{var width=Math.max.apply(null,rows.map(function(r){return r.length;}));headers=Array.from({length:width},function(_,i){return 'column'+(i+1);});body=rows.map(function(r){var obj={};headers.forEach(function(h,i){obj[h]=r[i]===undefined?'':r[i];});return obj;});}out.value=JSON.stringify(body,null,2);
-        }catch(e){out.value='';alert('CSV → JSON 失败：'+e.message);}};
-    getById('jsonToCsv').onclick=function(){var out=getById('csvJsonOutput');try{var arr=JSON.parse(getById('csvJsonInput').value);if(!Array.isArray(arr)||!arr.every(function(v){return v&&typeof v==='object'&&!Array.isArray(v);}))throw new Error('请输入由对象组成的 JSON 数组');var delimiter=getById('csvDelimiter').value;var keys=[];arr.forEach(function(obj){Object.keys(obj).forEach(function(k){if(!keys.includes(k))keys.push(k);});});if(!keys.length)throw new Error('对象没有字段');var rows=[keys.map(function(k){return csvField(k,delimiter);}).join(delimiter)];arr.forEach(function(obj){rows.push(keys.map(function(k){return csvField(obj[k],delimiter);}).join(delimiter));});out.value=rows.join('\r\n');}catch(e){out.value='';alert('JSON → CSV 失败：'+e.message);}};
+        }catch(e){out.value='';dtpToast('CSV → JSON 失败：' + e.message, 'error');}};
+    getById('jsonToCsv').onclick=function(){var out=getById('csvJsonOutput');try{var arr=JSON.parse(getById('csvJsonInput').value);if(!Array.isArray(arr)||!arr.every(function(v){return v&&typeof v==='object'&&!Array.isArray(v);}))throw new Error('请输入由对象组成的 JSON 数组');var delimiter=getById('csvDelimiter').value;var keys=[];arr.forEach(function(obj){Object.keys(obj).forEach(function(k){if(!keys.includes(k))keys.push(k);});});if(!keys.length)throw new Error('对象没有字段');var rows=[keys.map(function(k){return csvField(k,delimiter);}).join(delimiter)];arr.forEach(function(obj){rows.push(keys.map(function(k){return csvField(obj[k],delimiter);}).join(delimiter));});out.value=rows.join('\r\n');}catch(e){out.value='';dtpToast('JSON → CSV 失败：' + e.message, 'error');}};
 
     // ============ 文本批处理 ============
     function transformTextLines(fn){var text=getById('textToolsInput').value;getById('textToolsOutput').value=fn(text.split(/\r?\n/),text);}
@@ -5855,28 +5936,51 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     };
     /* 生成随机整数 / 安全令牌工具里有现成的随机源，这里只需复用 Web Crypto。 */
 
-    // ============ 主题切换：与站内其他页面共用 cipher_theme_v2 ============
+    // ============ 主题切换：light / dark / auto（跟随系统），共用 cipher_theme_v2 ============
     var DTP_THEME_KEY = 'cipher_theme_v2';
+    /* 三态：light、dark 为显式选择，auto 跟随系统。站内其他页面只认 light / dark，
+       读到 auto 时会回退到 prefers-color-scheme，语义一致，不会互相干扰。 */
+    var dtpThemeMode = 'auto';
+    var dtpSystemDarkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    function dtpResolveTheme(mode) {
+        if (mode === 'auto') return dtpSystemDarkQuery && dtpSystemDarkQuery.matches ? 'dark' : 'light';
+        return mode === 'dark' ? 'dark' : 'light';
+    }
     function dtpRepaintThemeAware() {
         try { if (document.getElementById('panel-workbench') && document.getElementById('panel-workbench').classList.contains('active')) drawChart(); } catch (e) { /* 图表未初始化时忽略 */ }
     }
-    function dtpApplyTheme(theme, persist) {
-        var normalized = theme === 'dark' ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', normalized);
-        var isDark = normalized === 'dark', btn = getById('themeToggle');
+    function dtpApplyTheme(mode, persist) {
+        var normalizedMode = (mode === 'dark' || mode === 'light') ? mode : 'auto';
+        var resolved = dtpResolveTheme(normalizedMode);
+        document.documentElement.setAttribute('data-theme', resolved);
+        dtpThemeMode = normalizedMode;
+        var btn = getById('themeToggle');
         if (btn) {
-            btn.textContent = isDark ? '☀ 浅色模式' : '🌙 深色模式';
-            btn.setAttribute('aria-pressed', String(isDark));
-            btn.setAttribute('aria-label', isDark ? '切换到浅色模式' : '切换到深色模式');
+            /* 三态下标签统一表示「当前状态」而非「点击后的目标」，避免出现
+               “深色模式”既可能指当前是深色、也可能指点了会变深的歧义。 */
+            var label = normalizedMode === 'auto'
+                ? (resolved === 'dark' ? '🖥 跟随系统 · 深色' : '🖥 跟随系统 · 浅色')
+                : (resolved === 'dark' ? '🌙 深色模式' : '☀ 浅色模式');
+            var modeName = normalizedMode === 'auto' ? '跟随系统' : (resolved === 'dark' ? '深色' : '浅色');
+            btn.textContent = label;
+            btn.setAttribute('aria-pressed', String(resolved === 'dark'));
+            btn.title = '当前：' + modeName + '，点击切换（浅色 → 深色 → 跟随系统）';
+            btn.setAttribute('aria-label', '主题：' + modeName + '，点击切换');
         }
-        /* 用户未显式选择过时，只跟随系统的深浅偏好显示，不写入存储，避免影响站内其他页面。 */
-        if (persist !== false) { try { localStorage.setItem(DTP_THEME_KEY, normalized); } catch (e) { /* 存储不可用时仅本次生效 */ } }
+        /* 只有显式选择才写存储；auto 也写入，便于下次打开保持“跟随系统”。 */
+        if (persist !== false) { try { localStorage.setItem(DTP_THEME_KEY, normalizedMode); } catch (e) { /* 存储不可用时仅本次生效 */ } }
         dtpRepaintThemeAware();
     }
     getById('themeToggle').addEventListener('click', function () {
-        var cur = document.documentElement.getAttribute('data-theme') || 'light';
-        dtpApplyTheme(cur === 'dark' ? 'light' : 'dark');
+        var next = dtpThemeMode === 'light' ? 'dark' : (dtpThemeMode === 'dark' ? 'auto' : 'light');
+        dtpApplyTheme(next);
     });
+    /* 跟随系统时，系统切换深浅要立即生效（不写存储）。 */
+    if (dtpSystemDarkQuery) {
+        var dtpOnSystemThemeChange = function () { if (dtpThemeMode === 'auto') dtpApplyTheme('auto', false); };
+        if (dtpSystemDarkQuery.addEventListener) dtpSystemDarkQuery.addEventListener('change', dtpOnSystemThemeChange);
+        else if (dtpSystemDarkQuery.addListener) dtpSystemDarkQuery.addListener(dtpOnSystemThemeChange);
+    }
 
     // ============ 移动端导航：小屏用下拉选择替代横向滚动的标签条 ============
     var dtpMobileSelect = getById('mobilePrimarySelect');
@@ -6088,7 +6192,8 @@ var DTP_EAN_PARITY = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG"
     try {
         var dtpStoredTheme = null;
         try { dtpStoredTheme = localStorage.getItem(DTP_THEME_KEY); } catch (e) {}
-        dtpApplyTheme(document.documentElement.getAttribute('data-theme') || 'light', dtpStoredTheme === 'dark' || dtpStoredTheme === 'light');
+        /* 有存储按三种状态之一还原；没有存储默认“跟随系统”，且不主动写存储。 */
+        dtpApplyTheme(dtpStoredTheme === 'light' || dtpStoredTheme === 'dark' ? dtpStoredTheme : 'auto', false);
         dtpLastToolKey = getCurrentToolKey();
         var dtpRestored = dtpDraftRestore(dtpLastToolKey);
         if (dtpRestored) setToolText('draftStatus', '已恢复该工具上次的输入（' + dtpRestored + ' 个字段）');
